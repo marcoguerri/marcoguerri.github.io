@@ -23,7 +23,8 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 16px; }
 
 h1 { margin-bottom: 1em; }
-p { margin: 1em 0; }
+p { margin: 1em 0;
+    font-size: 16px; }
 
 a         { color: #00a; }
 a:hover   { color: #000; }
@@ -133,6 +134,7 @@ ul.posts span {
 .post {
   font-size: 16px;
 }
+
 /* standard */
 .post pre {
   border: 1px solid #ddd;
