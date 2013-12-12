@@ -123,19 +123,20 @@ livecd ~ # mount /dev/sda1 /mnt/gentoo/boot
 livecd ~ # swapon /dev/mapper/vg-swap 
 livecd ~ # mount /dev/mapper/vg-root /mnt/gentoo/
 {% endhighlight %}
-After the precompiled filesystem has been downloaded, and the chrooted environment
+After the precompiled filesystem has been downloaded and the chrooted environment
 has been set, it is time to compile the kernel for the new system. The configuration
 procedure is highly hardware dependend. Make sure to activate all the necessary 
-modules to support the underlying hardware. A while ago, while a was working on
+modules to support the underlying hardware. A while ago, while I was working on
 a physical machine, I remember having problems with the SATA controller which was
 supported by sata\_nv module (CONFIG\_SATA\_NV). Now, considering that I am working
 on a virtual machine, the i386\_defconfig lacked these options:
-* CONFIG\_FUSION\_SPI for LSI SCSI controller (which is the one emulated by VMPlayer)
-* CONFIG\_CRYPTO\_SHA256 to support SHA256 algorithm in kernel space
-* CONFIG\_DM\_CRYPT to support dm\_cyrpt framework
-* CONFIG\_PCNET32 for network support (this is not strictly necessary to
+
+* **CONFIG\_FUSION\_SPI** for LSI SCSI controller (which is the one emulated by VMPlayer)
+* **CONFIG\_CRYPTO\_SHA256** to support SHA256 algorithm in kernel space
+* **CONFIG\_DM\_CRYPT** to support dm\_cyrpt framework
+* **CONFIG\_PCNET32** for network support (this is not strictly necessary to
 set up the environtment)
- 
+
 
 
 
