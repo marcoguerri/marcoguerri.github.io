@@ -11,7 +11,8 @@ to understand what happens under the hoods when you click the checkbox in the bo
 of a common disk partitioning menu during Linux installation.
 
 <div align="center">
-<a id="single_image" href="/assets/img/gentoo-enc/encrypt.png"><img src="/assets/img/gentoo-enc/encrypt.thumb.png" alt=""/></a>
+<a id="single_image" href="/assets/img/gentoo-enc/encrypt.png">
+<img src="/assets/img/gentoo-enc/encrypt.thumb.png" alt=""/></a>
 </div>
 The procedure is more or less the same as the
 one outlined in the [Gentoo Linux x86 Handbook](#gentoo_handbook). However, when it comes to
@@ -19,7 +20,7 @@ paritioning the drive, compiling the Kernel and setting the initial ramdisk,
 several different steps must be carried out. 
 
 I followed the whole process in a Virtual Machine, using VMWare Player as hypervisor.
-The image used in these notes is weekly build install-x86-minimal-20130820 
+The Gentoo live image used in these notes is the weekly build install-x86-minimal-20130820 
 (sha256sum d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2).
 Working "remotely" through ssh is much more convenient. You need to generate ssh
 keys, set a root password and start sshd daemon. The commands below generate
@@ -127,15 +128,15 @@ livecd ~ # mount /dev/mapper/vg-root /mnt/gentoo/
 {% endhighlight %}
 After the precompiled filesystem has been downloaded and the chrooted environment
 has been set, it is time to compile the kernel for the new system.  Kernel
-source code can be retrieved with 
+source code can be retrieved through Portage, gentoo package manager.
 
 {% highlight bash %}
 livecd ~ # emerge gentoo-sources
 {% highlight bash%}
-The version installed is *linux-3.10.7-gentoo-r1*. The configuration procedure 
-is highly hardware dependend. Make sure to activate all the necessary 
-modules to support the underlying hardware. A while ago, while I was working on
-a physical machine, I remember having problems with the SATA controller which was
+The kernel sources version installed is *linux-3.10.7-gentoo-r1*. 
+The configuration procedure is highly hardware dependend. Make sure to activate 
+all the necessary modules to support the underlying hardware. A while ago, while 
+I was working on a physical machine, I remember having problems with the SATA controller which was
 supported by sata\_nv module (CONFIG\_SATA\_NV). Now, considering that I am working
 on a virtual machine, the i386\_defconfig lacked these options:
 
