@@ -19,6 +19,8 @@ paritioning the drive, compiling the Kernel and setting the initial ramdisk,
 several different steps must be carried out. 
 
 I followed the whole process in a Virtual Machine, using VMWare Player as hypervisor.
+The image used in these notes is weekly build install-x86-minimal-20130820 
+(sha256sum d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2).
 Working "remotely" through ssh is much more convenient. You need to generate ssh
 keys, set a root password and start sshd daemon. The commands below generate
 a new set of RSA/DSA keys.
@@ -124,8 +126,14 @@ livecd ~ # swapon /dev/mapper/vg-swap
 livecd ~ # mount /dev/mapper/vg-root /mnt/gentoo/
 {% endhighlight %}
 After the precompiled filesystem has been downloaded and the chrooted environment
-has been set, it is time to compile the kernel for the new system. The configuration
-procedure is highly hardware dependend. Make sure to activate all the necessary 
+has been set, it is time to compile the kernel for the new system.  Kernel
+source code can be retrieved with 
+
+{% highlight bash %}
+livecd ~ # emerge gentoo-sources
+{% highlight bash%}
+The version installed is *linux-3.10.7-gentoo-r1*. The configuration procedure 
+is highly hardware dependend. Make sure to activate all the necessary 
 modules to support the underlying hardware. A while ago, while I was working on
 a physical machine, I remember having problems with the SATA controller which was
 supported by sata\_nv module (CONFIG\_SATA\_NV). Now, considering that I am working
