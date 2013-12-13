@@ -132,7 +132,7 @@ source code can be retrieved through Portage, gentoo package manager.
 
 {% highlight bash %}
 livecd ~ # emerge gentoo-sources
-{% highlight bash%}
+{% endhighlight %}
 The kernel sources version installed is *linux-3.10.7-gentoo-r1*. 
 The configuration procedure is highly hardware dependend. Make sure to activate 
 all the necessary modules to support the underlying hardware. A while ago, while 
@@ -145,10 +145,6 @@ on a virtual machine, the i386\_defconfig lacked these options:
 * **CONFIG\_DM\_CRYPT** to support dm\_cyrpt framework
 * **CONFIG\_PCNET32** for network support (this is not strictly necessary to
 set up the environtment)
-
-
-
-
 
 
 
