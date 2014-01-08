@@ -4,24 +4,28 @@ title:  "Gentoo full disk encryption with dm-crypt"
 date:   2013-10-07 13:31:48
 categories: jekyll update
 ---
+
+
 These notes describe the process of installing a Gentoo Linux distribution with
-encrypted root and swap partitions using LUKS and dm_crypt. Everything will
+encrypted root and swap partitions using LUKS and dm\_crypt. Everything will
 be done manually (Kernel compilation, creation of the initrd): the aim is therefore
 to understand what happens under the hoods when you click the checkbox in the bottom
 of a common disk partitioning menu during Linux installation.
 
 <div align="center">
 <a id="single_image" href="/assets/img/gentoo-enc/encrypt.png">
-<img src="/assets/img/gentoo-enc/encrypt.thumb.png" alt=""/></a>
+<img src="/assets/img/gentoo-enc/encrypt.thumb.png" alt=""/>
+</a>
 </div>
 The procedure is more or less the same as the
 one outlined in the [Gentoo Linux x86 Handbook](#gentoo_handbook). However, when it comes to
 paritioning the drive, compiling the Kernel and setting the initial ramdisk,
-several different steps must be carried out. 
+several different steps must be carried out.
 
 I followed the whole process in a Virtual Machine, using VMWare Player as hypervisor.
-The Gentoo live image used in these notes is the weekly build install-x86-minimal-20130820 
-(sha256sum d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2).
+The Gentoo live image used in these notes is the weekly build 
+[install-x86-minimal-20130820](#sha512).
+
 Working "remotely" through ssh is much more convenient. You need to generate ssh
 keys, set a root password and start sshd daemon. The commands below generate
 a new set of RSA/DSA keys.
@@ -34,8 +38,8 @@ livecd ~ # ssh-keygen -t dsa -C "gentoo-setup"
 [...]
 Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_key
 [...]
-
 {% endhighlight %}
+
 The Gentoo Linux x86 Handbook can be followed up to step 4, which deals with hard
 disk configuration. In this notes I will use /dev/sda both for boot and root
 partitions.
@@ -127,18 +131,19 @@ livecd ~ # swapon /dev/mapper/vg-swap
 livecd ~ # mount /dev/mapper/vg-root /mnt/gentoo/
 {% endhighlight %}
 After the precompiled filesystem has been downloaded and the chrooted environment
-has been set, it is time to compile the kernel for the new system.  Kernel
-source code can be retrieved through Portage, gentoo package manager.
+has been set, it is time to compile the kernel for the new system. Kernel
+source code can be retrieved through Portage, Gentoo package manager.
 
 {% highlight bash %}
 livecd ~ # emerge gentoo-sources
 {% endhighlight %}
-The kernel sources version installed is *linux-3.10.7-gentoo-r1*. 
+The version of kernel sources installed is *linux-3.10.7-gentoo-r1*. 
 The configuration procedure is highly hardware dependend. Make sure to activate 
-all the necessary modules to support the underlying hardware. A while ago, while 
-I was working on a physical machine, I remember having problems with the SATA controller which was
-supported by sata\_nv module (CONFIG\_SATA\_NV). Now, considering that I am working
-on a virtual machine, the i386\_defconfig lacked these options:
+all the necessary modules to support the underlying hardware. For instance, 
+a while ago while I was working on a physical machine, I remember having problems 
+with the SATA controller which was supported by sata\_nv module (CONFIG\_SATA\_NV). 
+Now, considering that I am working on a virtual machine, the i386\_defconfig 
+lacked these options:
 
 * **CONFIG\_FUSION\_SPI** for LSI SCSI controller (which is the one emulated by VMPlayer)
 * **CONFIG\_CRYPTO\_SHA256** to support SHA256 algorithm in kernel space
@@ -146,17 +151,81 @@ on a virtual machine, the i386\_defconfig lacked these options:
 * **CONFIG\_PCNET32** for network support (this is not strictly necessary to
 set up the environtment)
 
+Once the kernel is properly configure it can be compiled together with the 
+modules. 
 
+{% highlight bash %}
+make -j4 i386_defconfig
+make modules
+make modules_install
+{% endhighlight %}
 
+After having compiled the kernel, Gentoo Handbook can be resumed from Chapter 8.
+In section 8.a, the fstab file is set up. Since we are using logical volumes,
+the procedure is slightly different from the one outlined in the guide. My
+fstab looks like the following:
 
+{% highlight bash %}
+/dev/sda1               /boot       ext4    noauto,noatime  1 2
+/dev/mapper/vg-root     /           ext4    noatime         0 1
+/dev/mapper/vg-swap     none        swap    sw              0 0
+/dev/cdrom              /mnt/cdrom  auto    noauto,ro       0 0
+/dev/fd0                /mnt/floppy auto    noauto          0 0
+/proc                   /proc       proc    default
+{% endhighlight %}
+
+Chapter 10 of the Gentoo Handbook deals with the installation of the bootloader.
+Here I will use grub legacy (i.e. v1), since I am quite familiar with it and it
+will help speed up the process. Inside the chrooted environment proceed as follows:
+
+{% highlight bash %}
+
+export DONT_MOUNT_BOOT=1
+emerge --config =grub-0.97-r12
+ * Enter the directory where you want to setup grub: 
+/boot
+ * Linking from new grub.conf name to menu.lst
+ * Copying files from /lib/grub and /usr/share/grub to /boot/grub
+Probing devices to guess BIOS drives. This may take a long time.
+ * Grub has been installed to /boot successfully.
+{% endhighlight %}
+
+DONT\_MOUNT\_BOOT variable will prevent grub from trying to mount to boot partition
+and consequently failing, since it is already mounted. When prompted for the 
+installation directory, just type /boot.
+
+It is now time to actually install grub in the MBR for /dev/sda. Open grub
+command line simply typing grub and follow the example below:
+
+{% highlight bash %}
+grub> root (hd0,0)
+    Filesystem type is ext2fs, partition type 0x83
+
+grub> setup (hd0)
+    Checking if "/boot/grub/stage1" exists... yes
+    Checking if "/boot/grub/stage2" exists... yes
+    Checking if "/boot/grub/e2fs_stage1_5" exists... yes
+    Running "embed /boot/grub/e2fs_stage1_5 (hd0)"...  22 sectors are embedded.
+succeeded
+     Running "install /boot/grub/stage1 (hd0) (hd0)1+22 p (hd0,0)/boot/grub/stage2 
+/boot/grub/menu.lst" succeeded
+Done.
+
+grub>
+
+{% endhighlight %}
 
 
 
 
 References:<br>
-<a name=gentoo_handbook> 
+<a name="gentoo_handbook">
 [1] [Gentoo Linux x86 Handbook](http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1)
-
+</a>
+<br>
+<a name="sha512">
+[2] sha512: d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2
+</a>
 [jekyll-gh]: https://github.com/mojombo/jekyll
 [jekyll]:    http://jekyllrb.com
 
