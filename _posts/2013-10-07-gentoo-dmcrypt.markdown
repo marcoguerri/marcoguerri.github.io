@@ -160,9 +160,7 @@ make modules
 make modules_install
 {% endhighlight %}
 
-After having compiled the kernel, Gentoo Handbook can be resumed from Chapter 8.
-In section 8.a, the fstab file is set up. Since we are using logical volumes,
-the procedure is slightly different from the one outlined in the guide. My
+After having compiled the kernel and copied bzImage into /mnt/gentoo/boot, Gentoo Handbook can be resumed from Chapter 8. In section 8.a, the fstab file is set up. Since we are using logical volumes, the procedure is slightly different from the one outlined in the guide. My
 fstab looks like the following:
 
 {% highlight bash %}
@@ -215,7 +213,139 @@ grub>
 
 {% endhighlight %}
 
+An alternative to install grub is to simply use grub-install in the following way:
 
+{% highlight bash %}
+grub-install /dev/sda
+{% endhighlight %}
+This will only work as long as df output is not broken. If /etc/mtab is empty, then an error is
+raised (df: cannot read table of mounted file systems). A quick workaround is to manually add 
+the entry for the boot parition, which is enough to make grub-install work:
+
+{% highlight bash %}
+/dev/sda1 /boot ext4 rw,relatime,data=ordered 0 0"
+{% endhighlight %}
+
+It is now time to create the initial ramdisk which will be responsible for mounting the encrypted device. Therefore, it will need the basic cryptsetup tools and all the relative dependencies. For instance the dependencies of cryptsetup are listed below:
+
+{% highlight bash %}
+livecd boot # ldd /sbin/cryptsetup 
+  linux-gate.so.1 (0xb7777000)
+  libcryptsetup.so.4 => /usr/lib/libcryptsetup.so.4 (0xb7750000)
+  libpopt.so.0 => /usr/lib/libpopt.so.0 (0xb7742000)
+  libc.so.6 => /lib/libc.so.6 (0xb75c2000)
+  libuuid.so.1 => /lib/libuuid.so.1 (0xb75bc000)
+  libdevmapper.so.1.02 => /lib/libdevmapper.so.1.02 (0xb7579000)
+  libgcrypt.so.11 => /usr/lib/libgcrypt.so.11 (0xb74e8000)
+  /lib/ld-linux.so.2 (0xb7778000)
+  libudev.so.1 => /lib/libudev.so.1 (0xb74d4000)
+  libgpg-error.so.0 => /usr/lib/libgpg-error.so.0 (0xb74cf000)
+  librt.so.1 => /lib/librt.so.1 (0xb74c5000)
+  libpthread.so.0 => /lib/libpthread.so.0 (0xb74a9000)
+
+{% endhighlight %}
+
+After leaving the chrooted environment, the following script can be used the setup the initrd
+
+{% highlight bash %}
+
+
+
+ROOT="/mnt/gentoo"
+mkdir -p $ROOT/boot/initram
+cd $ROOT/boot/initram
+mkdir bin lib dev dev/mapper dev/vc etc newroot proc sys
+ 
+cp /bin/busybox /sbin/cryptsetup /sbin/mdadm bin
+ln -s /bin/busybox bin/cat 
+ln -s /bin/busybox bin/mount 
+ln -s /bin/busybox bin/sh
+ln -s /bin/busybox bin/switch_root
+ln -s /bin/busybox bin/umount
+ln -s /bin/busybox bin/sleep
+
+cp -a /sbin/vgchange bin
+cp -a /sbin/vgscan bin
+cp -a /sbin/lvm bin
+ 
+cp -a /dev/console /dev/sda2 /dev/null /dev/urandom dev
+
+# Random device to avoid 
+# "Cannot initialize crypt RNG backend" error
+
+mknod -m 644 dev/random c 1 8
+
+# Libraries for cryptsetup
+cp -a /lib/ld-linux.so.2 lib
+cp -a /lib/ld-2.15.so lib
+cp -a /usr/lib/libcryptsetup.so.4 lib
+cp -a /usr/lib/libcryptsetup.so.4.2.0 lib
+cp -a /usr/lib/libpopt.so.0 lib
+cp -a /usr/lib/libpopt.so.0.0.0 lib
+cp -a /lib/libc.so.6 lib
+cp -a /lib/libc-2.15.so lib
+cp -a /lib/libuuid.so.1 lib
+cp -a /lib/libuuid.so.1.3.0 lib
+cp -a /lib/libdevmapper.so.1.02 lib
+cp -a /usr/lib/libgcrypt.so.11 lib
+cp -a /usr/lib/libgcrypt.so.11.8.2 lib
+cp -a /lib/libudev.so.1 lib
+cp -a /lib/libudev.so.1.3.5 lib
+cp -a /usr/lib/libgpg-error.so.0 lib
+cp -a /usr/lib/libgpg-error.so.0.8.0 lib
+cp -a /lib/librt.so.1 lib
+cp -a /lib/librt-2.15.so lib
+cp -a /lib/libpthread.so.0 lib
+cp -a /lib/libpthread-2.15.so lib
+
+# Libraries for vgscan/vgchange
+cp -a /lib/libdl.so.2 lib
+cp -a /lib/libdl-2.15.so lib
+cp -a /lib/libdevmapper-event.so.1.02 lib
+cp -a /lib/libreadline.so.6 lib
+cp -a /lib/libreadline.so.6.2 lib
+cp -a /lib/libncurses.so.5 lib
+cp -a /lib/libncurses.so.5.9 lib
+
+
+cat > init << EOF_init
+#!/bin/sh
+echo "###########################################"
+echo "Initrd initialization"
+echo "###########################################"
+mount -t proc proc /proc
+CMDLINE="`cat /proc/cmdline`"
+mount -t sysfs sysfs /sys
+sleep 3
+/bin/cryptsetup luksOpen /dev/sda2 vault
+/bin/vgchange -ay vg
+mount -r /dev/mapper/vg-root /newroot
+umount /sys
+umount /proc
+exec switch_root /newroot /sbin/init ${CMDLINE}
+EOF_init
+
+chmod a+x init
+
+{% endhighlight %}
+
+The actual initrd image can be created with the following commands:
+
+{% highlight bash %}
+cd /mnt/gentoo/boot/initram
+find . | cpio --quiet -o -H newc | gzip -9 > /mnt/gentoo/boot/initramfs
+{% endhighlight %}
+
+Actually, I am not 100% sure that cpio is part of the minimal gentoo image. It should be in the stage3 image just installed, so it might be necessary to specify the absolute path with respect to /mnt/gentoo. Once created the initrd, grub.conf must be set up to point to the correct binaries. Mine looks like this:
+
+{% highlight bash %}
+title Gentoo
+root (hd0,0)
+kernel /bzImage vga=791 (to change the default resolution of /dev/console)
+initrd /initramfs
+{% endhighlight %}
+
+Everything should be ready now. umount /mnt/gentoo/boot, /mnt/gentoo/proc and /mnt/gentoo, reboot and hopefully you will be promped for the password of the encrypted volume.
 
 
 References:<br>
