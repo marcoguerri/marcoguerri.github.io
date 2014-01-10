@@ -8,71 +8,72 @@ categories: jekyll update
 
 These notes describe the process of installing a Gentoo Linux distribution with
 encrypted root and swap partitions using LUKS and dm\_crypt. Everything will
-be done manually (Kernel compilation, creation of the initrd): the aim is therefore
-to understand what happens under the hoods when you click the checkbox in the bottom
-of a common disk partitioning menu during Linux installation.
+be done manually (kernel compilation, creation of the initrd): the aim is 
+therefore to show what happens under the hoods when you click on the checkbox 
+in the bottom of a common disk partitioning menu during Linux installation.
 
+{% comment %}
 <div align="center">
 <a id="single_image" href="/assets/img/gentoo-enc/encrypt.png">
 <img src="/assets/img/gentoo-enc/encrypt.thumb.png" alt=""/>
 </a>
 </div>
+{% endcomment %}
+
 The procedure is more or less the same as the
 one outlined in the [Gentoo Linux x86 Handbook](#gentoo_handbook). However, when it comes to
 paritioning the drive, compiling the Kernel and setting the initial ramdisk,
 several different steps must be carried out.
 
-I followed the whole process in a Virtual Machine, using VMWare Player as hypervisor.
-The Gentoo live image used in these notes is the weekly build 
+I went through the whole process inside a Virtual Machine, using VMWare Player 
+as hypervisor. The Gentoo live image I have used is the weekly build 
 [install-x86-minimal-20130820](#sha512).
 
 Working "remotely" through ssh is much more convenient. You need to generate ssh
 keys, set a root password and start sshd daemon. The commands below generate
 a new set of RSA/DSA keys.
-{% highlight bash %}
-livecd ~ # ssh-keygen -t rsa -C "gentoo-setup"
-[...]
-Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_rsa_key
-[...]
-livecd ~ # ssh-keygen -t dsa -C "gentoo-setup"
-[...]
-Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_key
-[...]
-{% endhighlight %}
+
+    livecd ~ # ssh-keygen -t rsa -C "gentoo-setup"
+    [...]
+    Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_rsa_key
+    [...]
+    livecd ~ # ssh-keygen -t dsa -C "gentoo-setup"
+    [...]
+    Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_key
+    [...]
 
 The Gentoo Linux x86 Handbook can be followed up to step 4, which deals with hard
-disk configuration. In this notes I will use /dev/sda both for boot and root
-partitions.
+disk configuration. I will be using /dev/sda both for boot and root partitions.
 
 First step: creating a plain primary boot partition with fdisk, /dev/sda1, and
 formatting it with  a Unix-like filesystem. In this case I have chosen ext4. 
 As far as the size is concerned, 256M are enough. To create the FS, mkfs.ext4 can be used.
-{% highlight bash %}
-mkfs.ext4 /dev/sda1
-{% endhighlight %}
+
+    mkfs.ext4 /dev/sda1
+
 The second partition, which will be used to map two logical encrypted volumes
 for root and swap, can take up all the space left on the device. After the
 creation of the partitions, /dev/sda2 must be format to be a LUKS compliant
 partition:
-{% highlight bash %}
-livecd ~ # cryptsetup --verify-passphrase luksFormat /dev/sda2
-[...]
-WARNING!
-========
-This will overwrite data on /dev/sda2 irrevocably.
+    
+    livecd ~ # cryptsetup --verify-passphrase luksFormat /dev/sda2
+    [...]
+    WARNING!
+    ========
+    This will overwrite data on /dev/sda2 irrevocably.
 
-Are you sure? (Type uppercase yes): YES
-Enter LUKS passphrase: 
-Verify passphrase: 
-{% endhighlight %}
+    Are you sure? (Type uppercase yes): YES
+    Enter LUKS passphrase: 
+    Verify passphrase: 
+
 Now two logical volumes inside the encrypted partition must be set, one for root
 and one for swap. To create logical volumes, the LVM framework will be used. 
 First of all the encrypted partition must be opened and a mapping with a plain
 device must be set up. This can be setup with the following command. 
-{% highlight bash %}
-livecd ~ # cryptsetup luksOpen /dev/sda2 vault
-Enter passphrase for /dev/sda2:
-{% endhighlight %}
+
+    livecd ~ # cryptsetup luksOpen /dev/sda2 vault
+    Enter passphrase for /dev/sda2:
+
 At this point, the device mapper has created a /dev/mapper/vault device which is
 the plain version of the encrypted disk. Now it is time to create logical
 volumes for root and swap inside the encrypted partition. The LVM framework will
@@ -226,7 +227,10 @@ the entry for the boot parition, which is enough to make grub-install work:
 /dev/sda1 /boot ext4 rw,relatime,data=ordered 0 0"
 {% endhighlight %}
 
-It is now time to create the initial ramdisk which will be responsible for mounting the encrypted device. Therefore, it will need the basic cryptsetup tools and all the relative dependencies. For instance the dependencies of cryptsetup are listed below:
+It is now time to create the initial ramdisk which will be responsible for 
+mounting the encrypted device. Therefore, it will need the basic cryptsetup 
+tools and all the relative dependencies. For instance, the dependencies of 
+cryptsetup are listed below.
 
 {% highlight bash %}
 livecd boot # ldd /sbin/cryptsetup 
@@ -245,17 +249,15 @@ livecd boot # ldd /sbin/cryptsetup
 
 {% endhighlight %}
 
-After leaving the chrooted environment, the following script can be used the setup the initrd
+After leaving the chrooted environment, the following script can be used to 
+setup the initrd.
 
 {% highlight bash %}
-
-
-
 ROOT="/mnt/gentoo"
 mkdir -p $ROOT/boot/initram
 cd $ROOT/boot/initram
 mkdir bin lib dev dev/mapper dev/vc etc newroot proc sys
- 
+
 cp /bin/busybox /sbin/cryptsetup /sbin/mdadm bin
 ln -s /bin/busybox bin/cat 
 ln -s /bin/busybox bin/mount 
@@ -267,12 +269,11 @@ ln -s /bin/busybox bin/sleep
 cp -a /sbin/vgchange bin
 cp -a /sbin/vgscan bin
 cp -a /sbin/lvm bin
- 
+
 cp -a /dev/console /dev/sda2 /dev/null /dev/urandom dev
 
 # Random device to avoid 
 # "Cannot initialize crypt RNG backend" error
-
 mknod -m 644 dev/random c 1 8
 
 # Libraries for cryptsetup
@@ -307,7 +308,6 @@ cp -a /lib/libreadline.so.6.2 lib
 cp -a /lib/libncurses.so.5 lib
 cp -a /lib/libncurses.so.5.9 lib
 
-
 cat > init << EOF_init
 #!/bin/sh
 echo "###########################################"
@@ -336,7 +336,10 @@ cd /mnt/gentoo/boot/initram
 find . | cpio --quiet -o -H newc | gzip -9 > /mnt/gentoo/boot/initramfs
 {% endhighlight %}
 
-Actually, I am not 100% sure that cpio is part of the minimal gentoo image. It should be in the stage3 image just installed, so it might be necessary to specify the absolute path with respect to /mnt/gentoo. Once created the initrd, grub.conf must be set up to point to the correct binaries. Mine looks like this:
+Actually, I am not completely sure that cpio is part of the minimal gentoo image. 
+It should be in the stage3 image just installed, so it might be necessary to 
+specify the absolute path with respect to /mnt/gentoo. Once created the initrd, 
+grub.conf must be set up to point to the correct binaries. Mine looks like this:
 
 {% highlight bash %}
 title Gentoo
@@ -345,7 +348,9 @@ kernel /bzImage vga=791 (to change the default resolution of /dev/console)
 initrd /initramfs
 {% endhighlight %}
 
-Everything should be ready now. umount /mnt/gentoo/boot, /mnt/gentoo/proc and /mnt/gentoo, reboot and hopefully you will be promped for the password of the encrypted volume.
+Everything should be ready now. umount /mnt/gentoo/boot, /mnt/gentoo/proc and 
+/mnt/gentoo, reboot and hopefully you will be promped for the password of 
+the encrypted volume.
 
 
 References:<br>
