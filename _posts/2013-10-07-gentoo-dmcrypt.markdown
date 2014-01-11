@@ -6,7 +6,7 @@ categories: jekyll update
 ---
 
 
-These notes describe the process of installing a Gentoo Linux distribution with
+This post sums up the installation procedure of a Gentoo Linux distribution with
 encrypted root and swap partitions using LUKS and dm\_crypt. Everything will
 be done manually (kernel compilation, creation of the initrd): the aim is 
 therefore to show what happens under the hood when you click on the checkbox 
@@ -296,9 +296,7 @@ setup the initrd.
 
     cat > init << EOF_init
     #!/bin/sh
-    echo "###########################################"
     echo "Initrd initialization"
-    echo "###########################################"
     mount -t proc proc /proc
     CMDLINE="`cat /proc/cmdline`"
     mount -t sysfs sysfs /sys
@@ -331,15 +329,13 @@ grub.conf must be set to point to the correct binaries. Mine looks like below.
 Everything should be ready now. umount /mnt/gentoo/boot, /mnt/gentoo/proc and 
 /mnt/gentoo, reboot and hopefully you will be promped for the password of 
 the encrypted volume.
-
-References:<br>
-<a name="gentoo_handbook">
-[1] [Gentoo Linux x86 Handbook](http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1)
-</a>
-<br>
-<a name="sha512">
-[2] sha512: d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2
-</a>
+<hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
+<ul class="references">
+</li> <a name="gentoo_handbook">[1] [Gentoo Linux x86 Handbook](http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1)
+</a> </li>
+<li> <a name="sha512">[2] sha512: d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2
+</a></li>
+</ul>
 [jekyll-gh]: https://github.com/mojombo/jekyll
 [jekyll]:    http://jekyllrb.com
 
