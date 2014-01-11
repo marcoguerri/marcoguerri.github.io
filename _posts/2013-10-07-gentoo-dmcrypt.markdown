@@ -9,7 +9,7 @@ categories: jekyll update
 This post sums up the installation procedure of a Gentoo Linux distribution with
 encrypted root and swap partitions using LUKS and dm\_crypt. Everything will
 be done manually (kernel compilation, creation of the initrd): the aim is 
-therefore to show what happens under the hood when you click on the checkbox 
+therefore to show what happens under the hood when you click on the encryption checkbox 
 in the bottom of a common disk partitioning menu during Linux installation.
 
 {% comment %}
