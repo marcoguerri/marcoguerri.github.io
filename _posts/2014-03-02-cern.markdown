@@ -1,0 +1,35 @@
+---
+layout: post
+title:  "CERN, the European Organization for Nuclear Research"
+date:   2014-03-02 13:31:48
+categories: jekyll update
+---
+
+All the forces that steer the Universe can be reduce to four main interactions: 
+electormagnetism, gravitational force, strong and weak interaction. 
+
+One of the
+most relevant attempts to unify these forces into a single explanation in the work
+done by Scottish physicist James Clerk Maxwell in mid-nineteenth century, when
+he demonstrated that electricity and magnetism are connected and that the relationship
+between the two of them can be expressed in terms of four equations.  
+
+The latest and most successful attempt to unify all the four foundamental laws
+has been the melding of electromagnetism and the weak force, performed by American
+physicists Steven Weinberg and Sheldon Glashow and Pakistani physicist Abdus Salam.
+This is known as the electroweak interaction. However, at the beginning there
+were many obscure details. Particles involved in electromagnetic and weak exchanges
+are significantly different in terms of masses and physicists in the 20th century
+have tried to find an explanantion to this disparity. 
+
+
+This inequality was probably generated from an initial symmetry in the universe, 
+where all forces were perfectly balanced. The most famous mechanism proposed 
+that would explain this symmetry breaking is based on the Higgs field, 
+introduced by British physicist Peter Higgs in 1964. It basically explains how,
+during the nascent moments of the universe, energy was transformed into massive 
+particles leaving at the same time photons massless.
+
+[jekyll-gh]: https://github.com/mojombo/jekyll
+[jekyll]:    http://jekyllrb.com
+
