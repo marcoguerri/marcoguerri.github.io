@@ -5,14 +5,19 @@ date:   2014-03-02 13:31:48
 categories: jekyll update
 ---
 
-All the forces that steer the Universe can be reduce to four main interactions: 
-electormagnetism, gravitational force, strong and weak interaction. 
+All the forces that steer the Universe can be reduced to four main interactions: 
+electormagnetism, gravitational force, strong and weak interaction, the last two
+being those that operate on the nuclear scale. Every force involves an interaction,
+and each interaction occurs by means of its own exchange particle or set of particles.
 
 One of the
 most relevant attempts to unify these forces into a single explanation in the work
 done by Scottish physicist James Clerk Maxwell in mid-nineteenth century, when
 he demonstrated that electricity and magnetism are connected and that the relationship
-between the two of them can be expressed in terms of four equations.  
+between the two of them can be expressed in terms of four equations (the well
+known Maxwell equations). In early 1900, physicists came to realize that these
+waves always travel in discrete packets of energy, called photons. All electromagnetic 
+phenomena, involve the exchange of photons between charged particles.
 
 The latest and most successful attempt to unify all the four foundamental laws
 has been the melding of electromagnetism and the weak force, performed by American
@@ -20,15 +25,40 @@ physicists Steven Weinberg and Sheldon Glashow and Pakistani physicist Abdus Sal
 This is known as the electroweak interaction. However, at the beginning there
 were many obscure details. Particles involved in electromagnetic and weak exchanges
 are significantly different in terms of masses and physicists in the 20th century
-have tried to find an explanantion to this disparity. 
-
+have tried to find an explanantion to this disparity. For example, photons have
+no mass, while the carriers of the weak interaction are massive, and thus the latter
+force has a shorter range.
 
 This inequality was probably generated from an initial symmetry in the universe, 
 where all forces were perfectly balanced. The most famous mechanism proposed 
 that would explain this symmetry breaking is based on the Higgs field, 
 introduced by British physicist Peter Higgs in 1964. It basically explains how,
-during the nascent moments of the universe, energy was transformed into massive 
-particles leaving at the same time photons massless.
+during the nascent moments of the universe, the initial symmetry was broken and the
+energy acquired became mass and was shared among many elementary particles.
+
+If the Higgs mechanism is correct, a foundamental particle called the Higgs Boson
+should prove the theory. Because of its high mass, it could be observed only
+during high-energy particle events. The Higgs Boson is therefore the key ingredient
+for the electroweak unification, which is also known as the Standard Model. 
+
+The electroweak and strong forces can be explained well in terms of quantum mechanics.
+However quantum mechanics explains the subatomic realm in terms of odds of a physical event.
+At the same time, with the general theory of relativity, a precise and deterministic
+description of gravity can be given.
+
+There have been recent attempts to replace elementary particles with vibrating 
+strands with the string theory. While this theory solves some unexplainable results
+obtained with former approaches, it also introduces many unnecessary dimensions. and so
+far has not been backed by experimental results.
+
+The purpose of a particles accelerator it to make particles collide at high
+energies so that, according to Einstein's equation, a high chance of producing
+a massive particle in the collision is achieved.
+
+The two main families in which physicists have splitted particles are hadrons and
+leptons (the former are subject to the strong force, while the latter are not).
+
+
 
 [jekyll-gh]: https://github.com/mojombo/jekyll
 [jekyll]:    http://jekyllrb.com
