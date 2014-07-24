@@ -82,6 +82,11 @@ volumes. First step: creating a physical volume.
     livecd ~ # pvcreate /dev/mapper/vault           
       Physical volume "/dev/mapper/vault" successfully created
 
+The volume group which will contain the logical volumes must then be created
+
+    livecd ~ # vgcreate vg /dev/mapper/vault
+        Volume group "vg" successfully created
+
 Then, the actual volumes can be created. Here I will use a 4GB LV for swap
 and a LV for root which will extend up to the end of the physical volume.
 
