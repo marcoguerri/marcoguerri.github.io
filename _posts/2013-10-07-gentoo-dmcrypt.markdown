@@ -33,14 +33,17 @@ Working "remotely" through ssh is much more convenient. You need to generate ssh
 keys, set a root password and start sshd daemon. The commands below generate
 a new set of RSA/DSA keys.
 
-    livecd ~ # ssh-keygen -t rsa -C "gentoo-setup"
-    [...]
-    Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_rsa_key
-    [...]
-    livecd ~ # ssh-keygen -t dsa -C "gentoo-setup"
-    [...]
-    Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_key
-    [...]
+{% highlight console linenos %}
+livecd ~ # ssh-keygen -t rsa -C "gentoo-setup"
+[...]
+Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_rsa_key
+[...]
+livecd ~ # ssh-keygen -t dsa -C "gentoo-setup"
+[...]
+Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_key
+[...]
+
+{% endhighlight %}
 
 The Gentoo Linux x86 Handbook can be followed up to step 4, which deals with hard
 disks configuration. I will be using /dev/sda both for boot and root partitions.
@@ -153,7 +156,7 @@ on a virtual machine, the i386\_defconfig lacked these options:
 * CONFIG\_CRYPTO\_SHA256 to support SHA256 algorithm in kernel space
 * CONFIG\_DM\_CRYPT to support dm\_cyrpt framework
 * CONFIG\_PCNET32 for network support (this is not strictly necessary to
-set up the environtment)
+set up the environment)
 
 Once the kernel is properly configured, it can be compiled together with the 
 modules. 
@@ -269,28 +272,28 @@ setup the initrd.
 
     # Libraries for cryptsetup
 
-    LIBS="/lib/ld-linux.so.2 \
-          /lib/ld-2.15.so \
-          /usr/lib/libcryptsetup.so.4 \
-          /usr/lib/libcryptsetup.so.4.2.0 \
-          /usr/lib/libpopt.so.0 \
-          /usr/lib/libpopt.so.0.0.0 \
-          /lib/libc.so.6 \
-          /lib/libc-2.15.so \
-          /lib/libuuid.so.1 \
-          /lib/libuuid.so.1.3.0 \
-          /lib/libdevmapper.so.1.02 \
-          /usr/lib/libgcrypt.so.11  \
-          /usr/lib/libgcrypt.so.11.8.2 \
-          /lib/libudev.so.1 \
-          /lib/libudev.so.1.3.5 \
-          /usr/lib/libgpg-error.so.0 \
-          /usr/lib/libgpg-error.so.0.8.0 \
-          /lib/librt.so.1 \
-          /lib/librt-2.15.so \
-          /lib/librt-2.15.so \
-          /lib/libpthread.so.0 \
-          /lib/libpthread-2.15.so"
+    LIBS='$/lib/ld-linux.so.2 \
+           /lib/ld-2.15.so \
+           /usr/lib/libcryptsetup.so.4 \
+           /usr/lib/libcryptsetup.so.4.2.0 \
+           /usr/lib/libpopt.so.0 \
+           /usr/lib/libpopt.so.0.0.0 \
+           /lib/libc.so.6 \
+           /lib/libc-2.15.so \
+           /lib/libuuid.so.1 \
+           /lib/libuuid.so.1.3.0 \
+           /lib/libdevmapper.so.1.02 \
+           /usr/lib/libgcrypt.so.11  \
+           /usr/lib/libgcrypt.so.11.8.2 \
+           /lib/libudev.so.1 \
+           /lib/libudev.so.1.3.5 \
+           /usr/lib/libgpg-error.so.0 \
+           /usr/lib/libgpg-error.so.0.8.0 \
+           /lib/librt.so.1 \
+           /lib/librt-2.15.so \
+           /lib/librt-2.15.so \
+           /lib/libpthread.so.0 \
+           /lib/libpthread-2.15.so'
 
     for l in $LIBS;
     do
@@ -298,13 +301,13 @@ setup the initrd.
     done
 
     # Libraries for vgscan/vgchange
-    LIBS="/lib/libdl.so.2 \
-          /lib/libdl-2.15.so \
-          /lib/libdevmapper-event.so.1.02 \
-          /lib/libreadline.so.6 \
-          /lib/libreadline.so.6.2 \
-          /lib/libncurses.so.5 \
-          /lib/libncurses.so.5.9"    
+    LIBS=$'/lib/libdl.so.2 \
+           /lib/libdl-2.15.so \
+           /lib/libdevmapper-event.so.1.02 \
+           /lib/libreadline.so.6 \
+           /lib/libreadline.so.6.2 \
+           /lib/libncurses.so.5 \
+           /lib/libncurses.so.5.9'
 
     for l in $LIBS;
     do
