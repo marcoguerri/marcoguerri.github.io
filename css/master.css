@@ -1,7 +1,7 @@
 body {
-  font-family: Arial, sans-serif;
+  font-family: "Helvetica Neue",HelveticaNeue,Helvetica,Arial,sans-serif;
   background: #FFFFFF;
-  font-size:14px;
+  font-size: 1em;
 }
 
 .more { font-size: 0.7em;}
@@ -112,7 +112,6 @@ a:visited {
 .post span:after {
     padding-left:5px;
     padding-right:5px;
-    content:  "\2014\2014\2014\2014"
 }
 
 div.post {
