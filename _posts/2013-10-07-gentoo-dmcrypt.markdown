@@ -272,7 +272,7 @@ setup the initrd.
 
     # Libraries for cryptsetup
 
-    LIBS='$/lib/ld-linux.so.2 \
+    LIBS=$'/lib/ld-linux.so.2 \
            /lib/ld-2.15.so \
            /usr/lib/libcryptsetup.so.4 \
            /usr/lib/libcryptsetup.so.4.2.0 \
