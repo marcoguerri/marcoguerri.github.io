@@ -20,6 +20,7 @@
     padding: 5px;
 }
 
+
 #toc h2, .toc h2 {
     border: medium none;
     display: inline;
@@ -34,12 +35,12 @@
 #toc ul, .toc ul {
     list-style-image: none;
     list-style-type: none;
-    margin-left: 0;
-    padding-left: 0;
+    padding: 0px;
+    margin: 0px;
     text-align: left;
 }
 #toc ul ul, .toc ul ul {
-    margin: 0 0 0 2em;
+    margin: 0 0 0 1em;
 }
 #toc .toctoggle, .toc .toctoggle {
     font-size: 94%;
@@ -51,5 +52,5 @@
 }
 
 #toc-container {
-	margin-bottom: 10px;
+	margin-bottom: 1em;
 }
