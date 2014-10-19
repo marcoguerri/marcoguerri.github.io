@@ -14,6 +14,9 @@ Unfortunately the outcome has not been the one I was hoping for, but this has
 proven to be a very interesting experiment anyway.
 
 
+The bug
+=======
+
 As probably everyone knowns, Hearbleed, CVE-2014-0160 in the Common 
 Vulnerabilities and Exposures system, is a bug which affects OpenSSL library 
 and allows an attacker to retrieve a 64KB chunk from the address space of the
@@ -68,6 +71,9 @@ to their very early experiments, they thought this would not happen, but it turn
 out they were wrong. In fact, at least four people were able to steal the private
 keys exploiting the heartbleed challenge, Fedor Indutny being the first one.
 
+openssl package
+===============
+
 I therefore wanted to try to steal the private keys from my own instance. I am
 running Debian Wheezy 7.1 and, according to apt, the openssl version I have
 installed on my machine is 1.0.1e.
@@ -120,15 +126,83 @@ openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 
 The package installed on the machine is therefore not vulnerable. In order to
 restore the bug, it is necessary to rebuild it, avoiding the application of
-the patch.
+the patch. When the sources are downloaded, the patches are applied automaticall,
+the easiest way to build a vulnerable package it to apply a reverse patch. In
+bried the following commands can be used:
+
 
 {% highlight console lineos %}
-➜  ~ [1] at 21:20:34 [Sun 12] $ sudo apt-get source openssl
+sudo apt-get source openssl
+cd openssl-1.0.1e/debian/patches/
+interdiff CVE-2014-0160.patch /dev/null > hb_reversed.patch
+mv hb_reversed.patch ../../
+patch -p1 < hb_reversed.patch
 {% endhighlight %}
 
- 
+The patch should apply successfully. The changes must be committed with dpkg-source 
+--commit (you won't be able to compile the new package until then). This will
+create the "official" patch out of the differences in the codebase. When committing,
+you will be asked for a description of the fix, which will be appended on the 
+top of the patch. In order to modify the changelog, dch can be used. This is part
+of devscripts in Debian.
+
+*dch -i* hould open an editor where a new entry in the changelog can be appended to the 
+old ones. The version which appears in the changelog will the one displayed
+by apt. For instance, in my case I incremented my version to 1.0.1e-2+deb7u13.
+The package can be build with  *dpkg-buildpackage -us -uc*.
+
+Once finished, openssl\_1.0.1e-2+deb7u13\_i386.deb can be installed. Checking
+that the new revision has been correctly installed should lead to the output below.
+
+ {% highlight console lineos %}
+➜  ~ [1] at 13:14:50 [Sun 19] $ sudo dpkg -i openssl_1.0.1e-2+deb7u13_i386.deb
+[sudo] password for marco: 
+(Reading database ... 197475 files and directories currently installed.)
+Preparing to replace openssl 1.0.1e-2+deb7u12 (using openssl_1.0.1e-2+deb7u13_i386.deb) ...
+Unpacking replacement openssl ...
+Setting up openssl (1.0.1e-2+deb7u13) ...
+Processing triggers for man-db ...
 
 
+➜  ~ [1] at 13:15:17 [Sun 19] $ sudo apt-cache policy openssl
+openssl:
+  Installed: 1.0.1e-2+deb7u13
+  Candidate: 1.0.1e-2+deb7u13
+  Version table:
+ *** 1.0.1e-2+deb7u13 0
+        100 /var/lib/dpkg/status
+     1.0.1e-2+deb7u12 0
+        500 http://security.debian.org/ wheezy/updates/main i386 Packages
+     1.0.1e-2+deb7u11 0
+        500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
+{% endhighlight %}
+
+
+In case you want to revert to the old clean version, apt allows to define a
+specific revision on the command line.
+
+{% highlight console lineos %} 
+➜  ~ [1] at 13:18:57 [Sun 19] $  sudo apt-get install openssl=1.0.1e-2+deb7u12
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+The following packages will be DOWNGRADED:
+  openssl
+0 upgraded, 0 newly installed, 1 downgraded, 0 to remove and 246 not upgraded.
+Need to get 0 B/694 kB of archives.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue [Y/n]? Y
+dpkg: warning: downgrading openssl from 1.0.1e-2+deb7u13 to 1.0.1e-2+deb7u12
+(Reading database ... 197475 files and directories currently installed.)
+Preparing to replace openssl 1.0.1e-2+deb7u13 (using .../openssl_1.0.1e-2+deb7u12_i386.deb) ...
+Unpacking replacement openssl ...
+Processing triggers for man-db ...
+Setting up openssl (1.0.1e-2+deb7u12) ...
+{% endhighlight %}
+
+
+nginx installation
+==================
 
 
 
