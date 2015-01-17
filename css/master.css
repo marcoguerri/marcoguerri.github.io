@@ -1,7 +1,10 @@
 body {
-  font-family: "Helvetica Neue",HelveticaNeue,Helvetica,Arial,sans-serif;
+  font-family: arial, sans-serif;
+  font-weight: normal;
   background: #FFFFFF;
+  line-height: 150%;
   font-size: 1em;
+  overflow-y:scroll;
 }
 
 .more { font-size: 0.7em;}
@@ -50,7 +53,7 @@ a:visited {
 #header h1 {
   font-size: 4em;
   display: inline;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.03em;
   color: #47423F;
   font-weight: normal;
 }
@@ -100,7 +103,6 @@ a:visited {
 
 #content p {
   line-height: 140%;
-  letter-spacing: -0.03em;
 }
 
 .date {
