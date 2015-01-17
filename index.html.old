@@ -1,0 +1,13 @@
+---
+layout: master
+title: Marco's page
+---
+
+    <div class='post'>
+        <h1><a href='{{site.posts.first.url}}'>{{site.posts.first.title}}</a></h1>
+        <div class='date'>
+            <span>Latest post - {{site.posts.first.date | date: "%-d %B %Y" }}</span>
+        </div>
+        <div class='body'>{{ site.posts.first.content }}</div>
+    </div>
+
