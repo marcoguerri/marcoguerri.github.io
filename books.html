@@ -1,0 +1,44 @@
+---
+layout: master
+title: Books
+full_posts: 2
+---
+
+<div style="width: 100%; overflow: hidden;">
+    <div align="justify" style="padding: 10px 20px 10px 0px; vertical-align:top; display: table-cell;"> 
+
+    Despite being by no means an avid reader, among the activities I enjoy reading is 
+    certainly one worth writing few lines about. I mainly read books related to 
+    science and computers, but I also enjoy horror novels and self-improvement books. 
+    Here's a list of posts where I collected some ideas and recommendations about
+    the books I enjoyed the most. All the covers displayed on this site are a 
+    curtesy of the OpenLibrary project. </div>
+    <div style="margin:0; display: table-cell; width:20%"> 
+    <a href="https://openlibrary.org/" target="_blank">
+    <img src="https://openlibrary.org/images/logo_OL-lg.png"/></a></div>
+</div>
+
+
+{% for post in site.posts %}
+  {% if post.title contains 'Books' %}
+      {% if forloop.index < page.full_posts %}
+      <div class='post'>
+        <h1><a href='{{post.url}}'>{{post.title}}</a></h1>
+        <div class="date"> 
+        <span class='date'>{{post.date | date_to_string}}</span>
+        </div>
+        <div class='body'>{{post.excerpt}}</div>
+      </div>
+      {% else %}
+        {% if forloop.index == page.full_posts %}
+        <h3>Older Posts</h3>
+        <table class='post-list'>
+        {% endif %}
+        <tr>
+          <th><a href='{{ post.url }}'>{{ post.title }}</a></th>
+          <td>{{ post.date | date: "%-d %B %Y" }}</td>
+        </tr>
+      {% endif %}
+    {% endif %}
+{% endfor %}
+</table>
