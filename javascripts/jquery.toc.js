@@ -17,12 +17,11 @@
     var tocContainerHTML = '<div id="toc-container"><table class="toc" id="toc"><tbody><tr><td>%1<ul>%2</ul></td></tr></tbody></table></div>';
 
     function createLevelHTML(anchorId, tocLevel, tocSection, tocNumber, tocText, tocInner) {
-        var link = '<a href="#%1""><span class="tocnumber">%2</span> <span class="toctext">%3</span></a>%4'
+        var link = '<a href="#%1""> <span class="toctext">%2</span></a>%3'
             .replace('%1', anchorId)
-            .replace('%2', tocNumber)
-            .replace('%3', tocText)
-            .replace('%4', tocInner ? tocInner : '');
-        return '<li class="toclevel-%1 tocsection-%2">%3</li>\n'
+            .replace('%2', tocText)
+            .replace('%3', tocInner ? tocInner : '');
+        return '<li style="list-style-type:disc" class="toclevel-%1 tocsection-%2">%3</li>\n'
             .replace('%1', tocLevel)
             .replace('%2', tocSection)
             .replace('%3', link);
@@ -60,7 +59,7 @@
                     $(this).text());
             });
             if (levelHTML) {
-                levelHTML = '<ul>' + levelHTML + '</ul>\n';
+                levelHTML = '<ul style="list-style-type:disc">' + levelHTML + '</ul>\n';
             }
             var anchorId = config.anchorPrefix + tocLevel + '-' + tocSection;
             h1.attr('id', anchorId);
