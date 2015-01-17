@@ -343,7 +343,7 @@ grub.conf must be set to point to the correct binaries. Mine looks like below.
 
     title Gentoo
     root (hd0,0)
-    kernel /bzImage vga=791 (to change the default resolution of /dev/console)
+    kernel /bzImage vga=791
     initrd /initramfs
 
 Everything should be ready now. umount /mnt/gentoo/boot, /mnt/gentoo/proc and 
