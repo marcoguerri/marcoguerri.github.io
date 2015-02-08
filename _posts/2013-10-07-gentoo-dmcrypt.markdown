@@ -214,7 +214,8 @@ command line simply typing grub and follow the example below.
 
     grub>
 
-An alternative way to install grub is to simply use grub-install as follows.
+An alternative way to install grub is to simply use grub-install. update-grub
+can be used to update menu.lst (or grub.cfg) based on the kernels available under /boot.
 
     grub-install /dev/sda
 
@@ -339,7 +340,8 @@ The actual initrd image is then built with the following commands.
 I am not completely sure that cpio is part of the minimal gentoo image. 
 It should be in the stage3 image just installed, so it might be necessary to 
 specify the absolute path with respect to /mnt/gentoo. Once created the initrd, 
-grub.conf must be set to point to the correct binaries. Mine looks like below.
+make sure grub.conf is set correctly to load the kernel image and the initrd. 
+Mine looks like below.
 
     title Gentoo
     root (hd0,0)
