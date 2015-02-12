@@ -7,8 +7,8 @@ categories: jekyll update
 
 
 This post sums up the installation procedure of a Gentoo Linux distribution with
-encrypted root and swap partitions using LUKS and dm\_crypt. Everything will
-be done manually (kernel compilation, creation of the initrd): the aim is 
+encrypted root and swap partitions using LUKS and dm\_crypt. Everything is
+done manually (kernel compilation, creation of the initrd): the aim is 
 therefore to show what happens under the hood when you click on the encryption checkbox 
 in the bottom of a common disk partitioning menu during Linux installation.
 
@@ -29,8 +29,8 @@ I went through the whole process inside a Virtual Machine, using VMWare Player
 as hypervisor. The Gentoo live image I have used is the weekly build 
 [install-x86-minimal-20130820](#sha512).
 
-Working "remotely" through ssh is much more convenient. You need to generate ssh
-keys, set a root password and start sshd daemon. The commands below generate
+Working "remotely" through ssh is much more convenient. ssh
+keys must be generated, a root password set and sshd daemon started. The commands below generate
 a new set of RSA/DSA keys.
 
 {% highlight console linenos %}
@@ -47,18 +47,17 @@ Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_k
 
 The Gentoo Linux x86 Handbook can be followed up to step 4, which deals with hard
 disks configuration. I will be using /dev/sda both for boot and root partitions.
-
-First step: creating a plain primary boot partition with fdisk, /dev/sda1, and
-formatting it with a Unix-like filesystem, ext4 in this case.
-As far as the size is concerned, 256M are enough. To create the fs, mkfs.ext4 is
-the tool that we need.
+The first step is to create a plain primary boot partition with fdisk, /dev/sda1, and
+to format it with a Unix-like filesystem, ext4 in this case.
+As far as the size is concerned, 256M are enough. mkfs.ext4 can be used to 
+create the filesystem.
 
     mkfs.ext4 /dev/sda1
 
-The second partition, which will be used to map two logical encrypted volumes
-for root and swap, can take up all the space left on the device. After the
-creation of the partitions, /dev/sda2 must be formatted to be a LUKS compliant
-partition:
+The second partition, which will be used as a LVM physical volume with on top
+two logical volumes for root and swap, can take up all the space left on the device. 
+After the creation of the partitions, /dev/sda2 must be formatted as a LUKS
+partition.
     
     livecd ~ # cryptsetup --verify-passphrase luksFormat /dev/sda2
     [...]
@@ -70,37 +69,32 @@ partition:
     Enter LUKS passphrase: 
     Verify passphrase: 
 
-Now we create two logical volumes inside the encrypted partition, one for root
-and one for swap. These volumes will be created with the LVM framework. 
-First of all the encrypted partition must be opened and a mapping with a plain
-device must be set up. This can be setup with the following command. 
+By opening the LUKS volume, a mapping with a plaintext device via the device mapper layer
+is created. This can be done with the following command. 
 
     livecd ~ # cryptsetup luksOpen /dev/sda2 vault
     Enter passphrase for /dev/sda2:
 
-The device mapper has created a /dev/mapper/vault device which is
-the plain version of the encrypted disk. Now it is time to create two logical
-volumes. First step: creating a physical volume.
+The device mapper creates a /dev/mapper/vault. This becomes the LVM physical volume,
+which is then added to the volume group.
     
     livecd ~ # pvcreate /dev/mapper/vault           
       Physical volume "/dev/mapper/vault" successfully created
 
-The volume group which will contain the logical volumes must then be created
-
     livecd ~ # vgcreate vg /dev/mapper/vault
         Volume group "vg" successfully created
 
-Then, the actual volumes can be created. Here I will use a 4GB LV for swap
-and a LV for root which will extend up to the end of the physical volume.
+Now the logical volumes can be created. Here I use a 4GB LV for swap
+and a LV for root which takes take up the remaining capacity of the 
+volume group.
 
     livecd ~ # lvcreate --size 4G --name swap vg
       Logical volume "swap" created
     livecd ~ # lvcreate --extents 100%FREE --name root vg
       Logical volume "root" created
 
-Now under /dev/mapper, the two LV should appear: /dev/mapper/vg-root and 
-/dev/mapper/vg-swap. It is time to create filesystems on the LV, for for swap 
-and then for root.
+The LVs should now appear under /dev/mapper: /dev/mapper/vg-root and 
+/dev/mapper/vg-swap. A root and swap filesystems must be created on top of the LVs.
 
     livecd ~ # mkswap /dev/mapper/vg-swap 
     Setting up swapspace version 1, size = 4194300 KiB
@@ -139,13 +133,13 @@ Now the Gentoo Handbook can be resumed from point 4.f
     livecd ~ # mount /dev/mapper/vg-root /mnt/gentoo/
 
 After the precompiled filesystem has been downloaded and the chrooted environment
-has been set, it is time to compile the kernel for the new installation. The 
-kernel source code can be retrieved through Portage, Gentoo package manager.
+has been set, the kernel must be compiled. The kernel source code can be 
+retrieved through Portage, Gentoo package manager.
 
     livecd ~ # emerge gentoo-sources
 
-The version installed with this live image is *linux-3.10.7-gentoo-r1*. 
-The configuration procedure is highly hardware dependend. Make sure to activate 
+The version installed with this live image is *linux-3.10.7-gentoo-r1*, but 
+the configuration procedure is highly hardware dependend. Make sure to activate 
 all the necessary modules to support the underlying hardware. For instance, 
 a while ago while I was working on a physical machine, I remember having problems 
 with the SATA controller which was supported by sata\_nv module, compiled through
@@ -168,7 +162,7 @@ modules.
 
 After having compiled the kernel and copied bzImage into /mnt/gentoo/boot, 
 Gentoo Handbook can be resumed from Chapter 8. In section 8.a, the fstab file 
-is set up. Since we are using logical volumes, the procedure is slightly different 
+is set up. Since I am using logical volumes, the procedure is slightly different 
 from the one outlined in the guide. My fstab looks like the following:
 
     /dev/sda1               /boot       ext4    noauto,noatime  1 2
@@ -179,8 +173,8 @@ from the one outlined in the guide. My fstab looks like the following:
     /proc                   /proc       proc    default
 
 Chapter 10 of the Gentoo Handbook deals with the installation of the bootloader.
-I will use grub legacy (i.e. v1), since I am quite familiar with it and it
-will help speed up the process. Inside the chrooted environment proceed as follows.
+I will use grub legacy (i.e. v0.97), since I am quite familiar with it and it
+will help speed up the process.
 
     export DONT_MOUNT_BOOT=1
     emerge --config =grub-0.97-r12
@@ -191,12 +185,10 @@ will help speed up the process. Inside the chrooted environment proceed as follo
     Probing devices to guess BIOS drives. This may take a long time.
     * Grub has been installed to /boot successfully.
 
-DONT\_MOUNT\_BOOT variable will prevent grub from trying to mount the boot partition
-and consequently failing, since it is already mounted. When prompted for the 
-installation directory, just type /boot.
-
-It is now time to actually install grub on the MBR of /dev/sda. Open grub
-command line simply typing grub and follow the example below.
+DONT\_MOUNT\_BOOT variable prevents grub from trying to mount the boot partition,
+already mounted, and consequently failing. When prompted for the 
+installation directory, just type /boot. grub stage1 and stage1.5 must then be installed
+respectively on the MBR and in the DOS compatibility region of /dev/sda.
 
 
     grub> root (hd0,0)
@@ -219,15 +211,14 @@ can be used to update menu.lst (or grub.cfg) based on the kernels available unde
 
     grub-install /dev/sda
 
-This will only work as long as df output is not broken. If /etc/mtab is empty, then an error is
+This only works as long as df output is not broken. If /etc/mtab is empty, then an error is
 raised (df: cannot read table of mounted file systems). A quick workaround is to manually add 
 the entry for the boot parition as shown below, which is enough to make grub-install work.
 
     /dev/sda1 /boot ext4 rw,relatime,data=ordered 0 0"
 
-It is now time to create the initial ramdisk which will be responsible for 
-mounting the encrypted device. It will need the basic cryptsetup 
-tools and all the relative dependencies listed below.
+The initial ramdisk responsible for mounting the encrypted device must then be
+created. This should contain cryptsetup tools and all the relative dependencies listed below.
 
 
     livecd boot # ldd /sbin/cryptsetup 
@@ -338,19 +329,18 @@ The actual initrd image is then built with the following commands.
     find . | cpio --quiet -o -H newc | gzip -9 > /mnt/gentoo/boot/initramfs
 
 I am not completely sure that cpio is part of the minimal gentoo image. 
-It should be in the stage3 image just installed, so it might be necessary to 
+It should be in the Gentoo stage3 image just installed, so it might be necessary to 
 specify the absolute path with respect to /mnt/gentoo. Once created the initrd, 
-make sure grub.conf is set correctly to load the kernel image and the initrd. 
-Mine looks like below.
+grub.conf should be configured to load the kernel image and the initrd. 
 
     title Gentoo
     root (hd0,0)
     kernel /bzImage vga=791
     initrd /initramfs
 
-Everything should be ready now. umount /mnt/gentoo/boot, /mnt/gentoo/proc and 
-/mnt/gentoo, reboot and hopefully you will be promped for the password of 
-the encrypted volume.
+After umounting /mnt/gentoo/boot, /mnt/gentoo/proc,
+/mnt/gentoo and rebooting the machine, the initrd should ask for the password of 
+the encrypted volume and then mount the root filesystem.
 <hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
 <ul class="references">
 </li> <a name="gentoo_handbook">[1] [Gentoo Linux x86 Handbook](http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1)
