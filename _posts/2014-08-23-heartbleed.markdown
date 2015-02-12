@@ -27,7 +27,7 @@ OpenSSL from version 1.0.1 to 1.0.1f included.
 The programming error lies in ssl/t1\_lib.c in function tls1\_process\_heartbeat 
 A hearbeat request is a way to check if the remote end of the connection is still
 alive. The client sends a request  with a payload and the server is supposed 
-to reply with the same payload. This is what happens in the code below.
+to reply with the same payload.
 
 
 {% highlight C linenos %}
@@ -69,7 +69,8 @@ Of course the worst case scenario is a server leaking a chunk of memory which
 contains the private keys used for the SSL connection. Soon after the bug went
 public, Cloudflare announced the Heartbleed Challange, asking the community to
 steal the private keys from a nginx instance running on their servers. According
-to their very early experiments, they thought [this would not happen](#cloudflare_analysis), 
+to their very early experiments, they thought <a href="https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/" target="_blank">
+this would not happen</a>, 
 but it turned out they were wrong. In fact, at least four people were able to steal 
 the private keys exploiting the heartbleed bug, Fedor Indutny being the first one.
 
@@ -248,7 +249,7 @@ be considered as properly formatted.
 <a id="single_image" href="/img/hb_good_request_detail.png"><img src="/img/hb_good_request_detail.png" alt=""/></a>
 </p>
 
-Even if the SSL handshake is not terminated, as shown by the picture below, 
+Even if the SSL handshake is not terminated, as shown by Wireshark dump, 
 the server should reply anyway with a HB response message. After several 
 unsuccessful attempts, I decided to go more in depth by following step by 
 step the execution on the server side.
@@ -339,7 +340,7 @@ The control path which explains why a HB response is not returned
 is quite complicated and without a proper knowledge of the
 library it's difficult to grasp what the code actually does. After
 a series of *step* and *next*, the single step execution led to the function
-*buffer_write* in *bf_buff.c*. The whole trace is reported below.
+*buffer_write* in *bf_buff.c*.
 
 {% highlight console linenos %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
@@ -641,8 +642,8 @@ start:
         }
 {% endhighlight %}
 
-This function basically writes the data passed as argument with pointer *\*in* into
-the buffer pointed by the BIO object *\*b*. The decision whether to flush or not
+This function basically writes the data passed as argument with pointer **in* into
+the buffer pointed by the BIO object **b*. The decision whether to flush or not
 the buffer through the socket is taken based on the size of the data with respect to 
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed (line 14). The HB response message here is 28 bytes and the buffer is 4KB,
@@ -655,8 +656,7 @@ therefore there's no flushing.
 
 What happens if the size of the HB message is bigger than the buffer, say 5000
 bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a> 
-**[2]** to send a properly formed heartbeat request and
-the trace of *buffer_write* is shown below.
+to send a well-formed heartbeat request while tracing *buffer_write*.
 
     (gdb) 
     247     i=b->method->bwrite(b,in,inl);
@@ -706,8 +706,9 @@ the trace of *buffer_write* is shown below.
     $5 = 5000
  
 
-5000 bytes are written and flushed in the output buffer in the loop at line 54.
-The client receives a proper response as shown in the network dump below.
+5000 bytes are written in the output buffer inside the loop at line 54 which is
+then flushed through the socket; the client receives a well-formed HB response.
+
 <p align="center"> 
 <a id="single_image" href="/img/hb_working_response.png"><img src="/img/hb_working_response.png" alt=""/></a>
 </p>
@@ -716,7 +717,8 @@ The client receives a proper response as shown in the network dump below.
 Heartbleed request
 =========================
 
-An example of malformed heartbeat request is shown below.
+A malformed hearbeat request features a payload size which does not match the actual
+lenght of the data carried inside the message.
 
     0x18                    # Type: Heartbeat
     0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
@@ -725,9 +727,9 @@ An example of malformed heartbeat request is shown below.
     0xFF 0xFF               # Payload size, does not match the actual size of the payload
                             # No payload
 
-The server will return 65536 bytes copied from the address space of the process,
-as explained at the beginning of the page. <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
-can be adapted to send a malformed request. The result is the following.
+Due to the lack of checks on the payload size, the server returns 65536 bytes 
+copied from the address space of the process: <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
+can be adapted to send a malformed request.
 
     ➜  ~/heartbleed [1] at 12:35:56 [Thu 12] $ ./send_heartbleed
     Initializing new connection...
@@ -750,15 +752,12 @@ instances of the script. After ~3M requests, I could not find any trace of the
 private keys.
 
 
-[jekyll-gh]: https://github.com/mojombo/jekyll
-[jekyll]:    http://jekyllrb.com
-
-
 
 <hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
 <ul class="references">
 <li> <a name="cloudflare_analysis">[1] [CloudFlare Analysis of HeartBleed](https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/)</li>
-<li> <a name="heartbeat_send">[2] [Code to send a heartbeat message](https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c) </li>
 </a> </li>
 </ul>
 
+[jekyll-gh]: https://github.com/mojombo/jekyll
+[jekyll]:    http://jekyllrb.com
