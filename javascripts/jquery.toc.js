@@ -21,7 +21,7 @@
             .replace('%1', anchorId)
             .replace('%2', tocText)
             .replace('%3', tocInner ? tocInner : '');
-        return '<li style="list-style-type:disc" class="toclevel-%1 tocsection-%2">%3</li>\n'
+        return '<li style="list-style-type:square" class="toclevel-%1 tocsection-%2">%3</li>\n'
             .replace('%1', tocLevel)
             .replace('%2', tocSection)
             .replace('%3', link);
