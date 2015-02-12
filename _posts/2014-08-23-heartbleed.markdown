@@ -755,7 +755,7 @@ private keys.
 
 <hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
 <ul class="references">
-<li> <a name="cloudflare_analysis">[1] [CloudFlare Analysis of HeartBleed](https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/)</li>
+<li> <a name="cloudflare_analysis">[1] [CloudFlare Analysis of HeartBleed](https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/)
 </a> </li>
 </ul>
 
