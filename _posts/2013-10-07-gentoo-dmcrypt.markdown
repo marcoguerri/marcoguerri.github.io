@@ -29,9 +29,8 @@ I went through the whole process inside a Virtual Machine, using VMWare Player
 as hypervisor. The Gentoo live image I have used is the weekly build 
 [install-x86-minimal-20130820](#sha512).
 
-Working "remotely" through ssh is much more convenient. ssh
-keys must be generated, a root password set and sshd daemon started. The commands below generate
-a new set of RSA/DSA keys.
+Working "remotely" through ssh is much more convenient. RSA/DSA ssh
+keys must be generated with ssh-keygen, a root password set and sshd daemon started.
 
 {% highlight console linenos %}
 livecd ~ # ssh-keygen -t rsa -C "gentoo-setup"
@@ -45,7 +44,7 @@ Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_k
 
 {% endhighlight %}
 
-The Gentoo Linux x86 Handbook can be followed up to step 4, which deals with hard
+The Gentoo Linux x86 Handbook can be followed up to step 4, which covers hard
 disks configuration. I will be using /dev/sda both for boot and root partitions.
 The first step is to create a plain primary boot partition with fdisk, /dev/sda1, and
 to format it with a Unix-like filesystem, ext4 in this case.
@@ -93,7 +92,7 @@ volume group.
     livecd ~ # lvcreate --extents 100%FREE --name root vg
       Logical volume "root" created
 
-The LVs should now appear under /dev/mapper: /dev/mapper/vg-root and 
+The two LVs should appear under /dev/mapper: /dev/mapper/vg-root and 
 /dev/mapper/vg-swap. A root and swap filesystems must be created on top of the LVs.
 
     livecd ~ # mkswap /dev/mapper/vg-swap 
@@ -211,14 +210,15 @@ can be used to update menu.lst (or grub.cfg) based on the kernels available unde
 
     grub-install /dev/sda
 
-This only works as long as df output is not broken. If /etc/mtab is empty, then an error is
+This only works as long as df output is not broken. If /etc/mtab is empty, an error is
 raised (df: cannot read table of mounted file systems). A quick workaround is to manually add 
-the entry for the boot parition as shown below, which is enough to make grub-install work.
+to /etc/mtab the following entry for the boot partition:
 
     /dev/sda1 /boot ext4 rw,relatime,data=ordered 0 0"
 
 The initial ramdisk responsible for mounting the encrypted device must then be
-created. This should contain cryptsetup tools and all the relative dependencies listed below.
+created. This should contain cryptsetup tools and all the relative dependencies
+listed by ldd.
 
 
     livecd boot # ldd /sbin/cryptsetup 
