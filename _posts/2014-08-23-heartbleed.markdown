@@ -5,13 +5,12 @@ date:   2014-08-23 13:31:48
 categories: jekyll update
 published: yes
 pygments: true
----
-
-In this post I will sum up all the steps I have gone though to implement a 
+summary: "In this post I will sum up all the steps I have gone through to implement a 
 Hearbleed POC. The aim was to try to exploit the well known bug to
 steal the private keys from my local instance using a vulnerable version of OpenSSL.
 Unfortunately the outcome was not the one I was hoping for, but this has 
-proven to be a very interesting experiment anyway.
+proven to be a very interesting experiment anyway."
+---
 
 
 The bug
@@ -24,7 +23,7 @@ process which is using the library. The bug resides in the implementation of one
 of the features of the TLS protocol, the TLS Hearbeat Extension, and affects
 OpenSSL from version 1.0.1 to 1.0.1f included.
 
-The programming error lies in ssl/t1\_lib.c in function tls1\_process\_heartbeat 
+The programming error lies in _ssl/t1\_lib.c_ in function tls1\_process\_heartbeat 
 A hearbeat request is a way to check if the remote end of the connection is still
 alive. The client sends a request  with a payload and the server is supposed 
 to reply with the same payload.
@@ -49,15 +48,15 @@ RAND_pseudo_bytes(bp, padding);
 
 {% endhighlight %}
 
-*payload* is the length of the payload of the HB request sent from the client. This
-value is read from the HB message itself. *pl* is a pointer to the buffer containing 
+*payload* is the length of the payload of the heartbeat request sent from the client. This
+value is read from the heartbeat message itself. *pl* is a pointer to the buffer containing 
 the payload sent by the client. What causes the bug is that
 the payload length advertised by the client is never checked against the actual
 length of the buffer received. A client might specify a length of N bytes, but
 send instead only M bytes, with M < N. When sending back the response,
 the server copies *payload* bytes from the buffer pointed by *pl*, which has been
-allocated by the server to store the HB request. So in principle a client can
-send a HB message with an arbitrary length value, and it will get back a chunk of memory
+allocated by the server to store the heartbeat request. So in principle a client can
+send a heartbeat message with an arbitrary length value, and it will get back a chunk of memory
 from the server address space. The *payload* field is actually 16 bits long,
 so the maximum length is 64KB. The bug can be easily fixed by checking that the advertised
 length of the payload matches the actual length. A <a href="http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=731f431497f463f3a2a97236fe0187b11c44aead" target="_blank">patch</a> 
@@ -147,7 +146,7 @@ patch -p1 < hb_reversed.patch
 The patch should apply successfully. The changes must be committed with dpkg-source 
 --commit (it is not possible to compile the new package until then). This will
 create the "official" patch out of the differences in the codebase. When committing,
-a description of the fix must be entered: this will be appended on the 
+a description of the fix must be entered: this will be appended on 
 top of the .patch file. In order to modify the changelog, dch can be used, which is part
 of devscripts in Debian.
 
@@ -232,7 +231,7 @@ instance.
     0x18                    # Type: Heartbeat
     0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
     0x00 0x17               # Record length, size of the heartbeat message
-    0x01                    # HB message type: request
+    0x01                    # hearbeat message type: request
     0x00 0x04               # Payload size
     0xDE 0xAD 0xBE 0xEF     # Payload
     0xAB 0x9A 0xC1 0x97     # 16 bytes random padding
@@ -240,17 +239,17 @@ instance.
     0x9E 0xEE 0xD4 0x3B     #
     0x93 0xDD 0x7D 0xB5     #
 
-It turned out to be a bit more complicated than that. The HB message is sent
+It turned out to be a bit more complicated than that. The heartbeat message is sent
 to the server but no response whatsoever is returned. The following picture shows
 that Wireshark decodes properly the SSL record, which means that the message can
-be considered as properly formatted.
+be considered as well-formatted.
 
 <p align="center">
-<a id="single_image" href="/img/hb_good_request_detail.png"><img src="/img/hb_good_request_detail.png" alt=""/></a>
+<a id="single_image" href="/img/hb_good_request_detail.png"><img  src="/img/hb_good_request_detail.png" alt=""/></a>
 </p>
 
 Even if the SSL handshake is not terminated, as shown by Wireshark dump, 
-the server should reply anyway with a HB response message. After several 
+the server should reply anyway with a heartbeat response message. After several 
 unsuccessful attempts, I decided to go more in depth by following step by 
 step the execution on the server side.
 
@@ -319,7 +318,7 @@ A breakpoint on *tls1_process_heartbeat* can be set and the execution resumed.
     (gdb) c
     Continuing.
 
-Now, upon receiving a HB message, the code will hit the breakpoint, allowing
+Now, upon receiving a heartbeat message, the code will hit the breakpoint, allowing
 step by step execution.
 
 
@@ -336,7 +335,7 @@ step by step execution.
     (gdb)
 
 
-The control path which explains why a HB response is not returned
+The control path which explains why a heartbeat response is not returned
 is quite complicated and without a proper knowledge of the
 library it's difficult to grasp what the code actually does. After
 a series of *step* and *next*, the single step execution led to the function
@@ -646,15 +645,15 @@ This function basically writes the data passed as argument with pointer **in* in
 the buffer pointed by the BIO object **b*. The decision whether to flush or not
 the buffer through the socket is taken based on the size of the data with respect to 
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
-not flushed (line 14). The HB response message here is 28 bytes and the buffer is 4KB,
-therefore there's no flushing.
+not flushed (line 14). The heartbeat response message here is 28 bytes and the buffer is 4KB,
+the data is written on the buffer but not flushed.
 
     (gdb) print i
     $1 = 4096
     (gdb) print inl
     $2 = 28
 
-What happens if the size of the HB message is bigger than the buffer, say 5000
+What happens if the size of the heartbeat message is bigger than the buffer, say 5000
 bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a> 
 to send a well-formed heartbeat request while tracing *buffer_write*.
 
@@ -707,7 +706,7 @@ to send a well-formed heartbeat request while tracing *buffer_write*.
  
 
 5000 bytes are written in the output buffer inside the loop at line 54 which is
-then flushed through the socket; the client receives a well-formed HB response.
+then flushed through the socket; the client receives a well-formed heartbeat response.
 
 <p align="center"> 
 <a id="single_image" href="/img/hb_working_response.png"><img src="/img/hb_working_response.png" alt=""/></a>
@@ -723,7 +722,7 @@ lenght of the data carried inside the message.
     0x18                    # Type: Heartbeat
     0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
     0x00 0x03               # Record length, size of the heartbeat message
-    0x01                    # HB message type: request
+    0x01                    # heartbeat message type: request
     0xFF 0xFF               # Payload size, does not match the actual size of the payload
                             # No payload
 
@@ -737,7 +736,7 @@ can be adapted to send a malformed request.
     Connected!
     resplen:  65556
 
-As expected, the HB response message contains 65536 bytes of payload, 16 bytes
+As expected, the heartbeat response message contains 65536 bytes of payload, 16 bytes
 of padding and 4 bytes of header, 65556 in total.
 
 Scanning leaked memory
@@ -752,12 +751,6 @@ instances of the script. After ~3M requests, I could not find any trace of the
 private keys.
 
 
-
-<hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
-<ul class="references">
-<li> <a name="cloudflare_analysis">[1] [CloudFlare Analysis of HeartBleed](https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/)
-</a> </li>
-</ul>
 
 [jekyll-gh]: https://github.com/mojombo/jekyll
 [jekyll]:    http://jekyllrb.com

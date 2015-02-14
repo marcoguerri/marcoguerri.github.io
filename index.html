@@ -14,7 +14,7 @@ full_posts: 1
                 <div class="date"> 
                     <span class='date'>{{post.date | date_to_string}}</span>
                 </div>
-                <div class='body'>{{post.excerpt}}</div>
+                <div class='body'>{{post.summary}}</div>
             </div>
         {% else %}
             {% if published == page.full_posts %}

@@ -8,13 +8,24 @@
     <link rel="stylesheet" href="/css/pygments.css">
     <link rel="stylesheet" href="/css/toc.css">
     <link rel="stylesheet" href="/css/master.css" type="text/css" media="screen" charset="utf-8"/>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
     <script src="/javascripts/jquery-1.11.1.min.js" type="text/javascript" charset="utf-8"></script>
     <script src="/javascripts/jquery.toc.js" type="text/javascript" charset="utf-8"></script>
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            var p1 = 'marco.', p2 = 'guerri', p4 = 'fastmail.com';
+            element = document.getElementById('email');
+            e = p1 + p2  + '@' + p4;
+            element.innerHTML = 'The preferred way to get touch with me is by dropping me an email at <a href=\'mailto:' + e + '\'>' + e + '</a>. ' + element.innerHTML;
+        });
+    </script>
   </head>
   <body>
     <div id='wrapper'>
       <div id='header'>
-        <h1>marco guerri</h1>
+              <h2>marco guerri</h2>
       </div>
       <div id='menu'>
         <ul>
@@ -27,13 +38,10 @@
         {{ content }}
         <div class='clearfix'></div>
       </div>
-    </div>
     <div id='footer'>
-        Copyright © 2014 Marco Guerri. Theme and code customized from
-        <a href="http://github.com/mbleigh"><u>Michael Bleigh</u></a> and
-        <a href="http://github.com/schacon/schacon.github.com/"><u>Scott Chacon</u></a>.
-        Hosted by GitHub and powered by Jekyll.
+        Copyright © 2014-2015 Marco Guerri. 
+        
     </div>
-    
+    </div>    
   </body>
 </html>

@@ -3,14 +3,13 @@ layout: post
 title:  "Gentoo full disk encryption with dm-crypt"
 date:   2013-10-07 13:31:48
 categories: jekyll update
----
-
-
-This post sums up the installation procedure of a Gentoo Linux distribution with
+summary: "This post sums up the installation procedure of a Gentoo Linux distribution with
 encrypted root and swap partitions using LUKS and dm\_crypt. Everything is
 done manually (kernel compilation, creation of the initrd): the aim is 
 therefore to show what happens under the hood when you click on the encryption checkbox 
-in the bottom of a common disk partitioning menu during Linux installation.
+in the bottom of a common disk partitioning menu during Linux installation."
+---
+
 
 {% comment %}
 <div align="center">
@@ -20,6 +19,9 @@ in the bottom of a common disk partitioning menu during Linux installation.
 </div>
 {% endcomment %}
 
+Initial setup
+=============
+
 The procedure is more or less the same as the
 one outlined in the [Gentoo Linux x86 Handbook](#gentoo_handbook). However, when it comes to
 paritioning the drive, compiling the Kernel and setting the initial ramdisk,
@@ -27,9 +29,7 @@ several different steps must be carried out.
 
 I went through the whole process inside a Virtual Machine, using VMWare Player 
 as hypervisor. The Gentoo live image I have used is the weekly build 
-[install-x86-minimal-20130820](#sha512).
-
-Working "remotely" through ssh is much more convenient. RSA/DSA ssh
+[install-x86-minimal-20130820](#sha512). Working "remotely" through ssh is much more convenient. RSA/DSA ssh
 keys must be generated with ssh-keygen, a root password set and sshd daemon started.
 
 {% highlight console linenos %}
@@ -43,6 +43,9 @@ Enter file in which to save the key (/root/.ssh/id_rsa): /etc/ssh/ssh_host_dsa_k
 [...]
 
 {% endhighlight %}
+
+Drives configuration
+====================
 
 The Gentoo Linux x86 Handbook can be followed up to step 4, which covers hard
 disks configuration. I will be using /dev/sda both for boot and root partitions.
@@ -131,6 +134,10 @@ Now the Gentoo Handbook can be resumed from point 4.f
     livecd ~ # swapon /dev/mapper/vg-swap 
     livecd ~ # mount /dev/mapper/vg-root /mnt/gentoo/
 
+
+Kernel compilation
+==================
+
 After the precompiled filesystem has been downloaded and the chrooted environment
 has been set, the kernel must be compiled. The kernel source code can be 
 retrieved through Portage, Gentoo package manager.
@@ -170,6 +177,9 @@ from the one outlined in the guide. My fstab looks like the following:
     /dev/cdrom              /mnt/cdrom  auto    noauto,ro       0 0
     /dev/fd0                /mnt/floppy auto    noauto          0 0
     /proc                   /proc       proc    default
+
+Bootloader installation
+=======================
 
 Chapter 10 of the Gentoo Handbook deals with the installation of the bootloader.
 I will use grub legacy (i.e. v0.97), since I am quite familiar with it and it
@@ -215,6 +225,10 @@ raised (df: cannot read table of mounted file systems). A quick workaround is to
 to /etc/mtab the following entry for the boot partition:
 
     /dev/sda1 /boot ext4 rw,relatime,data=ordered 0 0"
+
+
+Creation of the initrd
+======================
 
 The initial ramdisk responsible for mounting the encrypted device must then be
 created. This should contain cryptsetup tools and all the relative dependencies
@@ -330,7 +344,12 @@ The actual initrd image is then built with the following commands.
 
 I am not completely sure that cpio is part of the minimal gentoo image. 
 It should be in the Gentoo stage3 image just installed, so it might be necessary to 
-specify the absolute path with respect to /mnt/gentoo. Once created the initrd, 
+specify the absolute path with respect to /mnt/gentoo. 
+
+
+Final steps
+===========
+Once created the initrd, 
 grub.conf should be configured to load the kernel image and the initrd. 
 
     title Gentoo
