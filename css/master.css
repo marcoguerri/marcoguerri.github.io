@@ -15,9 +15,8 @@ em {
     padding: 2px 3px;
 }
 
-img.right {
-  float: right;
-  margin: 15px;
+div.post img {
+    width: 100%;
 }
 
 a {
@@ -120,6 +119,7 @@ a {
 
 div.post {
   margin-bottom: 2em;
+  width: 100%;
   float: left;
 }
 
