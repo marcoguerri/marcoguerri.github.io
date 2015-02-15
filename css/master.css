@@ -9,7 +9,10 @@ body {
 
 em {
     background-color: #EEE;
+    border: 1px solid #777;
+    border-radius: 3px;
     font-style: normal;
+    padding: 2px 3px;
 }
 
 img.right {
