@@ -23,7 +23,7 @@ process which is using the library. The bug resides in the implementation of one
 of the features of the TLS protocol, the TLS Hearbeat Extension, and affects
 OpenSSL from version 1.0.1 to 1.0.1f included.
 
-The programming error lies in _t1\_lib.c_ in function tls1\_process\_heartbeat 
+The programming error lies in *ssl/t1_lib.c* in function tls1\_process\_heartbeat 
 A hearbeat request is a way to check if the remote end of the connection is still
 alive. The client sends a request  with a payload and the server is supposed 
 to reply with the same payload.
