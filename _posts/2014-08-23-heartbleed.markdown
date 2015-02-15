@@ -339,217 +339,33 @@ The control path which explains why a heartbeat response is not returned
 is quite complicated and without a proper knowledge of the
 library it's difficult to grasp what the code actually does. After
 a series of *step* and *next*, the single step execution led to the function
-*buffer_write* in *bf_buff.c*.
+*buffer_write* in *bf_buff.c*. 
 
 {% highlight console linenos %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
-2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
-(gdb) s
-2582        unsigned int padding = 16; /* Use minimum padding */
-(gdb) s
-2585        hbtype = *p++;
-(gdb) s
-2586        n2s(p, payload);
-(gdb) 
-2587        pl = p;
-(gdb) 
-2589        if (s->msg_callback)
-(gdb) 
-2594        if (hbtype == TLS1_HB_REQUEST)
-(gdb) 
-2603            buffer = OPENSSL_malloc(1 + 2 + payload + padding);
-(gdb) n
-2604            bp = buffer;
-(gdb) 
-2607            *bp++ = TLS1_HB_RESPONSE;
-(gdb) 
-2608            s2n(payload, bp);
-(gdb) 
-2609            memcpy(bp, pl, payload);
-(gdb) 
-2610            bp += payload;
-(gdb) 
-2612            RAND_pseudo_bytes(bp, padding);
-(gdb) 
+[...]
 2614            r = ssl3_write_bytes(s, TLS1_RT_HEARTBEAT, buffer, 3 + payload + padding);
 (gdb) s
     ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
-    584     const unsigned char *buf=buf_;
-    (gdb) 
-    588     s->rwstate=SSL_NOTHING;
-    (gdb) 
-    589     tot=s->s3->wnum;
-    (gdb) 
-    590     s->s3->wnum=0;
-    (gdb) 
-    592     if (SSL_in_init(s) && !s->in_handshake)
-    (gdb) n
-    603     n=(len-tot);
-    (gdb) 
-    606         if (n > s->max_send_fragment)
-    (gdb) 
-    609             nw=n;
-    (gdb) 
+    [...]
     611         i=do_ssl3_write(s, type, &(buf[tot]), nw, 0);
     (gdb) s
-        do_ssl3_write (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23, 
-        create_empty_fragment=0) at s3_pkt.c:638
-        638     int i,mac_size,clear=0;
-        (gdb) n
-        639     int prefix_len=0;
-        (gdb) 
-        641     long align=0;
-        (gdb) 
-        643     SSL3_BUFFER *wb=&(s->s3->wbuf);
-        (gdb) 
-        649     if (wb->left != 0)
-        (gdb) 
-        653     if (s->s3->alert_dispatch)
-        (gdb) 
-        661     if (wb->buf == NULL)
-        (gdb) 
-        662         if (!ssl3_setup_write_buffer(s))
-        (gdb) 
-        665     if (len == 0 && !create_empty_fragment)
-        (gdb) 
-        668     wr= &(s->s3->wrec);
-        (gdb) 
-        669     sess=s->session;
-        (gdb) 
-        671     if (    (sess == NULL) ||
-        (gdb) 
-        672         (s->enc_write_ctx == NULL) ||
-        (gdb) 
-        671     if (    (sess == NULL) ||
-        (gdb) 
-        676         clear=s->enc_write_ctx?0:1; /* must be AEAD cipher */
-        (gdb) 
-        680         mac_size=0;
-        (gdb) 
-        690     if (!clear && !create_empty_fragment && !s->s3->empty_fragment_done)
-        (gdb) 
-        717     if (create_empty_fragment)
-        (gdb) 
-        730     else if (prefix_len)
-        (gdb) 
-        737         align = (long)wb->buf + SSL3_RT_HEADER_LENGTH;
-        (gdb) 
-        738         align = (-align)&(SSL3_ALIGN_PAYLOAD-1);
-        (gdb) 
-        740         p = wb->buf + align;
-        (gdb) 
-        741         wb->offset  = align;
-        (gdb) 
-        746     *(p++)=type&0xff;
-        (gdb) 
-        747     wr->type=type;
-        (gdb) 
-        749     *(p++)=(s->version>>8);
-        (gdb) 
-        753     if (s->state == SSL3_ST_CW_CLNT_HELLO_B
-        (gdb) 
-        758         *(p++)=s->version&0xff;
-        (gdb) 
-        761     plen=p; 
-        (gdb) 
-        762     p+=2;
-        (gdb) 
-        764     if (s->enc_write_ctx && s->version >= TLS1_1_VERSION)
-        (gdb) 
-        780         eivlen = 0;
-        (gdb) 
-        783     wr->data=p + eivlen;
-        (gdb) 
-        784     wr->length=(int)len;
-        (gdb) 
-        785     wr->input=(unsigned char *)buf;
-        (gdb) 
-        791     if (s->compress != NULL)
-        (gdb) 
-        801         memcpy(wr->data,wr->input,wr->length);
-        (gdb) 
-        802         wr->input=wr->data;
-        (gdb) 
-        809     if (mac_size != 0)
-        (gdb) 
-        816     wr->input=p;
-        (gdb) 
-        817     wr->data=p;
-        (gdb) 
-        819     if (eivlen)
-        (gdb) 
-        827     s->method->ssl3_enc->enc(s,1);
-        (gdb) 
-        830     s2n(wr->length,plen);
-        (gdb) 
-        835     wr->type=type; /* not needed but helps for debugging */
-        (gdb) 
-        836     wr->length+=SSL3_RT_HEADER_LENGTH;
-        (gdb) 
-        838     if (create_empty_fragment)
-        (gdb) 
-        847     wb->left = prefix_len + wr->length;
-        (gdb) 
-        850     s->s3->wpend_tot=len;
-        (gdb) 
-        851     s->s3->wpend_buf=buf;
-        (gdb) 
-        852     s->s3->wpend_type=type;
-        (gdb) 
-        853     s->s3->wpend_ret=len;
-        (gdb) 
+        do_ssl3_write (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23, create_empty_fragment=0) at s3_pkt.c:638
+        [...]
         856     return ssl3_write_pending(s,type,buf,len);
         (gdb) s
-        ssl3_write_pending (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23)
-            at s3_pkt.c:866
-            866     SSL3_BUFFER *wb=&(s->s3->wbuf);
-            (gdb) n
-            869     if ((s->s3->wpend_tot > (int)len)
-            (gdb) 
-            870         || ((s->s3->wpend_buf != buf) &&
-            (gdb) 
-            872         || (s->s3->wpend_type != type))
-            (gdb) 
-            880         clear_sys_error();
-            (gdb) 
-            881         if (s->wbio != NULL)
-            (gdb) 
-            883             s->rwstate=SSL_WRITING;
-            (gdb) 
-            886                 (unsigned int)wb->left);
-            (gdb) 
-            884             i=BIO_write(s->wbio,
-            (gdb) 
-            885                 (char *)&(wb->buf[wb->offset]),
-            (gdb) 
+        ssl3_write_pending (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23) at s3_pkt.c:866
+            [...]
             884             i=BIO_write(s->wbio,
             (gdb) s
                 BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:227
-                227     if (b == NULL)
-                (gdb) n
-                230     cb=b->callback;
-                (gdb) 
-                231     if ((b->method == NULL) || (b->method->bwrite == NULL))
-                (gdb) 
-                237     if ((cb != NULL) &&
-                (gdb) 
+                [...]    
                 241     if (!b->init)
                 (gdb) 
                 247     i=b->method->bwrite(b,in,inl);
                 (gdb) s
                     buffer_write (b=0x99128b0, in=0x995b8cb "\030\003\002", inl=28) at bf_buff.c:199
-                    199     int i,num=0;
-                    (gdb) n
-                    202     if ((in == NULL) || (inl <= 0)) return(0);
-                    (gdb) 
-                    203     ctx=(BIO_F_BUFFER_CTX *)b->ptr;
-                    (gdb) 
-                    204     if ((ctx == NULL) || (b->next_bio == NULL)) return(0);
-                    (gdb) 
-                    206     BIO_clear_retry_flags(b);
-                    (gdb) 
-                    208     i=ctx->obuf_size-(ctx->obuf_len+ctx->obuf_off);
-                    (gdb) 
+                    [...]
                     210     if (i >= inl)
                     (gdb) 
                     212         memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,inl);
@@ -564,6 +380,7 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
                 249     if (i > 0) b->num_write+=(unsigned long)i;
 {% endhighlight %}
 
+A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
 The *buffer_write* function is defined in crypto/bio/bf_buf.c as follows.
 
 {% highlight C linenos %}
@@ -705,8 +522,8 @@ to send a well-formed heartbeat request while tracing *buffer_write*.
     $5 = 5000
  
 
-5000 bytes are written in the output buffer inside the loop at line 54 which is
-then flushed through the socket; the client receives a well-formed heartbeat response.
+The loop at line 54 writes 5000 bytes in the output buffer, which is then flushed through 
+the socket; the client receives a well-formed heartbeat response.
 
 <p align="center"> 
 <a id="single_image" href="/img/hb_working_response.png"><img src="/img/hb_working_response.png" alt=""/></a>
