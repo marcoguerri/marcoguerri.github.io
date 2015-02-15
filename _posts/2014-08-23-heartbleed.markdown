@@ -311,7 +311,7 @@ command.
     (gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
     Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
 
-A breakpoint on _tls1\_process\_heartbeat_ can be set and the execution resumed.
+A breakpoint on *tls1_process_heartbeat* can be set and the execution resumed.
 
     (gdb) break tls1_process_heartbeat
     Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
