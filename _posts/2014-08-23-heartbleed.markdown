@@ -214,8 +214,8 @@ in the configuration file, */etc/nginx/nginx.conf* by default.
     server {
         listen              443 ssl;
         server_name         localhost;
-        ssl_certificate     /home/marco/Desktop/HeartBleed/cacert.pem;
-        ssl_certificate_key /home/marco/Desktop/HeartBleed/private_unencrypted.pem;
+        ssl_certificate     <path_to_ssl_cert>;
+        ssl_certificate_key <path_to_private_key>;
         location / {
                 root   /usr/share/nginx/www;
                 index  index.html index.htm;
@@ -248,7 +248,7 @@ be considered as well-formatted.
 <a id="single_image" href="/img/hb_good_request_detail.png"><img  src="/img/hb_good_request_detail.png" alt=""/></a>
 </p>
 
-Even if the SSL handshake is not terminated, as shown by Wireshark dump, 
+Even if the SSL handshake is not terminated, as shown by the traffic captured with Wireshark, 
 the server should reply anyway with a heartbeat response message. After several 
 unsuccessful attempts, I decided to go more in depth by following step by 
 step the execution on the server side.
@@ -265,19 +265,19 @@ In order to execute libssl code step by step, the sources must be compiled with
 debug symbols and without optimization. Step by step execution of optimized code is very tricky, as
 it's difficult to map the assembly code to the original source due to optimizations 
 like instruction reordering, loop unrolling, inlining. The easiest way is to simply
-turn off optimizations. CFLAGS used by dpkg can be set in /etc/dpkg/buildflags.conf.
+turn off optimizations. CFLAGS used by dpkg can be set in */etc/dpkg/buildflags.conf*.
 In this specific case, the following directive does the job.
 
     SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  
 
 After recompiling  libssl1.0.0, the debugging symbols should be embedded in the library,
-therefore the debug package (libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386) should
+therefore the debug package *libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386* should
 not be necessary. A further simplification which makes the debugging easier is
 to set
 
     worker_processes 1;
 
-in /etc/nginx/nginx.conf, so that there is just one thread serving the requests
+in */etc/nginx/nginx.conf*, so that there is just one thread serving the requests
 coming from the clients. nginx must be stopped and restarted and gdb can
 then be attached to the worker process.
 
@@ -311,7 +311,7 @@ command.
     (gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
     Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
 
-A breakpoint on *tls1_process_heartbeat* can be set and the execution resumed.
+A breakpoint on *tls1\_process\_heartbeat* can be set and the execution resumed.
 
     (gdb) break tls1_process_heartbeat
     Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
@@ -336,8 +336,8 @@ step by step execution.
 
 
 The control path which explains why a heartbeat response is not returned
-is quite complicated and without a proper knowledge of the
-library it's difficult to grasp what the code actually does. After
+is not that trivial and without a proper knowledge of the
+library it's difficult to fully grasp what the code does. After
 a series of *step* and *next*, the single step execution led to the function
 *buffer_write* in *bf_buff.c*. 
 
@@ -381,7 +381,7 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 {% endhighlight %}
 
 A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
-The *buffer_write* function is defined in crypto/bio/bf_buf.c as follows.
+The *buffer_write* function is defined in *crypto/bio/bf_buf.c* as follows.
 
 {% highlight C linenos %}
 static int buffer_write(BIO *b, const char *in, int inl)
@@ -458,8 +458,8 @@ start:
         }
 {% endhighlight %}
 
-This function basically writes the data passed as argument with pointer **in* into
-the buffer pointed by the BIO object **b*. The decision whether to flush or not
+This function writes the data passed as argument with pointer *\*in* into
+the buffer pointed by the BIO object *\*b*. The decision whether to flush or not
 the buffer through the socket is taken based on the size of the data with respect to 
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed (line 14). The heartbeat response message here is 28 bytes and the buffer is 4KB,
@@ -523,7 +523,8 @@ to send a well-formed heartbeat request while tracing *buffer_write*.
  
 
 The loop at line 54 writes 5000 bytes in the output buffer, which is then flushed through 
-the socket; the client receives a well-formed heartbeat response.
+the socket; the client receives a well-formed heartbeat response with a payload
+which matches the one carried in the request message.
 
 <p align="center"> 
 <a id="single_image" href="/img/hb_working_response.png"><img src="/img/hb_working_response.png" alt=""/></a>
@@ -545,7 +546,8 @@ lenght of the data carried inside the message.
 
 Due to the lack of checks on the payload size, the server returns 65536 bytes 
 copied from the address space of the process: <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
-can be adapted to send a malformed request.
+can be adapted to send a malformed request. The heartbeat response message contains 65536 bytes 
+of payload, 16 bytes of padding and 4 bytes of header, 65556 in total.
 
     ➜  ~/heartbleed [1] at 12:35:56 [Thu 12] $ ./send_heartbleed
     Initializing new connection...
@@ -553,8 +555,6 @@ can be adapted to send a malformed request.
     Connected!
     resplen:  65556
 
-As expected, the heartbeat response message contains 65536 bytes of payload, 16 bytes
-of padding and 4 bytes of header, 65556 in total.
 
 Scanning leaked memory
 =============================
@@ -562,10 +562,13 @@ Scanning leaked memory
 After setting up my local nginx instance with a newly generated private/public
 key pair, I tried to look for a prime factor that could divide *n* (part of the 
 public key) in the memory leaked by the server. I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/exploit.c" target="_blank">
-exploit.c</a> to exploit the bug. With *ulimit*, I capped the maximum size of 
-the virtual address space of the process at 256MB and I fired up 8 parallel 
-instances of the script. After ~3M requests, I could not find any trace of the 
-private keys.
+exploit.c</a> to exploit the bug. 
+
+
+
+With *ulimit*, I capped the maximum size of the virtual address space of the process 
+at 256MB and I fired up 8 parallel instances of the script. After ~3M requests, 
+I could not find any trace of the private keys.
 
 
 
