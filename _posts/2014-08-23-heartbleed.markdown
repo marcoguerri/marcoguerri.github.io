@@ -458,8 +458,8 @@ start:
         }
 {% endhighlight %}
 
-This function writes the data passed as argument with pointer *\*in* into
-the buffer pointed by the BIO object *\*b*. The decision whether to flush or not
+This function writes the data passed as argument with pointer <em>*in</em> into
+the buffer pointed by the BIO object <em>*b</em>. The decision whether to flush or not
 the buffer through the socket is taken based on the size of the data with respect to 
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed (line 14). The heartbeat response message here is 28 bytes and the buffer is 4KB,
