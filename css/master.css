@@ -179,8 +179,8 @@ table.post-list {
 }
 
 table.post-list a {
+  font-weight: normal;
   color: #000000;
-  font-weight: bold;
   text-decoration: none;
 }
 
@@ -190,6 +190,7 @@ table.post-list th {
 
 table.post-list td, table.post-list th {
   padding: 0.5em 0.3em;
+  border-bottom: 1px solid #DBA;
 }
 
 table.post-list tr:last-child td, table.post-list tr:last-child th {
