@@ -84,7 +84,7 @@ to notice that resize2fs uses the filesystem blocksize as default unit (normally
 and that the space reported by *df* is the usable space as seen by the user. The actual
 minimum size, metadata included, of an ext filesystem is not trivial to calculate:
 there is a detailed [article](http://www.tldp.org/HOWTO/Filesystems-HOWTO-6.html)
- on TLDP which explains the layout of ext2. The structure basically
+ on TLDP which covers the layout of ext2. The structure basically
 consists of block groups, each one being divided as follows:
 
 * Superblock
@@ -98,7 +98,7 @@ Taking into consideration all contributions of the metadata requires an in-depth
 understanding of the filesystem, but resize2fs comes to the rescue. In fact, 
 this calculation is done by function *calculate\_minimum\_resize\_size* 
 in [*resize/resize2fs.c*](http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/resize/resize2fs.c#n2769). If resize2fs is invoked with a command line argument  which is lower than the value returned
-by this function, it raises an error followed by the minimum allowed size of the
+by that function, it raises an error followed by the minimum allowed size of the
 filesystem, as the number of 4K blocks. Add a small margin and proceed.
 
 {% highlight console lineos %}
@@ -170,10 +170,10 @@ sda                       8:0    0 745.2G  0 disk
 The LVs occupy around 30GB altogether, hence the underlying physical volume could be 
 resized to match this value with the usual safety margin. Unfortunately, this operation 
 is not immediately straightforward because the physical extents (PE) which map 
-the logical extends (LE) are normally fragmented throughout the whole physical volume. The physical extents must be therefore collected at the beginning of the PV. 
+the logical extends (LE) are normally fragmented throughout the whole physical 
+volume. The physical extents must be therefore collected at the beginning of the PV. 
 *pvdisplay* and *pvs* can be used to verify how many PEs are used and how these are mapped on 
 the PV.
-
 
 {% highlight console lineos %}
 [root@localhost tmp]# pvdisplay | grep Allocated
@@ -200,8 +200,8 @@ This operation can be accomplished with *pvmove* command, which should result in
 the following situation.
 
 {% highlight console lineos %}
-pvmove --alloc anywhere /dev/sda2:22494:22838 /dev/sda2:473-817
-
+[root@localhost tmp]# pvmove --alloc anywhere /dev/sda2:22494:22838 /dev/sda2:473-817
+[...]
 [root@localhost tmp]# pvs -v --segments /dev/sda2
     Using physical volume(s) on command line.
     Wiping cache of LVM-capable devices
@@ -217,8 +217,8 @@ pvmove --alloc anywhere /dev/sda2:22494:22838 /dev/sda2:473-817
 {% endhighlight %}
 
 At this point it would be a good idea to check that the logical volumes can still
-be mounted and that e2fsck does not report any problem. We have now 818 PE allocated
-which roughly corresponds to 25GB
+be mounted and that e2fsck does not report any problem. We have now 818x32 MiB 
+Physical Extents allocated, which roughly corresponds to 25GB.
 
 
 {% highlight console lineos %}
@@ -242,9 +242,11 @@ The PV can be resized taking into consideration a safety margin.
 Resizing the partition
 =======
 
-The partition /dev/sda2 now occupies much more space than it's necessary for the 
-physical volume. It can be therefore resized accordingly. This step is very critical
-and needs much attention. *fdisk* shows the information concerning the current partition
+The partition /dev/sda2 is now larger than it's necessary for the 
+physical volume. Resizing a partition basically means redefining its boundaries 
+in the partition table, i.e. start and end sector: this is a critical step, 
+which requires much attention. *fdisk* shows the information concerning the current 
+layout of the disk.
 
  
 {% highlight console lineos %}
@@ -254,11 +256,10 @@ Partition 1 does not end on cylinder boundary.
 /dev/sda2             131       97282   780361728   8e  Linux LVM
 {% endhighlight %}
 
-The unit used by fdisk is cylinders, in this case corresponding to ~7.84MiB. The
-partition must be deleted and recreated with the same starting sector. Let's say
-that the new partition must be at least of 35GB, ~4571 cylinders. After creating
-the new partition, remember to set the partition type to LVM with fdisk. After 
-creating the new partition, I have the following situation.
+The unit used by fdisk is cylinders, which corresponds to ~7.84MiB. /dev/sda2 must be
+deleted and recreated with the same Start sector. The End sector is obviously defined
+based on the desired size, 35GB in this case or ~4571 cylinders. LVM type must also
+be set with fdisk. The layout is now the following:
 
 {% highlight console lineos %}
 [root@localhost tmp]# parted -l
@@ -273,8 +274,9 @@ Number  Start   End     Size    Type     File system  Flags
 
 {% endhighlight %}
 
-To obtain a compressed image of the disk, proceed deactivating the logical volumes
-and dumping ~40GB from /dev/sda.
+To obtain a compressed image of the disk, the LVs must be first disabled and /dev/sda
+dumped for around ~40GB from the beginning of the disk: everything else beyond this
+area is unallocated space and therefore not interesting.
 
 
 {% highlight console lineos %}
@@ -282,9 +284,11 @@ vgchange -a n vg1
 dd if=/dev/sda conv=sync bs=128K count=328000| gzip -c  > /tmp/sda.img.gzip
 {% endhighlight %}
 
-I obtained a 14GB image, with more careful roundings, the compression ratio can
-be improved significantly. To test the restore procedure, the image can be simply 
-rewritten on the disk.
+Make sure the live environment provides enough in-memory space for dumping the whole
+compressed file. My configuration led to a 14GB image, and RAM was large enough
+to host this file. With more careful rounding, 
+the compression ratio can be improved significantly. To test the restore procedure, 
+the image can be simply decompressed and written on the disk.
 
 
 {% highlight console lineos %}
@@ -298,4 +302,4 @@ rewritten on the disk.
 
 {% endhighlight %}
 
-If everything went well, the system should boot into exact same system as before.
+If everything went well, the system should boot into the exact same environment as before.
