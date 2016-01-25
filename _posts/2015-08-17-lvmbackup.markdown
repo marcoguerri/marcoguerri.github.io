@@ -152,7 +152,7 @@ Do you really want to reduce swap? [y/n]: y
 
 {% endhighlight %}
 
-Modying the mapping of the Extents
+Modifying the mapping of the Extents
 =======
 The current situation is shown below.
 {% highlight console lineos %}
