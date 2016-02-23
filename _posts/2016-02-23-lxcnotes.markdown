@@ -1,0 +1,101 @@
+---
+layout: post
+title:  "LXC notes "
+date:   2016-02-23 15:28:23
+categories: jekyll update
+summary: "Just some notes on the creation and operation of Linux containers. 
+Mostly for myself, to clarify and hopefully retain some concepts that are not
+part of my daily work and that I tend to forget."
+---
+
+
+Setup of the machine
+=======
+All the steps below refer to a host system running Linux Debian 8.2.
+*lxc* package is needed to operate Linux containers in userspace.
+This will install lxc templates under /usr/share/lxc/templates/. These templates
+are basically shell script responsible for the creation of the rootfs that will
+be mounted by the container.
+
+
+Creation of the container
+=======
+To create a Debian based container, the lxc-debian template can be used. This uses
+debootstrap to to create a Debian based roots, which in my case is located under
+/var/lib/lxc/DebianTestContainer/rootfs.
+
+
+{% highlight console lineos %}
+sudo lxc-create -n DebianTestContainer -t /usr/share/lxc/templates/lxc-debian
+{% endhighlight %}
+
+The container can be started as follows:
+
+
+{% highlight console lineos %}
+sudo lxc-start -d -n DebianTestContainer
+{% endhighlight %}
+This will start the container in the background, and a getty will be spawned on
+tty[1..4], according to the template I have on my machine. lxc-console can be used
+to connect to a tty that can be specified with -t option (0 is the console, any other 
+number is a tty).
+
+{% highlight console lineos %}
+➜ mguerri-lenovo ~/nas/Data/Technical [] at 21:54:32 [Tue 23] $ sudo lxc-console -n DebianTestContainer -t 1
+
+Connected to tty 1
+Type <Ctrl+a q> to exit the console, <Ctrl+a Ctrl+a> to enter Ctrl+a itself
+
+Debian GNU/Linux 8 DebianTestContainer tty1
+
+DebianTestContainer login:
+{% endhighlight %}
+
+The newly created container is endowed only with a loopback interface. Network interface
+must be defined at creation time and LXC provides all the tools to abstract most
+of the complexity. Each container can be configured using a file deployed under
+/var/lib/lxc/<ContainerName>/config. After the creation of the container, without
+any other addition, the config file of my DebianTestContainer looks like the following
+
+
+{% highlight console lineos %}
+# Template used to create this container: /usr/share/lxc/templates/lxc-debian
+# Parameters passed to the template:
+# For additional config options, please look at lxc.container.conf(5)
+lxc.network.type = empty
+lxc.rootfs = /var/lib/lxc/DebianTestContainer/rootfs
+
+# Common configuration
+lxc.include = /usr/share/lxc/config/debian.common.conf
+
+# Container specific configuration
+lxc.mount = /var/lib/lxc/DebianTestContainer/fstab
+lxc.utsname = DebianTestContainer
+lxc.arch = amd64
+lxc.autodev = 1
+lxc.kmsg = 0
+{% endhighlight %}
+
+
+
+Networking
+=======
+The simplest network configuration for the container is based on bridges and veth
+devices.
+
+
+
+
+Linux bridges
+=======
+Linux bridges are expose to userspace as network device whose job is to forward
+traffic (between what will soon come) at Layer 2, i.e. based on hardware addresses.
+Forwarding decisions are taken based on a table of MAC addresses that is filled in after
+discovering which hosts are connected to which network. A software bridge is normally
+created to link a physical network interface to a virtual network interface belonging
+to a virtual network. Once the bridge is up and running, the OS will reply to all 
+ARP queries for MAC addresses belonging to the virtual network and will forward
+incoming frames, via the bridge, to the virtual network. Under Debian, the bridge
+can be set up via */etc/network/interfaces* or by using *ip*. I will use the latter
+method.
+
