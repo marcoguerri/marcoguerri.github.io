@@ -3,9 +3,8 @@ layout: post
 title:  "LXC notes "
 date:   2016-02-23 15:28:23
 categories: jekyll update
-summary: "Just some notes on the creation and operation of Linux containers. 
-Mostly for myself, to clarify and hopefully retain some concepts that are not
-part of my daily work and that I tend to forget."
+summary: "Just some notes on the creation and operation of Linux containers.
+This post is work in progress..."
 ---
 
 
@@ -89,13 +88,78 @@ devices.
 Linux bridges
 =======
 Linux bridges are expose to userspace as network device whose job is to forward
-traffic (between what will soon come) at Layer 2, i.e. based on hardware addresses.
-Forwarding decisions are taken based on a table of MAC addresses that is filled in after
+traffic between two networks at Layer 2, i.e. based on hardware addresses (just
+like a switch). Forwarding decisions are taken based on a table of MAC addresses that is filled in after
 discovering which hosts are connected to which network. A software bridge is normally
 created to link a physical network interface to a virtual network interface belonging
 to a virtual network. Once the bridge is up and running, the OS will reply to all 
 ARP queries for MAC addresses belonging to the virtual network and will forward
 incoming frames, via the bridge, to the virtual network. Under Debian, the bridge
-can be set up via */etc/network/interfaces* or by using *ip*. I will use the latter
-method.
+can be set up in several different ways:
 
+* Via */etc/network/interfaces*
+* Using *ip* command from iproute2
+* Using *brctl* command (deprecated)
+
+I will be using the second method. The following commands can be used to create
+a bridge and add a physical interface.
+
+{% highlight console lineos %}
+ip link add name br0 type bridge
+ip link set br0 up
+ip link set eth0 master br0
+{% endhighlight %}
+
+Bridge can be removed with *ip link del br0*. The bridge is now visible as a 
+network interface, which does not have level 3 presence yet, as an IP has not been
+assigned to it.
+
+{% highlight console lineos %}
+➜ mguerri-lenovo ~ [] at 21:59:40 [Tue 8] $ ip a
+
+7: br0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 3c:97:0e:6e:e1:54 brd ff:ff:ff:ff:ff:ff
+
+➜ mguerri-lenovo ~ [] at 21:59:38 [Tue 8] $ sudo brctl show
+bridge name bridge id       STP enabled interfaces
+br0     8000.3c970e6ee154   no      eth0
+docker0     8000.02425570456f   no
+{% endhighlight %}
+
+After adding eth0 to br0, the network stops working, I can't even ping my default 
+gateway. My arp table now looks like the following:
+
+
+{% highlight console lineos %}
+➜  ~ [] at 22:41:38 [Tue 8] $ sudo ip neigh                     
+192.168.0.1 dev br0 lladdr fc:c8:97:b7:a2:74 REACHABLE
+192.168.0.3 dev eth0 lladdr f8:32:e4:ea:bc:96 STALE
+192.168.0.1 dev eth0  INCOMPLETE
+{% endhighlight %}
+
+The MAC address of the default gateway is indeed fc:c8:97:b7:a2:74, but this
+entry is associated with br0, not eth0. In fact, what happens is that my 
+host keeps on broadcasting ARP requests for 192.168.0.1, even though the response
+is correctly received, but associated with br0. Once routing decision has been taken
+and eth0 is chosen for sending traffic on the local network, the ARP resolution
+is not available for layer 2 forwarding. An entry can be manually added (or
+replaced, as there is already an INCOMPLETE entry in the table) as follows:
+
+{% highlight console lineos %}
+➜  ~ [] at 22:58:01 [Tue 8] $ sudo ip neigh replace 192.168.0.1 lladdr fc:c8:97:b7:a2:74 dev eth0 nud reachable
+➜ mguerri-lenovo ~ [] at 22:58:05 [Tue 8] $ sudo ip neigh
+192.168.0.3 dev br0 lladdr f8:32:e4:ea:bc:96 STALE
+192.168.0.1 dev br0 lladdr fc:c8:97:b7:a2:74 REACHABLE
+192.168.0.3 dev eth0  FAILED
+192.168.0.1 dev eth0 lladdr fc:c8:97:b7:a2:74 REACHABLE
+{% endhighlight %}
+
+Now local network and everything behind the gateway can be reached.
+
+{% highlight console lineos %}
+➜ mguerri-lenovo ~ [] at 22:26:15 [Tue 8] $ ping 192.168.0.1
+PING 192.168.0.1 (192.168.0.1) 56(84) bytes of data.
+64 bytes from 192.168.0.1: icmp_seq=1 ttl=64 time=0.519 ms
+{% endhighlight %}
+
+So, why is the ARP entry associated to br0 in the first place?
