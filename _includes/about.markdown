@@ -1,13 +1,12 @@
 About
 =====
-My name is **Marco Guerri**, I was born in 1988 in Modena, Italy. I studied Computer Engineering 
-at University of Modena and Reggio Emilia and I currently work at CERN, the Conseil Européen pour la Recherche Nucléaire
-or European Council for Nuclear Research.
+I was born in Modena, Italy, too many years ago. I studied Computer Engineering 
+at University of Modena and Reggio Emilia and I currently work at CERN, the 
+European Organization for Nuclear Research.
 
-My daily job involves both software development and working with enterprise level hardware.
-My team is responsible for managing the CPU and storage servers deployed in the CERN 
-Data Centre in Geneva (Switzerland) and Budapest (Hungary) and for developing a
-collection of software related to hardware monitoring and capacity management.
+The usefulness of this blog is highly questionable. This is meant to be mostly a place
+for myself, a place where to dump ideas and experiments in a slightly more formal
+way than it would normally happen on my notebook (yeah, old school).
 
 {% comment %}
 Softwares behind this blog
