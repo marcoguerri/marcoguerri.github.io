@@ -99,8 +99,8 @@ openssl:
 At a first glance, this might seem a vulnerable release, but the output
 of openssl version shows that the package has been compiled in early 2015.
 
-{% highlight console lineos %} 
-➜  ~ [1] at 15:48:51 [Sun 1] $ openssl version -a              
+{% highlight console lineos %}
+➜  ~ [1] at 15:48:51 [Sun 1] $ openssl version -a
 OpenSSL 1.0.1e 11 Feb 2013
 built on: Thu Jan  8 21:47:50 UTC 2015
 platform: debian-i386-i686/cmov
@@ -114,7 +114,6 @@ On April the 7th, heartbleed bug was fixed and a patch was applied to the packag
 incrementing the release to deb7u5.
 
 {% highlight console lineos %} 
-
 openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 
   * Non-maintainer upload by the Security Team.
@@ -210,35 +209,38 @@ nginx installation
 nginx can be configured to enable HTTPS connections by simply adding this entry
 in the configuration file, */etc/nginx/nginx.conf* by default.
 
+{% highlight console linenos %}
 
-    server {
-        listen              443 ssl;
-        server_name         localhost;
-        ssl_certificate     <path_to_ssl_cert>;
-        ssl_certificate_key <path_to_private_key>;
-        location / {
-                root   /usr/share/nginx/www;
-                index  index.html index.htm;
-        }
+server {
+    listen              443 ssl;
+    server_name         localhost;
+    ssl_certificate     <path_to_ssl_cert>;
+    ssl_certificate_key <path_to_private_key>;
+    location / {
+            root   /usr/share/nginx/www;
+            index  index.html index.htm;
     }
+}
 
-
+{% endhighlight %}
 Heartbeat request
 =================
 The very first step is to try to send a proper hearbeat request to the nginx
 instance.
 
-    0x18                    # Type: Heartbeat
-    0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
-    0x00 0x17               # Record length, size of the heartbeat message
-    0x01                    # hearbeat message type: request
-    0x00 0x04               # Payload size
-    0xDE 0xAD 0xBE 0xEF     # Payload
-    0xAB 0x9A 0xC1 0x97     # 16 bytes random padding
-    0xDA 0xC8 0xFC 0x92     # 
-    0x9E 0xEE 0xD4 0x3B     #
-    0x93 0xDD 0x7D 0xB5     #
+{% highlight python linenos %}
+0x18                    # Type: Heartbeat
+0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
+0x00 0x17               # Record length, size of the heartbeat message
+0x01                    # hearbeat message type: request
+0x00 0x04               # Payload size
+0xDE 0xAD 0xBE 0xEF     # Payload
+0xAB 0x9A 0xC1 0x97     # 16 bytes random padding
+0xDA 0xC8 0xFC 0x92     # 
+0x9E 0xEE 0xD4 0x3B     #
+0x93 0xDD 0x7D 0xB5     #
 
+{% endhighlight %}
 It turned out to be a bit more complicated than that. The heartbeat message is sent
 to the server but no response whatsoever is returned. The following picture shows
 that Wireshark decodes properly the SSL record, which means that the message can
@@ -268,71 +270,71 @@ like instruction reordering, loop unrolling, inlining. The easiest way is to sim
 turn off optimizations. CFLAGS used by dpkg can be set in */etc/dpkg/buildflags.conf*.
 In this specific case, the following directive does the job.
 
-    SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  
+SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  
 
 After recompiling  libssl1.0.0, the debugging symbols should be embedded in the library,
 therefore the debug package *libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386* should
 not be necessary. A further simplification which makes the debugging easier is
 to set
 
-    worker_processes 1;
+worker_processes 1;
 
 in */etc/nginx/nginx.conf*, so that there is just one thread serving the requests
 coming from the clients. nginx must be stopped and restarted and gdb can
 then be attached to the worker process.
 
-    ➜  ~ [1] at 10:15:57 [Thu 12] $ ps aux | grep nginx
-    root      5210  0.0  0.0  11980   960 ?        Ss   10:15   0:00 nginx: master process /usr/sbin/nginx
-    www-data  5211  0.0  0.0  12144  1356 ?        S    10:15   0:00 nginx: worker process
-    marco     5258  0.0  0.0   3548   804 pts/0    S+   10:15   0:00 grep nginx
-    ➜  ~ [1] at 10:15:58 [Thu 12] $ sudo gdb           
-    GNU gdb (GDB) 7.4.1-debian
-    Copyright (C) 2012 Free Software Foundation, Inc.
-    License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
-    This is free software: you are free to change and redistribute it.
-    There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
-    and "show warranty" for details.
-    This GDB was configured as "i486-linux-gnu".
-    For bug reporting instructions, please see:
-    <http://www.gnu.org/software/gdb/bugs/>.
-    (gdb) attach 5211
+➜  ~ [1] at 10:15:57 [Thu 12] $ ps aux | grep nginx
+root      5210  0.0  0.0  11980   960 ?        Ss   10:15   0:00 nginx: master process /usr/sbin/nginx
+www-data  5211  0.0  0.0  12144  1356 ?        S    10:15   0:00 nginx: worker process
+marco     5258  0.0  0.0   3548   804 pts/0    S+   10:15   0:00 grep nginx
+➜  ~ [1] at 10:15:58 [Thu 12] $ sudo gdb           
+GNU gdb (GDB) 7.4.1-debian
+Copyright (C) 2012 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "i486-linux-gnu".
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+(gdb) attach 5211
 
 
 gdb executes the ptrace system call and starts tracing nginx. It then tries to load the
 symbols of all the shared objects mapped in the address space of the process, including
 libssl.so.1.0.0. If gdb fails to load the symbols for libssl, then something went wrong.
 
-    Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
-    Loaded symbols for /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0
+Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
+Loaded symbols for /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0
 
 gdb should also be pointed to the location of the source code with the *directory*
 command.
 
-    (gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
-    Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
+(gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
+Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
 
 A breakpoint on *tls1\_process\_heartbeat* can be set and the execution resumed.
 
-    (gdb) break tls1_process_heartbeat
-    Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
-    (gdb) c
-    Continuing.
+(gdb) break tls1_process_heartbeat
+Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
+(gdb) c
+Continuing.
 
 Now, upon receiving a heartbeat message, the code will hit the breakpoint, allowing
 step by step execution.
 
 
-    Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
-    2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
-    (gdb) s
-    2582        unsigned int padding = 16; /* Use minimum padding */
-    (gdb) s
-    2585        hbtype = *p++;
-    (gdb) s
-    2586        n2s(p, payload);
-    (gdb) 
-    2587        pl = p;
-    (gdb)
+Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
+2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
+(gdb) s
+2582        unsigned int padding = 16; /* Use minimum padding */
+(gdb) s
+2585        hbtype = *p++;
+(gdb) s
+2586        n2s(p, payload);
+(gdb) 
+2587        pl = p;
+(gdb)
 
 
 The control path which explains why a heartbeat response is not returned
@@ -346,38 +348,38 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 [...]
 2614            r = ssl3_write_bytes(s, TLS1_RT_HEARTBEAT, buffer, 3 + payload + padding);
 (gdb) s
-    ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
+ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
+[...]
+611         i=do_ssl3_write(s, type, &(buf[tot]), nw, 0);
+(gdb) s
+    do_ssl3_write (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23, create_empty_fragment=0) at s3_pkt.c:638
     [...]
-    611         i=do_ssl3_write(s, type, &(buf[tot]), nw, 0);
+    856     return ssl3_write_pending(s,type,buf,len);
     (gdb) s
-        do_ssl3_write (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23, create_empty_fragment=0) at s3_pkt.c:638
+    ssl3_write_pending (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23) at s3_pkt.c:866
         [...]
-        856     return ssl3_write_pending(s,type,buf,len);
+        884             i=BIO_write(s->wbio,
         (gdb) s
-        ssl3_write_pending (s=0x9910a58, type=24, buf=0x99609a8 "\002", len=23) at s3_pkt.c:866
-            [...]
-            884             i=BIO_write(s->wbio,
+            BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:227
+            [...]    
+            241     if (!b->init)
+            (gdb) 
+            247     i=b->method->bwrite(b,in,inl);
             (gdb) s
-                BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:227
-                [...]    
-                241     if (!b->init)
+                buffer_write (b=0x99128b0, in=0x995b8cb "\030\003\002", inl=28) at bf_buff.c:199
+                [...]
+                210     if (i >= inl)
                 (gdb) 
-                247     i=b->method->bwrite(b,in,inl);
-                (gdb) s
-                    buffer_write (b=0x99128b0, in=0x995b8cb "\030\003\002", inl=28) at bf_buff.c:199
-                    [...]
-                    210     if (i >= inl)
-                    (gdb) 
-                    212         memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,inl);
-                    (gdb) 
-                    213         ctx->obuf_len+=inl;
-                    (gdb) 
-                    214         return(num+inl);
-                    (gdb) 
-                    268     }
-                    (gdb) 
-                BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:249
-                249     if (i > 0) b->num_write+=(unsigned long)i;
+                212         memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,inl);
+                (gdb) 
+                213         ctx->obuf_len+=inl;
+                (gdb) 
+                214         return(num+inl);
+                (gdb) 
+                268     }
+                (gdb) 
+            BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:249
+            249     if (i > 0) b->num_write+=(unsigned long)i;
 {% endhighlight %}
 
 A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
@@ -385,58 +387,58 @@ The *buffer_write* function is defined in *crypto/bio/bf_buf.c* as follows.
 
 {% highlight C linenos %}
 static int buffer_write(BIO *b, const char *in, int inl)
-        {
-        int i,num=0;
-        BIO_F_BUFFER_CTX *ctx;
+    {
+    int i,num=0;
+    BIO_F_BUFFER_CTX *ctx;
 
-        if ((in == NULL) || (inl <= 0)) return(0);
-        ctx=(BIO_F_BUFFER_CTX *)b->ptr;
-        if ((ctx == NULL) || (b->next_bio == NULL)) return(0);
+    if ((in == NULL) || (inl <= 0)) return(0);
+    ctx=(BIO_F_BUFFER_CTX *)b->ptr;
+    if ((ctx == NULL) || (b->next_bio == NULL)) return(0);
 
-        BIO_clear_retry_flags(b);
+    BIO_clear_retry_flags(b);
 start:
-        i=ctx->obuf_size-(ctx->obuf_len+ctx->obuf_off);
-        /* add to buffer and return */
-        if (i >= inl)
-                {
-                memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,inl);
-                ctx->obuf_len+=inl;
-                return(num+inl);
-                }
-        /* else */
-        /* stuff already in buffer, so add to it first, then flush */
-        if (ctx->obuf_len != 0)
-                {
-                if (i > 0) /* lets fill it up if we can */
-                        {
-                        memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,i);
-                        in+=i;
-                        inl-=i;
-                        num+=i;
-                        ctx->obuf_len+=i;
-                        }
-                /* we now have a full buffer needing flushing */
-                for (;;)
-                        {
-                        i=BIO_write(b->next_bio,&(ctx->obuf[ctx->obuf_off]),
-                                ctx->obuf_len);
-                        if (i <= 0)
-                                {
-                                BIO_copy_next_retry(b);
+    i=ctx->obuf_size-(ctx->obuf_len+ctx->obuf_off);
+    /* add to buffer and return */
+    if (i >= inl)
+            {
+            memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,inl);
+            ctx->obuf_len+=inl;
+            return(num+inl);
+            }
+    /* else */
+    /* stuff already in buffer, so add to it first, then flush */
+    if (ctx->obuf_len != 0)
+            {
+            if (i > 0) /* lets fill it up if we can */
+                    {
+                    memcpy(&(ctx->obuf[ctx->obuf_off+ctx->obuf_len]),in,i);
+                    in+=i;
+                    inl-=i;
+                    num+=i;
+                    ctx->obuf_len+=i;
+                    }
+            /* we now have a full buffer needing flushing */
+            for (;;)
+                    {
+                    i=BIO_write(b->next_bio,&(ctx->obuf[ctx->obuf_off]),
+                            ctx->obuf_len);
+                    if (i <= 0)
+                            {
+                            BIO_copy_next_retry(b);
 
-                                if (i < 0) return((num > 0)?num:i);
-                                if (i == 0) return(num);
-                                }
-                        ctx->obuf_off+=i;
-                        ctx->obuf_len-=i;
-                        if (ctx->obuf_len == 0) break;
-                        }
-                }
-        /* we only get here if the buffer has been flushed and we
-         * still have stuff to write */
-        ctx->obuf_off=0;
+                            if (i < 0) return((num > 0)?num:i);
+                            if (i == 0) return(num);
+                            }
+                    ctx->obuf_off+=i;
+                    ctx->obuf_len-=i;
+                    if (ctx->obuf_len == 0) break;
+                    }
+            }
+    /* we only get here if the buffer has been flushed and we
+     * still have stuff to write */
+    ctx->obuf_off=0;
 
-        /* we now have inl bytes to write */
+    /* we now have inl bytes to write */
         while (inl >= ctx->obuf_size)
                 {
                 i=BIO_write(b->next_bio,in,inl);
