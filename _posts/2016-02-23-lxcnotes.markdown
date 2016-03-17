@@ -4,7 +4,7 @@ title:  "LXC notes "
 date:   2016-02-23 15:28:23
 categories: jekyll update
 summary: "Just some notes on the creation and operation of Linux containers.
-This post is work in progress..."
+Still work in progress..."
 ---
 
 

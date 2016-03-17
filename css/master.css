@@ -151,7 +151,7 @@ div.post {
 .highlight .lineno {
   border-right:1px solid #ccc;
   padding-left: 0.5em;
-  padding-right: 0.5em;
+ padding-right: 0.5em;
   font-size: 1em;
   color: white !important;
 }
@@ -167,7 +167,7 @@ figure {
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
   display: block; 
-  padding: 0.5em;
+  padding: 1em;
   overflow-x: auto; 
   font-family: Monaco,Consolas, Courier New, Monospace !important;
   font-size:110%;
@@ -187,9 +187,9 @@ figure {
   border: none;
   border-width: none;
   padding: none;
-  overflow: none;
+  overflow: auto;
+  font-size:80%;
   color: none;
-  line-height: none;
   letter-spacing: 0;
 }
 table.post-list {

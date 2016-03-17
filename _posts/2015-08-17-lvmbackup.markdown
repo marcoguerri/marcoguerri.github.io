@@ -7,8 +7,8 @@ categories: jekyll update
 pygments: true
 summary: "This post summarizes the backup procedure of a Linux installation based
 on a boot partition and three LVM logical volumes for root, var and swap. This proves
-useful when a Linux installation must be snapshotted and moved to a different machine
-using the lowest possible amount of space. All the following commands have been
+useful when a Linux installation must be snapshotted and moved to another identical 
+machine using the lowest possible amount of space. All the following commands have been
 executed from a live image based on RedHat Linux."
 ---
 
@@ -242,9 +242,9 @@ The PV can be resized taking into consideration a safety margin.
 Resizing the partition
 =======
 
-The partition /dev/sda2 is now larger than it's necessary for the 
-physical volume. Resizing a partition basically means redefining its boundaries 
-in the partition table, i.e. start and end sector: this is a critical step, 
+The partition /dev/sda2 is now larger than the physical volume requires. 
+Resizing a partition basically means redefining its boundaries 
+in the partition table, i.e. start and end coordinates: this is a critical step, 
 which requires much attention. *fdisk* shows the information concerning the current 
 layout of the disk.
 
@@ -256,10 +256,30 @@ Partition 1 does not end on cylinder boundary.
 /dev/sda2             131       97282   780361728   8e  Linux LVM
 {% endhighlight %}
 
-The unit used by fdisk is cylinders, which corresponds to ~7.84MiB. /dev/sda2 must be
-deleted and recreated with the same Start sector. The End sector is obviously defined
-based on the desired size, 35GB in this case or ~4571 cylinders. LVM type must also
-be set with fdisk. The layout is now the following:
+Pre-GPT partition tables identify the boundaries of partitions both in CHS and 
+LBA coordinates. fdisk default displaying unit is cylinders. This comes from the 
+DOS era when partitions had to be aligned to cylinder boundaries. As a matter of fact, 
+cylinders are identified in the partition table with 10 bits, so a value higher 
+than 1024 is just an abstraction implemented by fdisk (also known as  DOS-compatible 
+mode).  Nowadays this mode is 
+deprecated and logical sectors values are highly recommended. Furthermore, on this 
+machine the underlying device is a Solid State Drive, so CHS addressing does not
+make any sense at all. And there is more! This is a 4KB pages device so not
+even 512 bytes logical block addressing makes sense: it is purely an abstraction 
+implemented by the firmware. For the remainder of these notes, I have used cylinder
+values. This is really not a good a idea, as the resulting partition is not aligned
+with the optimal I/O size of the device, 4KB, which impacts both performance and 
+flash wearout, the latter maybe not being that critical anymore in 2016. 
+A flawless redefinition of the partition boundaries must take into consideration 
+the optimal I/O size.
+
+Anyhow, I will be continuing considering cylinder
+coordinates.
+
+fdisk reports that a cylinder corresponds to ~7.84MiB. /dev/sda2 must be
+deleted and recreated with the same Start cylinder. The End cylinder is obviously 
+defined based on the desired size, 35GB in this case or ~4571 cylinders. LVM type 
+must also be set with fdisk. The layout is now the following:
 
 {% highlight console lineos %}
 [root@localhost tmp]# parted -l
