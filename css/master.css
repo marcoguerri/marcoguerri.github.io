@@ -85,14 +85,21 @@ a {
 
 #content {
   margin-bottom: 50px;
-  margin-left: auto;
-  margin-right: auto;
+  margin: auto;
   text-align: justify;
   padding: 2em;
   width: 40%;
   background: #FAFAFA;
 }
 
+.content-books {
+  margin-bottom: 50px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: justify;
+  padding: 2em;
+  background: #FAFAFA;
+}
 #content h2 {
   margin: 0 0 0.5em 0;
   color: black;
@@ -102,7 +109,6 @@ a {
 #content p {
   line-height: 140%;
   width: 100%;
-  align:center;
 }
 
 .date {
@@ -151,7 +157,7 @@ div.post {
 .highlight .lineno {
   border-right:1px solid #ccc;
   padding-left: 0.5em;
- padding-right: 0.5em;
+  padding-right: 0.5em;
   font-size: 1em;
   color: white !important;
 }
@@ -160,6 +166,13 @@ figure {
     width:100%;
     margin: 0;
 }
+
+.highlight {
+    width:auto;
+    padding-right:2em;
+}
+
+
 .highlight pre code {
   width:100%;
   background: rgb(51, 51, 51);
@@ -175,6 +188,7 @@ figure {
 }
 
 .highlight pre pre {
+    margin:auto;
     padding-left:1em;
 
 }
@@ -209,7 +223,7 @@ table.post-list th {
 
 table.post-list td, table.post-list th {
   padding: 0.5em 0.3em;
-  border-bottom: 1px solid #DBA;
+  border-bottom: 0.1em solid #E1E1E1;
 }
 
 table.post-list tr:last-child td, table.post-list tr:last-child th {
