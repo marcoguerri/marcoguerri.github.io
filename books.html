@@ -9,10 +9,9 @@ full_posts: 2
 
     Despite being by no means an avid reader, among the activities I enjoy reading is 
     certainly one worth writing few lines about. I mainly read books related to
-    science, computers, history and I really love horror novels. This section will
-    be forever work in progress, but the main idea is the following:
-    collecting some ideas and recommendations about interesting readings.
-    It will happen, at some point...
+    science, computers, history and I really love horror novels. The main idea 
+    of this section is to collect some ideas and recommendations about interesting 
+    readings.
     
   <!--  . All the covers displayed on this site are a 
     curtesy of the OpenLibrary project. </div>
@@ -24,10 +23,10 @@ full_posts: 2
 
 
 {% for post in site.posts %}
-  {% if post.title contains 'Books' %}
+  {% if post.keywords contains 'Books' %}
       {% if forloop.index < page.full_posts %}
       <div class='post'>
-        <h1><a href='{{post.url}}'>{{post.title}}</a></h1>
+        <h1><a href='{{post.url}}'><b>{{post.title}}</b></a></h1>
         <div class="date"> 
         <span class='date'>{{post.date | date_to_string}}</span>
         </div>
@@ -36,14 +35,16 @@ full_posts: 2
       {% else %}
         {% if forloop.index == page.full_posts %}
         <h3>Older Posts</h3>
-        <table class='post-list'>
         Work in progress...
         {% endif %}
+
+        <table class='post-list'>
         <tr>
-          <th><a href='{{ post.url }}'>{{ post.title }}</a></th>
+          <th><a href='{{ post.url }}'><b>{{ post.title }}</b></a></th>
           <td>{{ post.date | date: "%-d %B %Y" }}</td>
         </tr>
+        </table>
       {% endif %}
     {% endif %}
 {% endfor %}
-</table>
+</div>
