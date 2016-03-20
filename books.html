@@ -24,27 +24,12 @@ full_posts: 2
 
 {% for post in site.posts %}
   {% if post.keywords contains 'Books' %}
-      {% if forloop.index < page.full_posts %}
-      <div class='post'>
-        <h1><a href='{{post.url}}'><b>{{post.title}}</b></a></h1>
-        <div class="date"> 
-        <span class='date'>{{post.date | date_to_string}}</span>
-        </div>
-        <div class='body'>{{post.excerpt}}</div>
-      </div>
-      {% else %}
-        {% if forloop.index == page.full_posts %}
-        <h3>Older Posts</h3>
-        Work in progress...
-        {% endif %}
-
         <table class='post-list'>
         <tr>
           <th><a href='{{ post.url }}'><b>{{ post.title }}</b></a></th>
           <td>{{ post.date | date: "%-d %B %Y" }}</td>
         </tr>
         </table>
-      {% endif %}
     {% endif %}
 {% endfor %}
 </div>

@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "The Cathedral and the Bazaar"
-date:   2015-01-17 20:00:00
+date:   2016-03-20 20:00:00
 categories: books
 keywords: Books
 published: Yes
