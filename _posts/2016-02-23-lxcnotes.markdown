@@ -3,6 +3,7 @@ layout: post
 title:  "LXC notes "
 date:   2016-02-23 15:28:23
 categories: jekyll update
+published: no
 summary: "Just some notes on the creation and operation of Linux containers.
 Still work in progress..."
 ---
