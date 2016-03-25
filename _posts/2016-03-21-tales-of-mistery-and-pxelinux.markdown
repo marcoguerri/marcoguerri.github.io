@@ -3,7 +3,7 @@ layout: post
 title:  "Tales of mistery and PXE boot failures"
 date:   2016-03-20 21:00:00
 categories: jekyll update
-published: yes
+published: no
 summary: "This a report of an interesting debugging session that followed an important
 regression after the update of the network boot infrastructure at CERN to PXELINUX
 6.03. It was an interesting dive into PXELINUX internals, down to the point where
