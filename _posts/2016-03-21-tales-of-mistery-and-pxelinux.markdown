@@ -116,10 +116,10 @@ and reboot. My understanding of the difference between the two was very limited,
 idea is the following:
 
 * lpxelinux.0 natively supports HTTP and FTP transfers by integrating
-a full-fledged TCP/IP stack, lwIP, therefore interacting with the NIC only to 
-transmit/receive layer 2 frames. 
+a full-fledged TCP/IP stack, lwIP, therefore interacting with the NIC only to
+transmit/receive layer 2 frames.
 * pxelinux relies instead on something else to implement network communication,
-therefore having to provide only application level payloads (or probably only 
+therefore having to provide only application level payloads (or probably only
 data structures correctly populated as required by the PXE standard).
 
 
@@ -133,30 +133,30 @@ a matter of digging down enough...
 Debug messages
 ------
 A good point where to start was where the error message itself was raised.
-A quick grep pointed to *./core/elflink/load_env32.c*, function load_env32. 
+A quick grep pointed to *./core/elflink/load_env32.c*, function load_env32.
 
 {% highlight C %}
     writestr("\nFailed to load ");
     writestr(LDLINUX);
 {% endhighlight %}
 
-<i>This function starts the ELF module subsystem, by first trying to load the dynamic 
-linker, ldlinux.c32, which is normally deployed on the TFTP server. This is consistent 
-with the network traffic trace: the first time ldlinux tries to access the network, 
+<i>This function starts the ELF module subsystem, by first trying to load the dynamic
+linker, ldlinux.c32, which is normally deployed on the TFTP server. This is consistent
+with the network traffic trace: the first time ldlinux tries to access the network,
 for some reason it fails and eventually it times out.</i>
 
-Something that I clearly needed was debug messages, enabling those already present and adding more, if needed. 
-*writestr* didn't seem something I could use: it was printing directly to the video buffer, 
+Something that I clearly needed was debug messages, enabling those already present and adding more, if needed.
+*writestr* didn't seem something I could use: it was printing directly to the video buffer,
 but it didn't support format strings. *dprintf*, however, seemed to be more suitable
 for the job. But what does dprinf do? By default, it is defined as vdprintf, and
 a quick look at the code revealed that I could not expect messages coming up on
 the KVM....
 
 {% highlight C %}
-    /* Initialize the serial port to 115200 n81 with FIFOs enabled */ 
-    outb(0x83, debug_base + LCR);                                                  
-    outb(0x01, debug_base + DLL);                                                  
-    outb(0x00, debug_base + DLM); 
+    /* Initialize the serial port to 115200 n81 with FIFOs enabled */
+    outb(0x83, debug_base + LCR);
+    outb(0x01, debug_base + DLL);
+    outb(0x00, debug_base + DLM);
     [...]
 {% endhighlight %}
 
@@ -168,7 +168,7 @@ have been more difficult with KVM. Clearly, it was not my intention to go
 down in the machine room and plug any connector to the machine. Again, modern
 BMCs can redirect traffic on serial port on the network via Serial Over Lan. So,
 
-* SOL activated  
+* SOL activated
 {% highlight console %}
 ipmitool -H <BMC_HOSTNAME> -I lanplus -U <USERNAME> -P <PASSWORD> sol payload enable <LANCHANNEL> <USER_ID>
 ipmitool -H <BMC_HOSTNAME> -I lanplus -U <USERNAME> -P <PASSWORD> sol activate
@@ -179,10 +179,10 @@ ipmitool -H <BMC_HOSTNAME> -I lanplus -U <USERNAME> -P <PASSWORD> sol activate
 
 {% highlight console %}
     CFLAGS += -D__SYSLINUX_CORE__ -D__FIRMWARE_$(FIRMWARE)__ \
-              -I$(objdir) -DLDLINUX=\"$(LDLINUX)\" 
+              -I$(objdir) -DLDLINUX=\"$(LDLINUX)\"
               -DDEBUG_PORT=0x3f8 -DCORE_DEBUG=1
 {% endhighlight %}
-* Serial console redirection disabled in the BIOS, to avoid too much noise on the 
+* Serial console redirection disabled in the BIOS, to avoid too much noise on the
 SOL
 
 Deploy, reboot and fingers crossed..
@@ -201,20 +201,202 @@ Deploy, reboot and fingers crossed..
 
 <i>Annuntio vobis gaudium magnum: Habemus debug messages</i> (tons of them)!
 So, I though a good idea was to start from *load_env32*. I tried to follow the control
-path, keeping an eye open for something that could be the root cause of the 
-failure to load ldlinux.c32 from the network. After some flawless execution, 
+path, keeping an eye open for something that could be the root cause of the
+failure to load ldlinux.c32 from the network. After some flawless execution,
 the following is the path that seemed relevant to me.
 relevant
 
 {% highlight console %}
-start_ldlinux
- _start_ldlinux
-  findpath [./com32/lib/sys/module/common.c]
-   fopen
+start_ldlinux [./core/elflink/load_env32.c]
+  _start_ldlinux [./core/elflink/load_env32.c]
+    spawn_load [./com32/lib/sys/module/exec.c]
+      module_load [./com32/lib/sys/module/elf_module.c]
+        image_load [./com32/lib/sys/module/common.c]
+          findpath [./com32/lib/sys/module/common.c]
+            fopen [./com32/lib/fopen.c]
+              open [./com32/lib/sys/open.c]
+                  opendev [./com32/lib/sys/opendev.c]
+                  open_file [./core/fs/fs.c]
+{% endhighlight %}
+
+At this point, it was clear that the upper layer of pxelinux was trying to load
+ldlinux.c32 via a file-like API that was abstracting the fact that the file was
+ sitting on a remove TFTP server.
+In fact, many structures are involved for file operations, and here I have tried
+to sum up what happens when from the moment *open* is invoked.
+
+*opendev* is called with a pointer to the *__file_dev* structure which
+defines the input operation hooks available (read/open/close)
+
+{% highlight C %}
+const struct input_dev __file_dev = {
+    .dev_magic = __DEV_MAGIC,
+    .flags = __DEV_FILE | __DEV_INPUT,
+    .fileflags = O_RDONLY,
+    .read = __file_read,
+    .close = __file_close,
+    .open = NULL,
+};
+
+struct file_info {
+    const struct input_dev *iop;    /* Input operations */
+    const struct output_dev *oop;   /* Output operations */
+    [...]
+};
+
+{% endhighlight %}
+
+*opendev* looks for a *file_info* structure available in the array *__file_info*
+and sets the input operations pointer, *iop*, to *__file_dev* (line 19 below).
+It then returns the corresponding fd (the index in *__file_info*). From now on,
+the attempts to read from a file associated with the fd returned, will go
+through the *__file_read* pointer.
+
+{% highlight C linenos %}
+int opendev(const struct input_dev *idev,
+        const struct output_dev *odev, int flags)
+{
+    [...]
+    for (fd = 0, fp = __file_info; fd < NFILES; fd++, fp++)
+    if (!fp->iop && !fp->oop)
+        break;
+
+    if (fd >= NFILES) {
+    errno = EMFILE;
+    return -1;
+    }
+    [...]
+    if (idev) {
+    if (idev->open && (e = idev->open(fp))) {
+        errno = e;
+        goto puke;
+    }
+    fp->iop = idev;
+    }
+    [...]
+}
+{% endhighlight %}
+
+What does *__file_read* do? Well, it calls the protected mode I/O API, in particular
+*pmapi_read_file*, which relies on *file->fs->fs_ops->getfssec* (getfssec is the
+function that actually does the reading). The structures
+*file* and *fs_ops* are shown below.
+
+{% highlight C %}
+
+struct file {
+   struct fs_info *fs;
+   uint32_t offset;            /* for next read */
+   struct ino1de *inode;        /* The file-specific information */
+};
+
+struct fs_ops {
+    /* in fact, we use fs_ops structure to find the right fs */
+    const char *fs_name;
+    enum fs_flags fs_flags;
+
+    int      (*fs_init)(struct fs_info *);
+    void     (*searchdir)(const char *, int, struct file *);
+    uint32_t (*getfssec)(struct file *, char *, int, bool *);
+    void     (*close_file)(struct file *);
+    void     (*mangle_name)(char *, const char *);
+    [...]
+
+};
+{% endhighlight %}
+
+The *file* structure is associated to the corresponding
+*file_info* by function *open_file* (line 24 below), which follows *opendev*.
+*openfile* calls *searchdir*, which locates the file and returns its handle (line
+10 below).
+
+
+{% highlight C linenos %}
+__export int open_file(const char *name, int flags, struct com32_filedata *filedata)
+{
+    int rv;
+    struct file *file;
+    char mangled_name[FILENAME_MAX];
+
+    dprintf("open_file %s\n", name);
+
+    mangle_name(mangled_name, name);
+    rv = searchdir(mangled_name, flags);
+
+    if (rv < 0)
+    return rv;
+
+    file = handle_to_file(rv);
+
+    if (file->inode->mode != DT_REG) {
+    _close_file(file);
+    return -1;
+    }
+
+    filedata->size  = file->inode->size;
+    filedata->blocklg2  = SECTOR_SHIFT(file->fs);
+    filedata->handle    = rv;
+
+    return rv;
+}
+{% endhighlight %}
+
+And here is where things start to become specific to the medium that used to
+retrieve the file, in this case the network.
+
+
+{% highlight C linenos %}
+int searchdir(const char *name, int flags)
+{
+    static char root_name[] = "/";
+    struct file *file;
+    char *path, *inode_name, *next_inode_name;
+    struct inode *tmp, *inode = NULL;
+    int symlink_count = MAX_SYMLINK_CNT;
+
+    dprintf("searchdir: %s  root: %p  cwd: %p\n",
+        name, this_fs->root, this_fs->cwd);
+
+    if (!(file = alloc_file()))
+    goto err_no_close;
+    file->fs = this_fs;
+
+    /* if we have ->searchdir method, call it */
+    if (file->fs->fs_ops->searchdir) {
+    file->fs->fs_ops->searchdir(name, flags, file);
+
+    [...]
+}
 
 
 {% endhighlight %}
 
+A *file* structure is allocated and on line 14 *this_fs* is set as the entry
+point for doing file operations, which result in a call to *getfssec* function,
+the one actually responsible for the I/O. I was therefore
+expecting *this_fs* to point to a network API (we are still trying to load ldlinux.c32
+via TFTP). So, what is *this_fs*? It's initialized in *fs_init*, which is called by
+*pxelinux.asm* with a pointer to the desired *fs_ops*.
+
+
+
+{% highlight C linenos %}
+;
+; do fs initialize
+;
+        mov eax,ROOT_FS_OPS
+        xor ebp,ebp
+        pm_call pm_fs_init
+
+        section .rodata
+        alignz 4
+
+ROOT_FS_OPS:
+        extern pxe_fs_ops
+        dd pxe_fs_ops
+        dd 0
+
+{% endhighlight %}
 
 
 
