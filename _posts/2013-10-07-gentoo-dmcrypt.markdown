@@ -351,10 +351,13 @@ After umounting /mnt/gentoo/boot, /mnt/gentoo/proc,
 the encrypted volume and then mount the root filesystem.
 <hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
 <ul class="references">
-</li> <a name="gentoo_handbook">[1] [Gentoo Linux x86 Handbook](http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1)
-</a> </li>
-<li> <a name="sha512">[2] sha512: d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2
-</a></li>
+<li>
+    <a name="gentoo_handbook">[1] <a target="_blank" href="http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1">Gentoo Linux x86 Handbook</a>
+   </a> 
+</li>
+<li> 
+    <a name="sha512">[2] sha512: d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2 </a>
+</li>
 </ul>
 [jekyll-gh]: https://github.com/mojombo/jekyll
 [jekyll]:    http://jekyllrb.com

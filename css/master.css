@@ -93,11 +93,11 @@ a {
 }
 
 .content-books {
-  margin-bottom: 50px;
   margin-left: auto;
   margin-right: auto;
   text-align: justify;
-  padding: 2em;
+  padding-left: 2em;
+  padding-right: 2em;
   background: #FAFAFA;
 }
 #content h2 {

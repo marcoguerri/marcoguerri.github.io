@@ -1,0 +1,25 @@
+---
+layout: master
+---
+<div>
+<h1 style="text-align:center">{{page.title}}</h1>
+    <div class="date">
+        <span class='date'>{{page.date | date: "%-d %B %Y"}}</span>
+    </div>
+</div>
+<div class='post'>
+    <div class='body'>
+        <div align="center" class="content-books">
+        {{ page.intro }}
+        </div>
+
+        <div style="float:left; padding-bottom:0em; padding-top:1em;padding-right:1em;padding-left:2em">
+            <img src='{{ page.cover }}'/></td>
+        </div>
+        <div align="center" class="content-books">
+            {{ content}}
+        </div>
+    </div>
+</div>
+
+

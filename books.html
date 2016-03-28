@@ -4,21 +4,22 @@ title: Books
 full_posts: 2
 ---
 
-<div style="width: 100%; overflow: hidden;">
-    <div align="justify" style="padding: 10px 20px 10px 0px; vertical-align:top; display: table-cell;"> 
+<div style="width: 100%;">
 
+    <div style="margin:0; display: table-cell; width:40%; float:left; padding-right:1em; padding-bottom:0em"> 
+        <a href="https://openlibrary.org/" target="_blank">
+    <img src="/img/openlibrary.png"/></a>
+    </div>
+    
+    <div align="justify" style="padding: 10px 20px 10px 0px; vertical-align:top;"> 
     Despite being by no means an avid reader, among the activities I enjoy reading is 
     certainly one worth writing few lines about. I mainly read books related to
     science, computers, history and I really love horror novels. The main idea 
     of this section is to collect some ideas and recommendations about interesting 
     readings.
     
-  <!--  . All the covers displayed on this site are a 
+    All the covers displayed on this site are a 
     curtesy of the OpenLibrary project. </div>
-    <div style="margin:0; display: table-cell; width:20%"> 
-    <a href="https://openlibrary.org/" target="_blank">
-    <img src="/img/openlibrary.png"/></a></div>
-   -->
 </div>
 
 
@@ -27,7 +28,7 @@ full_posts: 2
         <table class='post-list'>
         <tr>
           <th><a href='{{ post.url }}'><b>{{ post.title }}</b></a></th>
-          <td>{{ post.date | date: "%-d %B %Y" }}</td>
+          <td style="text-align:right">{{ post.date | date: "%-d %B %Y" }}</td>
         </tr>
         </table>
     {% endif %}
