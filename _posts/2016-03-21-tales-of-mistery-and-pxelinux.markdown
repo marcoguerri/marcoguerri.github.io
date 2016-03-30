@@ -3,7 +3,7 @@ layout: post
 title:  "Tales of mistery and PXE boot failures"
 date:   2016-03-20 21:00:00
 categories: jekyll update
-published: no
+published: yes
 summary: "This a report of an interesting debugging session that followed an important
 regression after the update of the network boot infrastructure at CERN to PXELINUX
 6.03. It was an interesting dive into PXELINUX internals, down to the point where
@@ -140,16 +140,16 @@ A quick grep pointed to *./core/elflink/load_env32.c*, function load_env32.
     writestr(LDLINUX);
 {% endhighlight %}
 
-<i>This function starts the ELF module subsystem, by first trying to load the dynamic
+This function starts the ELF module subsystem, by first trying to load the dynamic
 linker, ldlinux.c32, which is normally deployed on the TFTP server. This is consistent
 with the network traffic trace: the first time ldlinux tries to access the network,
-for some reason it fails and eventually it times out.</i>
+for some reason it fails and eventually it times out.
 
 Something that I clearly needed was debug messages, enabling those already present and adding more, if needed.
 *writestr* didn't seem something I could use: it was printing directly to the video buffer,
 but it didn't support format strings. *dprintf*, however, seemed to be more suitable
 for the job. But what does dprinf do? By default, it is defined as vdprintf, and
-a quick look at the code revealed that I could not expect messages coming up on
+a quick look at the code revealed that I could not expect messages to come up on
 the KVM....
 
 {% highlight C %}
@@ -165,7 +165,7 @@ Yay, serial port! It turns out that *DEBUG_STDIO* can be enabled to redefine dpr
 as printf, having debug messages written directly on the video buffer. In my case,
 serial port was actually good enough, I could easily copy/paste, which would
 have been more difficult with KVM. Clearly, it was not my intention to go
-down in the machine room and plug any connector to the machine. Again, modern
+down in the servers room and plug any connector to the machine. Again, modern
 BMCs can redirect traffic on serial port on the network via Serial Over Lan. So,
 
 * SOL activated
@@ -204,7 +204,6 @@ So, I though a good idea was to start from *load_env32*. I tried to follow the c
 path, keeping an eye open for something that could be the root cause of the
 failure to load ldlinux.c32 from the network. After some flawless execution,
 the following is the path that seemed relevant to me.
-relevant
 
 {% highlight console %}
 start_ldlinux [./core/elflink/load_env32.c]
@@ -222,8 +221,9 @@ start_ldlinux [./core/elflink/load_env32.c]
 At this point, it was clear that the upper layer of pxelinux was trying to load
 ldlinux.c32 via a file-like API that was abstracting the fact that the file was
  sitting on a remove TFTP server.
-In fact, many structures are involved for file operations, and here I have tried
-to sum up what happens when from the moment *open* is invoked.
+In fact, many data structures and functions are involved in file operations,
+nothing very much different then what you would find on a Linux OS
+and libc. It is actually interesting to dive a bit deeper.
 
 *opendev* is called with a pointer to the *__file_dev* structure which
 defines the input operation hooks available (read/open/close)
@@ -242,15 +242,24 @@ struct file_info {
     const struct input_dev *iop;    /* Input operations */
     const struct output_dev *oop;   /* Output operations */
     [...]
+    struct {
+    struct com32_filedata fd;
+    size_t offset;      /* Current file offset */
+    size_t nbytes;      /* Number of bytes available in buffer */
+    char *datap;        /* Current data pointer */
+    void *pvt;      /* Private pointer for driver */
+    char buf[MAXBLOCK];
+    } i;
+
 };
 
 {% endhighlight %}
 
-*opendev* looks for a *file_info* structure available in the array *__file_info*
+*opendev* looks for a *file_info* structure available in the statically allocated array *__file_info*
 and sets the input operations pointer, *iop*, to *__file_dev* (line 19 below).
-It then returns the corresponding fd (the index in *__file_info*). From now on,
+It then returns the corresponding fd (the index within *__file_info*). From now on,
 the attempts to read from a file associated with the fd returned, will go
-through the *__file_read* pointer.
+through *__file_dev.read* function pointer, that is *__file_read*.
 
 {% highlight C linenos %}
 int opendev(const struct input_dev *idev,
@@ -282,7 +291,7 @@ What does *__file_read* do? Well, it calls the protected mode I/O API, in partic
 function that actually does the reading). The structures
 *file* and *fs_ops* are shown below.
 
-{% highlight C %}
+{% highlight C linenos%}
 
 struct file {
    struct fs_info *fs;
@@ -305,10 +314,10 @@ struct fs_ops {
 };
 {% endhighlight %}
 
-The *file* structure is associated to the corresponding
-*file_info* by function *open_file* (line 24 below), which follows *opendev*.
-*openfile* calls *searchdir*, which locates the file and returns its handle (line
-10 below).
+The *file* structure is identified by a handle (which is again basically an index
+within an array) returned by *searchdir* hook above
+(line 13). This handle is associated to the corresponding *com32_filedata* within
+*file_info* in function *open_file* at line 24 below, which follows *opendev*.
 
 
 {% highlight C linenos %}
@@ -341,7 +350,7 @@ __export int open_file(const char *name, int flags, struct com32_filedata *filed
 }
 {% endhighlight %}
 
-And here is where things start to become specific to the medium that used to
+*searchdir*, is where things start to become specific to the medium that is used to
 retrieve the file, in this case the network.
 
 
@@ -372,10 +381,10 @@ int searchdir(const char *name, int flags)
 {% endhighlight %}
 
 A *file* structure is allocated and on line 14 *this_fs* is set as the entry
-point for doing file operations, which result in a call to *getfssec* function,
+point for doing file operations, which results in a call to *getfssec* function,
 the one actually responsible for the I/O. I was therefore
 expecting *this_fs* to point to a network API (we are still trying to load ldlinux.c32
-via TFTP). So, what is *this_fs*? It's initialized in *fs_init*, which is called by
+via TFTP). So, what is *this_fs*? It's initialized in *fs_init*, which is called indirectly by
 *pxelinux.asm* with a pointer to the desired *fs_ops*.
 
 
@@ -398,10 +407,82 @@ ROOT_FS_OPS:
 
 {% endhighlight %}
 
+Indeed *fs_ops* in this case is *pxe_fs_ops*, defined in core/fs/pxe/pxe.c,
+ which defines the API used to retrieve files via PXE (basically, TFTP).
+
+{% highlight C  %}
+
+const struct fs_ops pxe_fs_ops = {
+    .fs_name       = "pxe",
+    .fs_flags      = FS_NODEV,
+    .fs_init       = pxe_fs_init,
+    .searchdir     = pxe_searchdir,
+    .chdir         = pxe_chdir,
+    .realpath      = pxe_realpath,
+    .getfssec      = pxe_getfssec,
+    .close_file    = pxe_close_file,
+    .mangle_name   = pxe_mangle_name,
+    .chdir_start   = pxe_chdir_start,
+    .open_config   = pxe_open_config,
+    .readdir       = pxe_readdir,
+    .fs_uuid       = NULL,
+};
+
+{% endhighlight %}
+
+So, a call to *searchdir* was relinquishing control to *pxe_searchdir*.
+
+
+{% highlight C %}
+static void pxe_searchdir(const char *filename, int flags, struct file *file)
+{
+    int i = PXERetry;
+
+    do {
+        dprintf("PXE: file = %p, retries left = %d: ", file, i);
+        __pxe_searchdir(filename, flags, file);
+        dprintf("%s\n", file->inode ? "ok" : "failed");
+    } while (!file->inode && i--);
+}
+
+{% endhighlight %}
+
+At this point some more digging turned out to be necessary.
+
+
+{% highlight console %}
+pxe_searchdir [./core/fs/pxe/pxe.c]
+   __pxe_searchdir [./core/fs/pxe/pxe.c]
+       allocate_socket [./core/fs/pxe/pxe.c]
+{% endhighlight %}
+
+*allocate_socket* returns correctly. Still no luck. *__pxe_searchdir* next tries
+to locate a "URL scheme" to open the URL of the TFTP server.
 
 
 
+{% highlight C  %}
+for (us = url_schemes; us->name; us++) {
+    if (!strcmp(us->name, url.scheme)) {
+        if ((flags & ~us->ok_flags & OK_FLAGS_MASK) == 0) {
+            dprintf("Opening with URL scheme, function %#.10x\n",us->open);
+            us->open(&url, flags, inode, &filename);
+        }
+        found_scheme = true;
+        break;
+    }
+}
+{% endhighlight %}
 
+The debug message was added by me. Understanding what *us->open* was would have 
+taken much more time, but once located its linear address, 0x0000108e14, it was
+just a matter of a grep.
+
+
+{% highlight console linenos %}
+cat ./bios/core/lpxelinux.map | grep -i 108e14
+0x0000000000108e14                tftp_open
+{% endhighlight %}
 
 
 
