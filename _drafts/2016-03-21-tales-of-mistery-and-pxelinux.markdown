@@ -106,7 +106,7 @@ pxelinux is part of syslinux project and it comes in two different flavors:
 *pxelinux.0* and *lpxelinux.0*.
 For the remainder of this experiment, the following remarks apply:
 
-* I was compiling and testing the 32bits version of pxelinux
+* I was compiling and testing the 32bits legacy version of pxelinux
 * I was working on git commit 138e850f
 
 The first binary that I tried to deploy with my test environment was pxelinux.0,
@@ -456,9 +456,9 @@ pxe_searchdir [./core/fs/pxe/pxe.c]
        allocate_socket [./core/fs/pxe/pxe.c]
 {% endhighlight %}
 
-*allocate_socket* returns correctly. Still no luck. *__pxe_searchdir* next tries
-to locate a "URL scheme" to open the URL of the TFTP server.
-
+*allocate_socket* returns without errors. Still no luck. *__pxe_searchdir* tries
+then to locate a "URL scheme" suitable for opening the URL that points to the
+TFTP server.
 
 
 {% highlight C  %}
@@ -474,9 +474,9 @@ for (us = url_schemes; us->name; us++) {
 }
 {% endhighlight %}
 
-The debug message was added by me. Understanding what *us->open* was would have 
-taken much more time, but once located its linear address, 0x0000108e14, it was
-just a matter of a grep.
+Identifying the function pointed by the *us->open* hook would have been more time
+consuming than simply printing its location. Once obtained its linear address,
+0x0000108e14, it was just a matter of a grep.
 
 
 {% highlight console linenos %}
@@ -484,13 +484,39 @@ cat ./bios/core/lpxelinux.map | grep -i 108e14
 0x0000000000108e14                tftp_open
 {% endhighlight %}
 
+The control path proceeds as follows, without any error whatsover.
 
+{% highlight console linenos %}
+ tftp_open [core/fs/pxe/tftp.c.]
+   core_udp_open [core/fs/pxe/core.c]   
+     netconn_new [core/lwip/src/api/api_lib.c]
+     core_udp_sendto [core/fs/pxe/core.c]
+       netconn_sendto [core/lwip/src/api/api_lib.c]
+{% endhighlight %}
 
+A remark must be made regarding *core_udp_\** functions. 
+There are three different implementations available:
 
+* In core/legacynet/core.c, *core_udp_\** functions invoke directly the hooks exported
+by the PXE firmware (e.g. PXENV_UDP_WRITE). This code is compiled 
+and linked when building pxelinux.0.
 
+* In core/fs/pxe/core.c, *core_udp_\** functions invoke the lwIP API to implement 
+network communication. This code is compiled and linked when building
+lpxelinux.0.
 
+* In efi/udp.c, *core_udp_\** functions invoke the UEFI firmware to implement
+network communication. This code is compiled and linked when building pxelinux for
+EFI.
 
+Since I was building lpxelinux.0 for BIOS, the second situation was the one of
+interest.
 
+In the trace above, *netconn_new*  and *netconn_sendto* were the first occurrences
+of the transition to the lwIP stack. Plunging into lwIP meant that a new set
+of debug messages was also needed.
+
+ 
 
 
 
