@@ -492,13 +492,17 @@ The control path proceeds as follows, without any error whatsover.
      netconn_new [core/lwip/src/api/api_lib.c]
      core_udp_sendto [core/fs/pxe/core.c]
        netconn_sendto [core/lwip/src/api/api_lib.c]
+         netconn_send [core/lwip/src/api/api_lib.c]
+           tcpip_apimsg [core/lwip/src/api/tcpip.c]
+             sys_mbox_post [core/lwip/src/arch/sys_arch.c]  
+               mbox_post [core/thread/mbox.c]
 {% endhighlight %}
 
 A remark must be made regarding *core_udp_\** functions. 
 There are three different implementations available:
 
 * In core/legacynet/core.c, *core_udp_\** functions invoke directly the hooks exported
-by the PXE firmware (e.g. PXENV_UDP_WRITE). This code is compiled 
+by the PXE firmware (e.g. *PXENV_UDP_WRITE*). This code is compiled 
 and linked when building pxelinux.0.
 
 * In core/fs/pxe/core.c, *core_udp_\** functions invoke the lwIP API to implement 
@@ -514,7 +518,57 @@ interest.
 
 In the trace above, *netconn_new*  and *netconn_sendto* were the first occurrences
 of the transition to the lwIP stack. Plunging into lwIP meant that a new set
-of debug messages was also needed.
+of debug messages was also needed. lwIP defines several macros for debugging that 
+can be set in core/lwip/src/include/lwipopts.h. Enabling debug messages coming from
+the UDP layer seemed to be the right approach
+
+
+{% highlight C linenos %}
+#define LWIP_DEBUG
+#define UDP_DEBUG                       LWIP_DBG_ON
+#define API_LIB_DEBUG                   LWIP_DBG_ON
+{% endhighlight %}
+
+
+Everything seemed to be working correctly.
+
+
+{% highlight C linenos %}
+core_udp_sendto: 808EAD22 0045
+netconn_send: sending 51 bytes
+udp_send
+udp_send: added header in given pbuf 0x0038fc86
+udp_send: sending datagram of length 59
+udp_send: UDP packet length 59
+udp_send: UDP checksum 0x7be9
+udp_send: ip_output_if (,,,,IP_PROTO_UDP,)
+{% endhighlight %}
+
+Everything seemed to be working correctly. In fact, netconn_send was returning 0,
+no error whatsoever. Some more digging was necessary...  From the trace above, it was clear that
+the maximum call depth was reached with *mbox_post*, which was then returning without
+any error message. The function was appending the outgoing message on a list and it
+was increasing a semaphore to allow the main thread (*tcpip_thread* in 
+core/lwip/src/api/tcpip.c) to service the data. At this point, the relevant call trace 
+initiated by the main thread was the following
+
+{% highlight console linenos %}
+do_send [core/lwip/src/api/api_msg.c]
+  udp_sendto_chksum [core/lwip/src/core/udp.c]
+    udp_sendto_chksum [core/lwip/src/core/udp.c]
+      ip_route [core/lwip/src/core/ipv4/ip.c]
+      udp_sendto_if_chksum [core/lwip/src/core/udp.c]
+        ip_output_if [core/lwip/src/core/ipv4/ip.c]
+          ip_output_if_opt [core/lwip/src/core/ipv4/ip.c] 
+{% endhighlight %}
+
+Now, *ip_output_if_opt* was calling *netif->output()*, again difficult to trace
+without pointing directly to the virtual address.
+
+
+
+
+
 
  
 
