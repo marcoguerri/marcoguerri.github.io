@@ -200,7 +200,11 @@ Deploy, reboot and fingers crossed..
 {% endhighlight %}
 
 <i>Annuntio vobis gaudium magnum: Habemus debug messages</i> (tons of them)!
-So, I though a good idea was to start from *load_env32*. I tried to follow the control
+
+Tracing the execution
+------
+
+I though a good idea was to start from *load_env32*. I tried to follow the control
 path, keeping an eye open for something that could be the root cause of the
 failure to load ldlinux.c32 from the network. After some flawless execution,
 the following is the path that seemed relevant to me.
@@ -225,6 +229,8 @@ In fact, many data structures and functions are involved in file operations,
 nothing very much different then what you would find on a Linux OS
 and libc. It is actually interesting to dive a bit deeper.
 
+File-like API
+------
 *opendev* is called with a pointer to the *__file_dev* structure which
 defines the input operation hooks available (read/open/close)
 
@@ -350,6 +356,8 @@ __export int open_file(const char *name, int flags, struct com32_filedata *filed
 }
 {% endhighlight %}
 
+From file-like API to network
+------
 *searchdir*, is where things start to become specific to the medium that is used to
 retrieve the file, in this case the network.
 
@@ -449,7 +457,8 @@ static void pxe_searchdir(const char *filename, int flags, struct file *file)
 
 At this point some more digging turned out to be necessary.
 
-
+Network layer 4 via lwIP
+------
 {% highlight console %}
 pxe_searchdir [./core/fs/pxe/pxe.c]
    __pxe_searchdir [./core/fs/pxe/pxe.c]
@@ -488,24 +497,24 @@ The control path proceeds as follows, without any error whatsover.
 
 {% highlight console linenos %}
  tftp_open [core/fs/pxe/tftp.c.]
-   core_udp_open [core/fs/pxe/core.c]   
+   core_udp_open [core/fs/pxe/core.c]
      netconn_new [core/lwip/src/api/api_lib.c]
      core_udp_sendto [core/fs/pxe/core.c]
        netconn_sendto [core/lwip/src/api/api_lib.c]
          netconn_send [core/lwip/src/api/api_lib.c]
            tcpip_apimsg [core/lwip/src/api/tcpip.c]
-             sys_mbox_post [core/lwip/src/arch/sys_arch.c]  
+             sys_mbox_post [core/lwip/src/arch/sys_arch.c]
                mbox_post [core/thread/mbox.c]
 {% endhighlight %}
 
-A remark must be made regarding *core_udp_\** functions. 
+A remark must be made regarding *core_udp_\** functions.
 There are three different implementations available:
 
 * In core/legacynet/core.c, *core_udp_\** functions invoke directly the hooks exported
-by the PXE firmware (e.g. *PXENV_UDP_WRITE*). This code is compiled 
+by the PXE firmware (e.g. *PXENV_UDP_WRITE*). This code is compiled
 and linked when building pxelinux.0.
 
-* In core/fs/pxe/core.c, *core_udp_\** functions invoke the lwIP API to implement 
+* In core/fs/pxe/core.c, *core_udp_\** functions invoke the lwIP API to implement
 network communication. This code is compiled and linked when building
 lpxelinux.0.
 
@@ -518,7 +527,7 @@ interest.
 
 In the trace above, *netconn_new*  and *netconn_sendto* were the first occurrences
 of the transition to the lwIP stack. Plunging into lwIP meant that a new set
-of debug messages was also needed. lwIP defines several macros for debugging that 
+of debug messages was also needed. lwIP defines several macros for debugging that
 can be set in core/lwip/src/include/lwipopts.h. Enabling debug messages coming from
 the UDP layer seemed to be the right approach
 
@@ -533,7 +542,7 @@ the UDP layer seemed to be the right approach
 Everything seemed to be working correctly.
 
 
-{% highlight C linenos %}
+{% highlight console linenos %}
 core_udp_sendto: 808EAD22 0045
 netconn_send: sending 51 bytes
 udp_send
@@ -544,13 +553,13 @@ udp_send: UDP checksum 0x7be9
 udp_send: ip_output_if (,,,,IP_PROTO_UDP,)
 {% endhighlight %}
 
-Everything seemed to be working correctly. In fact, netconn_send was returning 0,
-no error whatsoever. Some more digging was necessary...  From the trace above, it was clear that
-the maximum call depth was reached with *mbox_post*, which was then returning without
-any error message. The function was appending the outgoing message on a list and it
-was increasing a semaphore to allow the main thread (*tcpip_thread* in 
-core/lwip/src/api/tcpip.c) to service the data. At this point, the relevant call trace 
-initiated by the main thread was the following
+*netconn_send* was returning 0,
+no error whatsoever. From the trace above, it was clear that
+the maximum call depth was reached with *mbox_post*, which was also returning
+successfully. The function was appending the outgoing message on a list and it
+was increasing a semaphore to allow the main thread (*tcpip_thread* in
+core/lwip/src/api/tcpip.c) to service outgoing data. At this point, the relevant
+call trace initiated by the main thread was the following:
 
 {% highlight console linenos %}
 do_send [core/lwip/src/api/api_msg.c]
@@ -559,19 +568,89 @@ do_send [core/lwip/src/api/api_msg.c]
       ip_route [core/lwip/src/core/ipv4/ip.c]
       udp_sendto_if_chksum [core/lwip/src/core/udp.c]
         ip_output_if [core/lwip/src/core/ipv4/ip.c]
-          ip_output_if_opt [core/lwip/src/core/ipv4/ip.c] 
+          ip_output_if_opt [core/lwip/src/core/ipv4/ip.c]
 {% endhighlight %}
 
 Now, *ip_output_if_opt* was calling *netif->output()*, again difficult to trace
-without pointing directly to the virtual address.
+without pointing directly to the virtual address, 0x112646 in this case.
+
+{% highlight console %}
+                0x00000000001120b6                etharp_output
+ .text          0x00000000001121a0        0x0 liblpxelinux.a(slipif.o)
+ .text          0x00000000001121a0      0xb03 liblpxelinux.a(undiif.o)
+                0x00000000001121a0                undiarp_tmr
+                0x00000000001121dc                undiif_start
+                0x000000000011292f                undiif_input
+ *fill*         0x0000000000112ca3        0x1 00
+
+{% endhighlight %}
+
+From the mapping above, it was clear that the output hook was residing somewhere
+between *0x1121dc* and *0x11292f*, most likely in *core/lwip/src/netif/undiif.c*, where
+code which interfaces directly with the hardware is defined. From *undiif.c*:
+{% highlight C %}
+/*
+ * This file is a skeleton for developing Ethernet network interface
+ * drivers for lwIP. Add code to the low_level functions and do a
+ * search-and-replace for the word "ethernetif" to replace it with
+ * something that better describes your network interface.
+ */
+{% endhighlight %}
+Layer 2 and below
+------
+The first thing that seemed obvious to do was to enable debug messages at the
+UNDIIF layer.
 
 
+{% highlight C %}
+#define LWIP_DBG_LEVEL                  LWIP_DBG_LEVEL_ALL
+#define UNDIIF_DEBUG                    LWIP_DBG_ON
+{% endhighlight %}
 
 
+{% highlight console %}
+core_udp_sendto: 808EAD22 0045
+undi xmit thd 'tcpip_thread'
+undi: d:ff:ff:ff:ff:ff:ff s:00:07:43:2e:f8:50 t: 806 x0
+  arp: s:00:07:43:2e:f8:50 128.142.160.103 00:00:00:00:00:00 128.142.173. 34 x0
+netconn_sendto succeded!
+{% endhighlight %}
+
+From this new trace, I could derive that *undi_transmit* was being called, but
+the debug information that was showing the outcome of the ARP request was 
+clearly wrong. Of course, since I was not seeing any traffic on the network, 
+that didn't really come as a surprise. The source address *00:07:43:2e:f8:50* was 
+the one of the Chelsio card, but the destination MAC was resolved as 
+*00:00:00:00:00:00*. To go a bit deeper, I enabled *UNDIIF_ARP_DEBUG*.
+
+{% highlight console %}
+Called core_udp_sendto for lwip
+core_udp_sendto: 808EAD22 0045
+find_entry: found matching entry 0
+etharp_request: sending ARP request.
+etharp_raw: sending raw ARP packet.
+{% endhighlight %}
+
+Everything seemed to be fine up to here, but mixed up with the other messages I
+could see the following entries
+
+{% highlight console %}
+etharp_timer: expired pending entry 0.
+etharp_timer: freeing entry 0, packet queue 0x00391094.
+{% endhighlight %}
+
+The pending ARP resolution request was timing out and it was being popped from the 
+queue. This pattern was clearly repeating until the eventual timeout from higher up
+in the stack. At this point <b>I realized that one of my assumptions, that no 
+data was being sent/received from the card, was wrong</b>. When looking at the 
+traffic dump, in order to filter out  uninteresting network activity, I was 
+querying by IP, basically ruling out all traffic at the data link layer, ARP 
+requests included! It was a quite a stupid mistake and in fact, after having another 
+look at the network dump, the situation was the following.
 
 
- 
-
-
-
+ARP requests were indeed being broadcasted on the local network! And the responses
+from the default gateway were there too! This changed completely the perspective 
+of the problem: it seemed that the card was perfectly capable of transmitting
+traffic, but not to receive the responses.
 
