@@ -631,7 +631,7 @@ etharp_request: sending ARP request.
 etharp_raw: sending raw ARP packet.
 {% endhighlight %}
 
-Everything seemed to be fine up to here, but mixed up with the other messages I
+Everything seemed to be fine up to this point, but mixed up with the other messages I
 could see the following entries
 
 {% highlight console %}
@@ -639,15 +639,20 @@ etharp_timer: expired pending entry 0.
 etharp_timer: freeing entry 0, packet queue 0x00391094.
 {% endhighlight %}
 
-The pending ARP resolution request was timing out and it was being popped from the 
+The pending ARP resolution request was timing out and it was being popped out of the 
 queue. This pattern was clearly repeating until the eventual timeout from higher up
 in the stack. At this point <b>I realized that one of my assumptions, that no 
 data was being sent/received from the card, was wrong</b>. When looking at the 
 traffic dump, in order to filter out  uninteresting network activity, I was 
 querying by IP, basically ruling out all traffic at the data link layer, ARP 
 requests included! It was a quite a stupid mistake and in fact, after having another 
-look at the network dump, the situation was the following.
+look at the network dump, the situation was pretty clear.
 
+<div align="center">
+<a id="single_image" href="/assets/img/pxe/PXETraffic.png">
+<img src="/assets/img/pxe/PXETraffic.png" alt=""/>
+</a>
+</div>
 
 ARP requests were indeed being broadcasted on the local network! And the responses
 from the default gateway were there too! This changed completely the perspective 
