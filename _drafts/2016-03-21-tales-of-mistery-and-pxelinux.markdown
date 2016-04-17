@@ -7,10 +7,9 @@ published: yes
 summary: "This a report of an interesting debugging session that followed an important
 regression after the update of the network boot infrastructure at CERN to PXELINUX
 6.03. It was an interesting dive into PXELINUX internals, down to the point where
-it meets the hardware. The issues I was confronted with involved several different
-layers of the infrastructure and therefore several different teams. As a consequence,
-sometimes it was necessary to proceed with a limited amount of information and reduced
-room for intervention, which made the whole process more fun."
+it meets the hardware. The journey was, at times, longer than what was strictly 
+necessary, but this was a Saturday adventure, so no time was stolen to daily work :)
+Curiosity is hard to tame. "
 ---
 
 Background and setup
@@ -26,7 +25,7 @@ anywhere. The ROM of the NIC was correctly initializing the stack, going through
 the whole DHCP discover, offer, request, ACK workflow, and it was finally loading
 correctly pxelinux image from the server, which was then being given control.
 PXELINUX initial banner was displayed and after a long delay, a timeout message
-would appear: "Failed to load ldlinux.c32". And then a reboot.
+was appearing: "Failed to load ldlinux.c32". And then a reboot.
 
 <p align="center">
 <a id="single_image" href="/img/pxe_timeout.png"><img src="/img/pxe_timeout.png" alt=""/></a>
@@ -38,20 +37,20 @@ The components involved
 The infrastructure for PXE boot involves several components: clearly, a NIC,
 with its PXE-compliant firmware, a DHCP server, a TFTP server, a PXE implementation
 that does the heavy lifting, that is, loading and booting the kernel and initrd,
-and the network in between the clients/servers. My team (Data Centre hardware)
+and the network in-between the clients/servers. My group, Computing Facilities,
 was involved as it was clear that the issue was confined to specific NIC types.
 At first, I was skeptical that any useful debugging could happen. The situation
-was basically the following:
+was the following:
 
-* No control over the network infrastructure
-* No control over firmware of the NIC (at least, not the untar-vim-Make-flash
-kind of control)
-* No control over the DHCP server
-* No control over the TFTP server
-* Well, I could recompile PXELINUX, yes
-* All the freedom to change kernel/initrd, but that was already at stage of the
-process far too advanced.
+* Limited control over the network infrastructure (different team responsible for that)
+* No control over the firmware of the NIC (proprietary black box)
+* Limited control over the DHCP server (different team responsible for that)
+* Limited control over the TFTP server (different team responsible for that)
+* All the freedom to modify/compile PXELINUX
+* All the freedom to change kernel/initrd, but that was already at a far too 
+advanced stage of the process
 
+Limited control basically means "don't waste other's people time" control.
 Anyway, if you don't have a dog, you go hunt with the cat. At a second thought,
 some of these hurdles could be overcome without too much effort. After deciding
 to focus on the first instance of the failure, the Chelsio T520-LL-CR, I set out
@@ -60,7 +59,7 @@ on a journey that turned out very interesting.
 
 A quick look at the network
 ------
-The first approach that I tried was to dump the network traffic, in case something
+The first approach that I tried was to dump network traffic, in case something
 obvious would turn up. I could not dump the traffic on the machine itself during
 PXE boot, and dumping at the other end of the communication was not a good idea
 either, so I asked the network team to set up port mirroring towards a host over
@@ -80,7 +79,7 @@ the following:
 * Adding the DHCP server to a list that would be taken into consideration by
 the DHCP Relays when routing DHCP traffic (you need a good reason to be in that
 list!)
-* Disabling any kind of DHCP answer from the official servers
+* Disabling any kind of DHCP answer from the official servers for the host under test
 * Configuring my own DHCP instance to provide an answer for the host under
 test, pointing to the test TFTP server and custom pxelinux.
 
@@ -97,7 +96,7 @@ for long time, as the noise, heat, air exhausted by the systems, all contribute
 to make the experience very tiring. The obvious way to proceed was to use KVM over
 IP, in order to have complete control over the system, and to perform power
 management operations via IPMI. With such a setup, I didn't have to leave the office
-for a second :).
+for a second :)
 
 
 Deploying the correct binary
@@ -112,15 +111,16 @@ For the remainder of this experiment, the following remarks apply:
 The first binary that I tried to deploy with my test environment was pxelinux.0,
 and this worked flawlessly, I could boot without any problem. With lpxelinux.0 instead, the
 behavior was identical to the production version: "Failed to load ldlinux.c32",
-and reboot. My understanding of the difference between the two was very limited, but
-idea is the following:
+and reboot. My understanding of the difference between the two was limited, but
+the idea is the following:
 
 * lpxelinux.0 natively supports HTTP and FTP transfers by integrating
 a full-fledged TCP/IP stack, lwIP, therefore interacting with the NIC only to
 transmit/receive layer 2 frames.
-* pxelinux relies instead on something else to implement network communication,
-therefore having to provide only application level payloads (or probably only
-data structures correctly populated as required by the PXE standard).
+* pxelinux relies instead on the firmware of the NIC to implement network communication,
+therefore having to provide only application level payload 
+
+slated as required by the PXE standard).
 
 
 Getting started...
@@ -617,10 +617,10 @@ netconn_sendto succeded!
 {% endhighlight %}
 
 From this new trace, I could derive that *undi_transmit* was being called, but
-the debug information that was showing the outcome of the ARP request was 
-clearly wrong. Of course, since I was not seeing any traffic on the network, 
-that didn't really come as a surprise. The source address *00:07:43:2e:f8:50* was 
-the one of the Chelsio card, but the destination MAC was resolved as 
+the debug information that was showing the outcome of the ARP request was
+clearly wrong. Of course, since I was not seeing any traffic on the network,
+that didn't really come as a surprise. The source address *00:07:43:2e:f8:50* was
+the one of the Chelsio card, but the destination MAC was resolved as
 *00:00:00:00:00:00*. To go a bit deeper, I enabled *UNDIIF_ARP_DEBUG*.
 
 {% highlight console %}
@@ -639,13 +639,13 @@ etharp_timer: expired pending entry 0.
 etharp_timer: freeing entry 0, packet queue 0x00391094.
 {% endhighlight %}
 
-The pending ARP resolution request was timing out and it was being popped out of the 
+The pending ARP resolution request was timing out and it was being popped out of the
 queue. This pattern was clearly repeating until the eventual timeout from higher up
-in the stack. At this point <b>I realized that one of my assumptions, that no 
-data was being sent/received from the card, was wrong</b>. When looking at the 
-traffic dump, in order to filter out  uninteresting network activity, I was 
-querying by IP, basically ruling out all traffic at the data link layer, ARP 
-requests included! It was a quite a stupid mistake and in fact, after having another 
+in the stack. At this point <b>I realized that one of my assumptions, that no
+data was being sent/received from the card, was wrong</b>. When looking at the
+traffic dump, in order to filter out  uninteresting network activity, I was
+querying by IP, basically ruling out all traffic at the data link layer, ARP
+requests included! It was a quite a stupid mistake and in fact, after having another
 look at the network dump, the situation was pretty clear.
 
 <div align="center">
@@ -655,7 +655,183 @@ look at the network dump, the situation was pretty clear.
 </div>
 
 ARP requests were indeed being broadcasted on the local network! And the responses
-from the default gateway were there too! This changed completely the perspective 
+from the default gateway were there too! This changed completely the perspective
 of the problem: it seemed that the card was perfectly capable of transmitting
 traffic, but not to receive the responses.
+
+Receiving data - Interrupt Service Routine
+------
+The interrupt service routine used by *lpxelinux* is defined in *core/pxeisr.inc*.
+The ISR calls the *PXENV_UNDI_ISR* hook exported by the PXE capable firmware and
+then check one of the return flags, *PXENV_UNDI_ISR_OUT_OURS*, to make sure
+that the interrupt "belongs to us". From the PXE specification
+
+{% highlight console %}
+When the Network Interface HW generates an interrupt the protocol driver’s
+interrupt service routine (ISR) gets control and takes care of the interrupt
+processing at the PIC level. The ISR then calls the UNDI using the
+PXENV_UNDI_ISR API with the value PXENV_UNDI_ISR_IN_START for the FuncFlag
+parameter. At this time UNDI must disable the interrupts at the Network Interface
+level and read any status values required to further process the interrupt. UNDI
+must return as quickly as possible with one of the two values, PXENV_UNDI_ISR_OUT_OURS
+or PXENV_UNDI_ISR_OUT_NOT_OURS, for the parameter FuncFlag depending on whether
+the interrupt was generated by this particular Network Interface or not.
+{% endhighlight %}
+
+This flag tells pxelinux whether the interrupt was generated by the network card
+from which the system is PXE booting or not. The ISR is installed
+at the IRQ specified by the UNDI firmware itself, in *pxe_start_isr*,
+{% highlight C %}
+    int irq = pxe_undi_info.IntNumber;
+
+    if (irq == 2)
+    irq = 9;        /* IRQ 2 is really IRQ 9 */
+    else if (irq > 15)
+    irq = 0;        /* Invalid IRQ */
+
+    pxe_irq_vector = irq;
+    if (irq) {
+        if (!install_irq_vector(irq, pxe_isr, &pxe_irq_chain))
+            irq = 0;        /* Install failed or stuck interrupt */
+    }
+{% endhighlight %}
+
+On this system, the ISR is installed at IRQ 11. In real mode with a master-slave PIC
+system, IRQ 11 belongs to the slave PIC, which translates to the interrupt vector
+0x70 + (IRQ - 0x8), namely 0x70 + 0x03, 0x73 as shown in the debug messages below.
+
+{% highlight C %}
+UNDI: IRQ 11(0x73): 7e6c:509e -> 0000:7e40
+pxe_start_isr: forcing pxe_need_poll
+{% endhighlight %}
+
+The meaning of the second message will become clear very soon.
+The most important routines which are responsible for setting up interrupts are
+*pxe_init_isr* and *pxe_start_isr*, which are both called by *pxe_fs_init*, although
+at different call depths as shown in the trace below.
+
+
+{% highlight console linenos %}
+ pxe_fs_init [core/fs/pxe/pxe.c]
+   pxe_init_isr [core/fs/pxe/isr.c]
+   network_init [core/fs/pxe/pxe.c]
+     net_core_init [core/fs/pxe/pxe.c]
+       undiif_start [core/lwip/src/netif/undiif.c]
+         netifapi_netif_add [core/lwip/src/api/netifapi.c]
+           netif_add [core/lwip/src/core/netif.c]
+             init (undiif_init) [core/lwip/src/netif/undiif.c]
+               low_level_init [core/lwip/src/netif/undiif.c]
+                 pxe_start_isr [core/fs/pxe/isr.c]
+{% endhighlight %}
+The most important routines which are responsible for setting up interrupts are
+*pxe_init_isr* and *pxe_start_isr*. The former starts the *pxe_receive_thread*
+thread, which basically loops indefinitely, first suspending on the
+*pxe_receive_thread_sem* semaphore and, when trigered, calling *pxe_process_irq*.
+
+The latter starts the *pxe_poll_thread* and detects whether the hardware correctly
+supports interrupts or polling is to be preferred. In the second case,
+*pxe_poll_thread* becomes responsible of handling interrupts. As shown in the debug
+trace above, *pxe_start_isr* detects that polling is to be preferred due to
+the *PXE_UNDI_IFACE_FLAG_IRQ* flag returned directly by the UNDI firmware. The code
+of the polling thread is shown below.
+
+{% highlight C %}
+static void pxe_poll_thread(void *dummy)
+{
+    (void)dummy;
+
+    /* Block indefinitely unless activated */
+    sem_down(&pxe_poll_thread_sem, 0);
+
+    for (;;) {
+    cli();
+    if (pxe_receive_thread_sem.count < 0 && pxe_isr_poll()) {
+        sem_up(&pxe_receive_thread_sem);
+    }
+    else
+        __schedule();
+    sti();
+    cpu_relax();
+    }
+}
+{% endhighlight %}
+
+*pxe_poll_thread_sem* is incremented by a callback function triggered
+at regular intervals. The thread checks the status of the receive thread semaphore
+and the return code of *pxe_isr_poll*, and, if necessary, ups *pxe_receive_thread_sem*
+to trigger the receive thread.
+
+{% highlight C %}
+static void pxe_receive_thread(void *dummy)
+{
+    (void)dummy;
+    for (;;) {
+    sem_down(&pxe_receive_thread_sem, 0);
+    pxe_process_irq();
+    }
+}
+{% endhighlight %}
+
+I tried first to understand whether *pxe_process_irq* was ever called. It tuner out,
+it <b>was not</b> and my attention was grabbed by *pxe_isr_poll*.
+
+
+{% highlight C %}
+static bool pxe_isr_poll(void)
+{
+    static __lowmem t_PXENV_UNDI_ISR isr;
+
+    isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
+    unsigned int ret = pxe_call(PXENV_UNDI_ISR, &isr);
+
+    return isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS;
+}
+{% endhighlight %}
+
+This function performs in polling mode the same checks as *pxe_isr* in *core/pxeisr.inc*,
+In particular, it returns true if *PXENV_UNDI_ISR_OUT_OURS* is set.
+Going back to PXENV_UNDI_ISR_OUT_OURS once again:
+
+{% highlight console %}
+If the value returned in FuncFlag is PXENV_UNDI_ISR_OUT_NOT_OURS, then the 
+interrupt was not generated by our NIC, and interrupt processing is complete.
+If the value returned in FuncFlag is PXENV_UNDI_ISR_OUT_OURS, the protocol driver 
+must start a handler thread and send an end-of-interrupt (EOI) command to the PIC. 
+Interrupt processing is now complete.
+{% endhighlight %}
+After playing a bit with *pxe_isr_poll*, it turned out *PXENV_UNDI_ISR_OUT_OURS* was 
+<b>never set</b>, keeping *pxe_receive_thread* indefinitely suspended on the semaphore. The obvious,
+DSAD attempt was replacing 
+
+
+{% highlight C %}
+return isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS;
+{% endhighlight %}
+
+with
+
+{% highlight C %}
+return 1;
+{% endhighlight %}
+
+Reboot and... <b>WOW. NIC loading initramfs, kernel and booting!</b>. The flag
+returned by the UNDI firmware was <b>always</b> 0 apparently, preventing lpxelinux
+from properly handling incoming data! The good feeling that came after nailing down
+the issue, was soon followed by the realization that I could not fix the issue
+myself. Clearly considering *PXENV_UNDI_ISR_OUT_OURS* as true even when there might
+be no interrupt to be served won't probably badly break the execution but for sure
+will constitute an unnecessary overhead. The firmware was probably ignoring altogether 
+the status of the flag, which worked fine as long as pxelinux was not involved 
+in the interrupt handling. But when switching to lpxelinux, the process all of 
+a sudden broke.
+
+Conclusions
+------
+Well, conclusions are fairly simple. We need a new firmware. The manufacturer
+has been made aware of the issue and hopefully this will be fixed soon.
+
+Updates
+------
+ * It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
+   just fine if *PXENV_UNDI_ISR_OUT_OURS* is considered always true.
 
