@@ -814,7 +814,7 @@ with
 return 1;
 {% endhighlight %}
 
-Reboot and... <b>WOW. NIC loading initramfs, kernel and booting!</b>. The flag
+Reboot and... <b>Yay! NIC loading initramfs, kernel and booting!</b>. The flag
 returned by the UNDI firmware was <b>always</b> 0 apparently, preventing lpxelinux
 from properly handling incoming data! The good feeling that came after nailing down
 the issue, was soon followed by the realization that I could not fix the issue
