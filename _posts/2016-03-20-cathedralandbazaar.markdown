@@ -25,7 +25,7 @@ the Incompatible Time Sharing, written in Assembly and running software written 
 Lisp. In <b>1969, ARPANET</b> was
 launched, the first packet switched network consisting of  universities and research institutes.
 In the same year, Ken Thomson and Dennis Ritchie (who had been working on Multics for
-Bell Labs), wrote Unix. The C Language was specifically created for use under Unix
+Bell Labs at AT&T), wrote Unix. The C Language was specifically created for use under Unix
 (and to write Unix itself!). Workhorse machines of early Unix culture where the <b>PDP-11</b>
 and <b>VAX</b>. At the beginning of the '80s, the three main cultures on the scene were:
  
@@ -33,4 +33,20 @@ and <b>VAX</b>. At the beginning of the '80s, the three main cultures on the sce
  * PDP-11, Unix and C
  * Early personal computer adopters (IBM 5550 was introduced in 1983)
 
-Richard Stallman started to write a Unix clone in C in 1982.
+Unix started to be licenced by AT&T to third parties at the end of the '70s, leading
+to a large ecosystem of academic and proprietary versions. The <b>Berkley variant of Unix, BSD, </b> 
+running on VAX became the hacking system par excellence. In 1984, Unix became 
+a supported AT&T product and the whole decade was basically marked by the rivalry 
+between Berkley Unix and AT&T version. Richard Stallman started to write a Unix 
+clone in C in 1982, GNU, mainly to create a software strictly linked to the
+four essential freedoms listed in the GNU Manifesto.   
+
+As of the beginning of 1990, the workstation market started to be threatened by personal 
+computers based on the Intel 386 processor. Individual hackers could afford such 
+machines, but the software landscape was not in good shape. Commercial Unixes were still expensive: some
+companies attempted to distribute AT&T or BSD Unix ports for PC-class machines, but 
+success was extremely scarce. Sources were not distributed with the OS, and this
+was clearly not what hackers wanted. The fragmented landscape of proprietary Unix
+version failed to compete with Microsoft's Windows OS, which, albeit inferior,
+grabbed a large share of the market.
+

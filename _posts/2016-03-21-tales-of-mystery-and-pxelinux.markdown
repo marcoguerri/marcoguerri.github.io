@@ -641,7 +641,7 @@ etharp_timer: freeing entry 0, packet queue 0x00391094.
 The pending ARP resolution request was timing out and it was being popped out of the
 queue. This pattern was repeating until the eventual timeout from higher up
 in the stack. At this point <b>I realized that one of my assumptions, that no
-data was being sent/received from the card, was wrong</b>. When looking at the
+data was being sent/received from the NIC, was wrong</b>. When looking at the
 traffic dump, in order to filter out  uninteresting network activity, I was
 querying by IP, basically ruling out all traffic at the data link layer, ARP
 requests included! It was a quite a stupid mistake and in fact, after having another
