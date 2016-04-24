@@ -4,8 +4,7 @@ title:  "Tales of mystery and PXE boot failures"
 date:   2016-03-20 21:00:00
 categories: jekyll update
 published: yes
-summary: "[Warning: this post is still in beta and it is being revised and improved]
-This a report of an interesting debugging session that followed an important
+summary: "This a report of an interesting debugging session that followed an important
 regression after the update of the network boot infrastructure at CERN to PXELINUX
 6.03. It was an interesting dive into PXELINUX internals, down to the point where
 it meets the hardware. The journey was, at times, longer than what was strictly 
@@ -19,7 +18,7 @@ At some point at the beginning of 2016, given the increasing necessity to suppor
 UEFI PXE boot, a decision was taken to upgrade the old PXELINUX 4
 to PXELINUX 6.03. Everything went well, except that a relatively small subset of
 machines could not PXE boot anymore after the upgrade (in legacy mode, as they had
-always done in the past). It soon became clear that this regression was confined
+always done in the past). We realized that this regression was confined
 to three flavors of machines, using three specific NICs: Chelsio T520-LL-CR,
 Mellanox ConnectX-2 and QLogic cLOM8214. The symptoms were not really pointing
 anywhere. The ROM of the NIC was correctly initializing the stack, going through
@@ -35,7 +34,7 @@ was appearing: "Failed to load ldlinux.c32". And then a reboot.
 
 The components involved
 ------
-The infrastructure for PXE boot involves several components: clearly, a NIC,
+The infrastructure for PXE boot involves several components: a NIC,
 with its PXE-compliant firmware, a DHCP server, a TFTP server, a PXE implementation
 that does the heavy lifting, that is, loading and booting the kernel and initrd,
 and the network in-between the clients/servers. My group, Computing Facilities,
@@ -119,16 +118,15 @@ the idea is the following:
 a full-fledged TCP/IP stack, lwIP, therefore interacting with the NIC only to
 transmit/receive layer 2 frames.
 * pxelinux relies instead on the firmware of the NIC to implement network communication,
-therefore having to provide only application level payload 
-
-slated as required by the PXE standard).
+therefore having to provide only application level payload formatted as required 
+by the PXE standard).
 
 
 Getting started...
 =======
 
 Now, with a working setup, and knowing more or less what I was after, It was just
-a matter of digging down enough...
+a matter of digging deep enough...
 
 
 Debug messages
@@ -146,7 +144,7 @@ linker, ldlinux.c32, which is normally deployed on the TFTP server. This is cons
 with the network traffic trace: the first time ldlinux tries to access the network,
 for some reason it fails and eventually it times out.
 
-Something that I clearly needed was debug messages, enabling those already present and adding more, if needed.
+Something that I needed was debug messages, enabling those already present and adding more, if needed.
 *writestr* didn't seem something I could use: it was printing directly to the video buffer,
 but it didn't support format strings. *dprintf*, however, seemed to be more suitable
 for the job. But what does dprinf do? By default, it is defined as vdprintf, and
@@ -223,7 +221,7 @@ start_ldlinux [./core/elflink/load_env32.c]
                   open_file [./core/fs/fs.c]
 {% endhighlight %}
 
-At this point, it was clear that the upper layer of pxelinux was trying to load
+The upper layer of pxelinux was trying to load
 ldlinux.c32 via a file-like API that was abstracting the fact that the file was
  sitting on a remove TFTP server.
 In fact, many data structures and functions are involved in file operations,
@@ -555,7 +553,7 @@ udp_send: ip_output_if (,,,,IP_PROTO_UDP,)
 {% endhighlight %}
 
 *netconn_send* was returning 0,
-no error whatsoever. From the trace above, it was clear that
+no error whatsoever. From the trace above, 
 the maximum call depth was reached with *mbox_post*, which was also returning
 successfully. The function was appending the outgoing message on a list and it
 was increasing a semaphore to allow the main thread (*tcpip_thread* in
@@ -586,8 +584,8 @@ without pointing directly to the virtual address, 0x112646 in this case.
 
 {% endhighlight %}
 
-From the mapping above, it was clear that the output hook was residing somewhere
-between *0x1121dc* and *0x11292f*, most likely in *core/lwip/src/netif/undiif.c*, where
+According to the mapping above, the output hook was residing somewhere
+etween *0x1121dc* and *0x11292f*, most likely in *core/lwip/src/netif/undiif.c*, where
 code which interfaces directly with the hardware is defined. From *undiif.c*:
 {% highlight C %}
 /*
@@ -641,7 +639,7 @@ etharp_timer: freeing entry 0, packet queue 0x00391094.
 {% endhighlight %}
 
 The pending ARP resolution request was timing out and it was being popped out of the
-queue. This pattern was clearly repeating until the eventual timeout from higher up
+queue. This pattern was repeating until the eventual timeout from higher up
 in the stack. At this point <b>I realized that one of my assumptions, that no
 data was being sent/received from the card, was wrong</b>. When looking at the
 traffic dump, in order to filter out  uninteresting network activity, I was
@@ -788,7 +786,7 @@ static bool pxe_isr_poll(void)
     return isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS;
 }
 {% endhighlight %}
-
+             
 This function performs in polling mode the same checks as *pxe_isr* in *core/pxeisr.inc*,
 In particular, it returns true if *PXENV_UNDI_ISR_OUT_OURS* is set.
 Going back to PXENV_UNDI_ISR_OUT_OURS once again:
@@ -815,24 +813,26 @@ with
 return 1;
 {% endhighlight %}
 
-Reboot and... <b>Yay! NIC loading initramfs, kernel and booting!</b>. The flag
-returned by the UNDI firmware was <b>always</b> 0 apparently, preventing lpxelinux
-from properly handling incoming data! The good feeling that came after nailing down
-the issue, was soon followed by the realization that I could not fix the issue
-myself. Clearly considering *PXENV_UNDI_ISR_OUT_OURS* as true even when there might
-be no interrupt to be served won't probably badly break the execution but for sure
-will constitute an unnecessary overhead. The firmware was probably ignoring altogether 
-the status of the flag, which worked fine as long as pxelinux was not involved 
-in the interrupt handling. But when switching to lpxelinux, the process all of 
-a sudden broke.
+Reboot and... <b>Yay! NIC loading initramfs, kernel and booting!</b>. Apparently, the flag
+returned by the UNDI firmware was always cleared, preventing lpxelinux
+from properly handling incoming data. The firmware was probably ignoring altogether
+that flag, which worked as long as pxelinux was not involved in the interrupt handling.
+Unfortunately, this marked the end of the  investigation: I could not 
+fix the issue myself as I did not have any control over the sources of the firmware of the NIC. 
+Considering *PXENV_UNDI_ISR_OUT_OURS* as always set was not an 
+option, as it could break the execution on hardware with multiple NICs sharing the 
+same IRQ (or in the best case, it would result in the invocation of the routine for servicing the 
+interrupt for no reason). 
+
 
 Conclusions
 ------
-Well, conclusions are fairly simple. We need a new firmware. The manufacturer
-has been made aware of the issue and hopefully this will be fixed soon.
+After the investigation we came to the conclusion that we need a new firmware which
+properly handles the *PXENV_UNDI_ISR_OUT_OURS* flag.
+The manufacturer has been made aware of the issue and hopefully this will be fixed soon.
 
 Updates
 ------
- * It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
-   just fine if *PXENV_UNDI_ISR_OUT_OURS* is considered always true.
+It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
+just fine if *PXENV_UNDI_ISR_OUT_OURS* is considered always set.
 
