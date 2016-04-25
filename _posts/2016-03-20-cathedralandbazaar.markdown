@@ -50,3 +50,41 @@ was clearly not what hackers wanted. The fragmented landscape of proprietary Uni
 version failed to compete with Microsoft's Windows OS, which, albeit inferior,
 grabbed a large share of the market.
 
+The following chapter is dedicated to Eric Raymond's famous essay, "The Cathedral
+and the Bazaar". Here he shares some aphorism on software development directly connected
+to his experience that help understand why the Linux community succeeds in creating 
+such a large amount of good software. I have reported some of those I considered 
+the most relevant for me.
+
+
+<b> Good programmers known what to write, great ones know what to rewrite (and
+reuse).</b>Sharing source code allows other programmers to use your code base to
+kickstart new projects. Results is what matters, not effort: starting from a partial
+solution is better than starting from nothing at all, reusing and adapting is what
+great programmers do.
+
+<b> A good understanding of a problem is not achieved until after a solution is found</b>.
+Therefore, it's inevitable start over at least once to get it right.
+
+<b>Treating your users as co-developers is your least-hassle route to rapid code improvement
+and effective debugging.</b> Users/Co-developers are essential for the success of
+a project. Linus' cleverest hack was not to build the Linux kernel itself, but the
+invention of the Linux development model (Bazaar). One precedent for the methods and
+success of Linux was seen in the GNU Emacs Lisp Library, developed in a collaborative
+way, in contrast to the traditional cathedral style adopted for the GNU tools.
+
+<b>Release early and release often</b>. The shared belief used to be that releasing
+too early was at high risk of wearing out user's patience. But Linus' approach of
+releasing very (VERY) often kept his users stimulated. The idea that, given a large
+enough developers base, bugs will be fixed quickly worked well with Linux. Sociologies
+have shown that the average opinion of a mass of equally expert observers is more reliable than
+the opinion of a single randomly chosen observer (<b>Delphi effect</b>). In the case of Linux, this has
+been proved true also for the development and debugging a piece of software so 
+complex as an OS kernel. Debugging cost in terms of interactoin does not increase
+with the square of the number of debuggers, sofware development does. According
+to <b>Brook's Law</b>, adding more programmers to a late project makes it later due to
+communication overhead. For debugging instead, many people running traces will be
+more effective than few people running traces sequentially, even more experienced.
+
+
+
