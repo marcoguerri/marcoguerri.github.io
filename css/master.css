@@ -64,6 +64,9 @@ a {
   width: 100%;
 }
 
+ul {
+    margin-left: 1em;
+}
 #menu ul {
   list-style: none;
   margin: 0;

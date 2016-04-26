@@ -57,8 +57,8 @@ such a large amount of good software. I have reported some of those I considered
 the most relevant for me.
 
 
-<b> Good programmers known what to write, great ones know what to rewrite (and
-reuse).</b>Sharing source code allows other programmers to use your code base to
+<b> Good programmers known what to write, great ones know what to rewrite and
+reuse.</b>Sharing source code allows other programmers to use your code base to
 kickstart new projects. Results is what matters, not effort: starting from a partial
 solution is better than starting from nothing at all, reusing and adapting is what
 great programmers do.
@@ -74,17 +74,49 @@ success of Linux was seen in the GNU Emacs Lisp Library, developed in a collabor
 way, in contrast to the traditional cathedral style adopted for the GNU tools.
 
 <b>Release early and release often</b>. The shared belief used to be that releasing
-too early was at high risk of wearing out user's patience. But Linus' approach of
-releasing very (VERY) often kept his users stimulated. The idea that, given a large
-enough developers base, bugs will be fixed quickly worked well with Linux. Sociologies
-have shown that the average opinion of a mass of equally expert observers is more reliable than
-the opinion of a single randomly chosen observer (<b>Delphi effect</b>). In the case of Linux, this has
-been proved true also for the development and debugging a piece of software so 
-complex as an OS kernel. Debugging cost in terms of interactoin does not increase
-with the square of the number of debuggers, sofware development does. According
-to <b>Brook's Law</b>, adding more programmers to a late project makes it later due to
-communication overhead. For debugging instead, many people running traces will be
-more effective than few people running traces sequentially, even more experienced.
+too early was at high risk of wearing out user's patience, generating bugs that
+grow excessively in complexity. However, Linus belief was that <b>given a large
+enough developers base, any bug would be fixed quickly.</b> And this worked very well.
+Sociologists have shown that the average opinion of a mass of equally expert observers is more reliable than
+the opinion of a single randomly chosen observer. This is often referred to as the 
+<b>Delphi effect</b>. In the case of Linux, it has been proved true also for the 
+development and debugging a piece of software so complex as an OS kernel. 
 
+Debugging cost in terms of interaction does not increase
+with the square of the number of debuggers, software development does. However,
+this assumes that all developers interact with each other, which is not true with
+Open Source development. According to <b>Brook's Law</b> (add to reading list: The Mythical Man-Month), 
+adding more programmers to a late project makes it later due to communication overhead. For debugging 
+instead, many people running traces will be more effective than few people running 
+traces sequentially, even more experienced.
 
+Code should be as simple as possible. "Right" code is code which gets better
+and simpler. From Antoine de Saint-Exupéry: <b>perfection is achieved not when there is nothing 
+more to add, but rather when there is nothing more to take away.</b>
 
+Starting projects in bazaar mode is very difficult, however it becomes easier to
+improve. It is not critical that the coordinator be able to originate brilliant designs,
+but he/she must recognize good design ideas from others. The open source community
+internal market in reputation exerts pressure on people not to launch development
+efforts they are not competent to follow through on. <b>Good people and communication
+skills are essentials for coordinators of bazaar mode projects.</b>
+
+If Brooke's law were the whole picture, the Linux would be impossible. A vital
+correction consists in <b>egoless programming</b> (add to reading list: The Psychology of
+Computer Programming). When developers encourage other people to look at their code
+and fix bugs, improvement is much faster and Brooke's law is heavily mitigated.
+Cheap Internet was a necessary condition for the Linux model to evolve. This,
+however, was not enough. Equally important was the development of a leadership 
+model not based on coercion but on cooperation: <b>the severe effort of many
+converging skills</b> is what projects like Linux requires.  
+
+The "utility function" Linux hackers are maximizing is thir own ego satisfactoin
+and reputation. Linus has funnelled the selfishness of hackers into the achievement
+of a common goal. It would be expected by such a culture to be fragmented,
+territorial and hostile. It is not the case for the Linux community (a clear proof
+is the sheer amount of documentation produced.
+
+Closed source world cannot win an evolutionary arm race with Open Source communities
+that can put order of magnitude more skilled time into a problem. A common
+critic is that the bazaar mode community is lacking the productivity-multiplying effect
+of traditional management.
