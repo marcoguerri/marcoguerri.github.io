@@ -102,12 +102,8 @@ for a second :)
 Deploying the correct binary
 ------
 pxelinux is part of syslinux project and it comes in two different flavors:
-*pxelinux.0* and *lpxelinux.0*.
-For the remainder of this experiment, the following remarks apply:
-
-* I was compiling and testing the 32bits legacy version of pxelinux
-* I was working on git commit 138e850f
-
+*pxelinux.0* and *lpxelinux.0*. During this experiment, I was compiling and 
+testing the 32bits legacy version of pxelinux and I was working on git commit 138e850f.
 The first binary that I tried to deploy with my test environment was pxelinux.0,
 and this worked flawlessly, I could boot without any problem. With lpxelinux.0 instead, the
 behavior was identical to the production version: "Failed to load ldlinux.c32",

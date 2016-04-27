@@ -1,5 +1,7 @@
 body {
-  font-family: Arial,sans-serif;
+  font-family: 'MS Serif', 'New York', sans-serif;
+  text-rendering: optimizelegibility;
+  font-size:90%;
   background: #FFFFFF;
   line-height: 150%;
   overflow-y:scroll;
@@ -14,12 +16,15 @@ em {
 }
 
 div.post img {
+    padding-top:2em;
+    padding-bottom:2em;
     max-width:100%; height:auto
 }
 
 a {
     color: #000000;
 }
+
 #wrapper {
   margin: 0 auto 0;
   width: 100%;
@@ -64,9 +69,6 @@ a {
   width: 100%;
 }
 
-ul {
-    margin-left: 1em;
-}
 #menu ul {
   list-style: none;
   margin: 0;
@@ -103,6 +105,12 @@ ul {
   padding-right: 2em;
   background: #FAFAFA;
 }
+
+.content-books ul {
+    margin-left: 30%;
+
+}
+
 #content h2 {
   margin: 0 0 0.5em 0;
   color: black;
@@ -135,6 +143,20 @@ div.post {
     width: 100%;
     float: right;
 }
+
+
+h1 {
+    font-weight:400;
+}
+
+h2 {
+    text-align:center;
+}
+
+
+h3 {
+    font-weight:400;
+}
 .summary h1 {
     text-align: center;
 }
@@ -142,6 +164,7 @@ div.post {
   font-size: 1.5em;
   font-weight: normal;
   text-align: center;
+  font-weight:400;
 }
 
 .post h1 a {
@@ -152,8 +175,19 @@ div.post {
   color: black;
   padding: 0.1em 0;
   margin: 0 0 0.0em 0;
-  font-weight: bold;
 }
+
+
+.post h3 a {
+  text-decoration: none;
+  clear: left;
+  text-align:center;
+  display: block;
+  color: black;
+  padding: 0.1em 0;
+  margin: 0 0 0.0em 0;
+}
+
 
 .post br { margin-bottom: 10px;}
 
