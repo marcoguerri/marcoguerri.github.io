@@ -33,7 +33,7 @@ was appearing: "Failed to load ldlinux.c32". And then a reboot.
 
 
 The components involved
-------
+=======
 The infrastructure for PXE boot involves several components: a NIC,
 with its PXE-compliant firmware, a DHCP server, a TFTP server, a PXE implementation
 that does the heavy lifting, that is, loading and booting the kernel and initrd,
@@ -58,7 +58,7 @@ on a journey that turned out very interesting.
 
 
 A quick look at the network
-------
+=======
 The first approach that I tried was to dump network traffic, in case something
 obvious would turn up. I could not dump the traffic on the machine itself during
 PXE boot, and dumping at the other end of the communication was not a good idea
@@ -69,7 +69,7 @@ Here I made the first assumption, that unfortunately turned out to be wrong late
 after relinquishing control to pxelinux, there is no network activity whatsoever.
 
 DHCP/TFTP servers
-------
+=======
 The following piece that I needed was my own DHCP/TFTP infrastructure, so that
 I could bypass the official servers and point directly to my test instances where
 I could deploy a custom pxelinux. This also turned out doable. What was necessary was
@@ -88,7 +88,7 @@ Once the test environment was in place, the debugging could start.
 
 
 Interaction with the machine
-------
+=======
 Another import point to address was the interaction with the machine under test.
 The system I used was part of a quad enclosure installed in a water cooled rack
 in the Data Centre. Clearly, you don't want to stand there with your keyboard/monitor
@@ -100,7 +100,7 @@ for a second :)
 
 
 Deploying the correct binary
-------
+=======
 pxelinux is part of syslinux project and it comes in two different flavors:
 *pxelinux.0* and *lpxelinux.0*. During this experiment, I was compiling and 
 testing the 32bits legacy version of pxelinux and I was working on git commit 138e850f.
@@ -117,16 +117,8 @@ transmit/receive layer 2 frames.
 therefore having to provide only application level payload formatted as required 
 by the PXE standard).
 
-
-Getting started...
-=======
-
-Now, with a working setup, and knowing more or less what I was after, It was just
-a matter of digging deep enough...
-
-
 Debug messages
-------
+=======
 A good point where to start was where the error message itself was raised.
 A quick grep pointed to *./core/elflink/load_env32.c*, function load_env32.
 
@@ -197,7 +189,7 @@ Deploy, reboot and fingers crossed..
 <i>Annuntio vobis gaudium magnum: Habemus debug messages</i> (tons of them)!
 
 Tracing the execution
-------
+=======
 
 I though a good idea was to start from *load_env32*. I tried to follow the control
 path, keeping an eye open for something that could be the root cause of the
@@ -225,7 +217,7 @@ nothing very much different then what you would find on a Linux OS
 and libc. It is actually interesting to dive a bit deeper.
 
 File-like API
-------
+=======
 *opendev* is called with a pointer to the *__file_dev* structure which
 defines the input operation hooks available (read/open/close)
 
@@ -352,7 +344,7 @@ __export int open_file(const char *name, int flags, struct com32_filedata *filed
 {% endhighlight %}
 
 From file-like API to network
-------
+=======
 *searchdir*, is where things start to become specific to the medium that is used to
 retrieve the file, in this case the network.
 
@@ -453,7 +445,7 @@ static void pxe_searchdir(const char *filename, int flags, struct file *file)
 At this point some more digging turned out to be necessary.
 
 Network layer 4 via lwIP
-------
+=======
 {% highlight console %}
 pxe_searchdir [./core/fs/pxe/pxe.c]
    __pxe_searchdir [./core/fs/pxe/pxe.c]
@@ -592,7 +584,7 @@ code which interfaces directly with the hardware is defined. From *undiif.c*:
  */
 {% endhighlight %}
 Layer 2 and below
-------
+=======
 The first thing that seemed obvious to do was to enable debug messages at the
 UNDIIF layer.
 
@@ -655,7 +647,7 @@ of the problem: it seemed that the card was perfectly capable of transmitting
 traffic, but not to receive the responses.
 
 Receiving data - Interrupt Service Routine
-------
+=======
 The interrupt service routine used by *lpxelinux* is defined in *core/pxeisr.inc*.
 The ISR calls the *PXENV_UNDI_ISR* hook exported by the PXE capable firmware and
 then check one of the return flags, *PXENV_UNDI_ISR_OUT_OURS*, to make sure
@@ -822,13 +814,13 @@ interrupt for no reason).
 
 
 Conclusions
-------
+=======
 After the investigation we came to the conclusion that we need a new firmware which
 properly handles the *PXENV_UNDI_ISR_OUT_OURS* flag.
 The manufacturer has been made aware of the issue and hopefully this will be fixed soon.
 
 Updates
-------
+=======
 It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
 just fine if *PXENV_UNDI_ISR_OUT_OURS* is considered always set.
 
