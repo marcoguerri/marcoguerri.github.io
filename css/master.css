@@ -1,7 +1,8 @@
 body {
   line-height: 150%;
-  font-family: 'Droid Sans';
-  font-weight:100;
+  font-family: Open Sans;
+  font-weight:300;
+  font-size:100%;
 }
 
 em {
@@ -31,11 +32,10 @@ a {
 }
 
 #header {
-  text-transform: lowercase;
   text-align: left;
   background: #E1E1E1;
-  font-size: 2em; 
-  padding: 0.5em;
+  font-size: 1em; 
+  padding: 0.7em;
   text-align: center;
 }
 
@@ -44,18 +44,16 @@ a {
   margin-left: 0.5em;
   padding-top: 20px;
   padding-bottom: 20px;
+  font-color: #47423F;
   font-size: 2em;
   font-weight: normal;
 }
 
 #menu {
-  top: 0;
   background: #47423F;
   padding: 0em;
-  text-align: center;
   color: #FFFFFF;
-  font-size: 0.9em;
-  width: 100%;
+  font-weight:300;
 }
 
 #menu ul {
@@ -66,12 +64,12 @@ a {
 
 #menu ul li {
   display: inline;
+  margin:0.5em;
 }
 
 #menu ul li a {
   text-decoration: none;
   color: white;
-  font-size: 1.3em;
   padding: 0 0.5em;
   line-height: 2.5em;
   font-weight: normal;
@@ -111,8 +109,9 @@ a {
 }
 
 .date {
-    padding-top:0,1em;
     padding-bottom:1em;
+    padding-left:0.5em;
+    font-size:95%;
     text-align:center;
 }
 
@@ -136,7 +135,7 @@ div.post {
 
 
 h1 {
-    font-weight:100;
+    font-weight:400;
     font-size:150%;
 }
 
