@@ -1,6 +1,7 @@
 About
 =====
-I was born in Modena, Italy, too many years ago. I studied Computer Engineering 
+I was born in Modena, Italy, a number of years ago which can be represented with
+5 bits, unsigned. I studied Computer Engineering 
 at University of Modena and Reggio Emilia and I currently work at CERN, the 
 European Organization for Nuclear Research.
 

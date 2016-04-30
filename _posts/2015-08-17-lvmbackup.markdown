@@ -8,8 +8,11 @@ pygments: true
 summary: "This post summarizes the backup procedure of a Linux installation based
 on a boot partition and three LVM logical volumes for root, var and swap. This proves
 useful when a Linux installation must be snapshotted and moved to another identical 
-machine using the lowest possible amount of space. All the following commands have been
-executed from a live image based on RedHat Linux."
+machine using the lowest possible amount of space. Such a procedure does entail
+a number of issues: all the machine specific parameters (e.g. /etc/hostname, MAC
+addresses in /etc/sysconfig/network-scripts) are deployed to the second machine
+and need to be adapted accordingly (not covered in this post). Bearing this in mind, 
+all the following commands have been executed from a live image based on RedHat Linux."
 ---
 
 Initial setup
