@@ -771,7 +771,7 @@ static bool pxe_isr_poll(void)
     isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
     unsigned int ret = pxe_call(PXENV_UNDI_ISR, &isr);
 
-    return isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS;
+    return isr.FuncFlag == PXENV_UNDI_ISR_OUT_OURS;
 }
 {% endhighlight %}
              
@@ -792,7 +792,7 @@ The first obvious course of action was to replaced the condition in the return s
 
 
 {% highlight C %}
-return isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS;
+return isr.FuncFlag == PXENV_UNDI_ISR_OUT_OURS;
 {% endhighlight %}
 
 with
