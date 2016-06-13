@@ -206,8 +206,10 @@ Setting up libssl1.0.0:i386 (1.0.1e-2+deb7u14) ...
 
 nginx installation
 ==================
-nginx can be configured to enable HTTPS connections by simply adding this entry
-in the configuration file, */etc/nginx/nginx.conf* by default.
+nginx can be configured to enable HTTPS connections by simply adding the following
+`server` entry in the configuration file within the `http` section, making sure it
+does not clash with other `server` definitions included from */etc/nginx/sites-enabled*.
+The default configuration file is */etc/nginx/nginx.conf*.
 
 {% highlight console %}
 server {
@@ -331,7 +333,7 @@ Now, upon receiving a heartbeat message, the code will hit the breakpoint, allow
 step by step execution.
 
 
-{% highlight C linenos %}
+{% highlight console linenos %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
 (gdb) s
@@ -352,7 +354,7 @@ library it's difficult to fully grasp what the code does. After
 a series of *step* and *next*, the single step execution led to the function
 *buffer_write* in *bf_buff.c*. 
 
-{% highlight C linenos %}
+{% highlight console linenos %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 [...]
 2614            r = ssl3_write_bytes(s, TLS1_RT_HEARTBEAT, buffer, 3 + payload + padding);
@@ -485,7 +487,7 @@ $2 = 28
 What happens if the size of the heartbeat message is bigger than the buffer, say 5000
 bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a> 
 to send a well-formed heartbeat request while tracing *buffer_write*.
-{% highlight C linenos %}
+{% highlight console linenos %}
     (gdb) 
     247     i=b->method->bwrite(b,in,inl);
     (gdb) s
