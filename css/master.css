@@ -10,7 +10,7 @@ em {
     border: 1px solid #777;
     border-radius: 3px;
     font-style: normal;
-    padding: 2px 3px;
+    padding: 0px 1px;
 }
 
 div.post img {
@@ -205,7 +205,6 @@ figure {
   display: block; 
   padding: 1em;
   overflow-x: auto; 
-  font-family: Monaco,Consolas, Courier New, Monospace !important;
   font-size:110%;
   color: white !important;
 }
@@ -216,7 +215,11 @@ figure {
 
 }
 
-
+.highlighter-rouge {
+    font-size:100%;
+    font-style:Italic;
+    font-family:Open Sans;
+}
 
 .nostyle {
   font-family: Curier,mono;
