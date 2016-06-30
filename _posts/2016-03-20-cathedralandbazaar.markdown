@@ -110,7 +110,7 @@ however, was not enough. Equally important was the development of a leadership
 model not based on coercion but on cooperation: <b>the severe effort of many
 converging skills</b> is what projects like Linux requires.  
 
-The "utility function" Linux hackers are maximizing is thir own ego satisfactoin
+The "utility function" Linux hackers are maximizing is their own ego satisfaction
 and reputation. Linus has funnelled the selfishness of hackers into the achievement
 of a common goal. It would be expected by such a culture to be fragmented,
 territorial and hostile. It is not the case for the Linux community (a clear proof
@@ -119,4 +119,51 @@ is the sheer amount of documentation produced.
 Closed source world cannot win an evolutionary arm race with Open Source communities
 that can put order of magnitude more skilled time into a problem. A common
 critic is that the bazaar mode community is lacking the productivity-multiplying effect
-of traditional management.
+of traditional management. But what is the management overhead buying?
+  
+  * Meeting deadlines?
+  * Meeting budget?
+  * Meeting features?
+  * Legal liability
+
+The truth is that rarely even one is achieved/guaranteed. Traditional development
+management is a necessary compensation for poorly motivated programmers. Some
+believe Open Source has been successful because it accept the most talented 5%.
+The position towards commercial software varies with two degrees of freedom:
+zealotry and hostility. Historically, the attitude has been very zealous and very
+anticommercial (Stallman). Unix has been more market friendly, more pragmatist,
+hating the refusal to incorporate open source tools (identified with the BSD
+Unix licence). The <b>Debian Free Software guidelines</b> became in 1997 the 
+Open Source definition.
+\\
+In the Open Source world, forks are considered a waste of resources and requires
+much public self-justification. The owner of an Open Source project is the one
+who has the right to distribute a modified version and the one who applies
+official patches (non official patches are referred to as rogue). There are
+three  ways to acquire ownership of an Open Source project:
+
+ * Founding it
+ * Project handed over by the owner
+ * Owner has lost interest and disappeared
+
+This theory of ownership is very similar to <b>John Locke</b>'s rationalization of the
+Anglo-American common law theory of land tenure which applies when the expected return
+from the resource exceeds the expected cost of defending it. What are the possible
+yields in the Open Source world?
+
+ * Simply use of the project: covered by the licence
+ * Seeking power: not in the case of Open Source, there is no scarcity economy in
+ Open Source.
+ * <b>Reputation</b>: this can definitely have a return in terms of wealth in the real
+    world.
+
+Societies are organized either by:
+
+ * command hierarchy 
+ * social status given by control of goods (<b>exchange economies</b>)
+ * social status given by what you give away (<b>gift cultures</b>, in the absence
+ of scarcity)
+
+
+Open source world is a post-scarcity gift culture where the expected return
+in Lockean terms is the maximization of reputation.
