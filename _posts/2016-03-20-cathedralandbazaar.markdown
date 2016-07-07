@@ -136,7 +136,7 @@ hating the refusal to incorporate open source tools (identified with the BSD
 Unix licence). The <b>Debian Free Software guidelines</b> became in 1997 the 
 Open Source definition.
 \\
-In the Open Source world, forks are considered a waste of resources and requires
+In the Open Source world, forks are considered a waste of resources and require
 much public self-justification. The owner of an Open Source project is the one
 who has the right to distribute a modified version and the one who applies
 official patches (non official patches are referred to as rogue). There are
@@ -151,19 +151,87 @@ Anglo-American common law theory of land tenure which applies when the expected 
 from the resource exceeds the expected cost of defending it. What are the possible
 yields in the Open Source world?
 
- * Simply use of the project: covered by the licence
- * Seeking power: not in the case of Open Source, there is no scarcity economy in
- Open Source.
- * <b>Reputation</b>: this can definitely have a return in terms of wealth in the real
-    world.
+ * Simply use of the project is not really enough as expected return. However,
+ open source licenses imply a context where use is the only yield (and there 
+ is no taboo against forking).
+ * Seeking power again does not apply in the context of Open Source, where there is
+  no scarcity economy and therefore no pursuing of material wealth.
+ * <b>Reputation</b> instead, is central to the hacker culture (eventually reputation 
+ can also have a return in terms of wealth in the real world). 
+ 
+Societies can be split into the following categories:
 
-Societies are organized either by:
-
- * command hierarchy 
- * social status given by control of goods (<b>exchange economies</b>)
- * social status given by what you give away (<b>gift cultures</b>, in the absence
- of scarcity)
+ * those organized according to a hierarchy of command
+ * those where social status is given by control of goods (<b>exchange economies</b>)
+ * those where social status given by what you give away (<b>gift cultures</b>) 
+ in the absence of scarcity
 
 
-Open source world is a post-scarcity gift culture where the expected return
-in Lockean terms is the maximization of reputation.
+The society of opensource hackers is a gift culture. There is not shortage of hardware
+resources (storage, compute power) and software is freely shared. The Lockean
+property customs used within hackers are aimed at maximizing reputation incentives,
+making sure that credit goes to the right individuals.
+
+<b>Open source world is a post-scarcity gift culture where the expected return
+in Lockean terms is the maximization of reputation.</b>
+
+Hacker culture <b>distrusts ego-based motivation</b> and despises egotism. It's 
+important that the role of prestige and ego remains unadmitted. In fact, self-promotion
+would generate noise that would corrupt productivity. Instead, code must 
+speak for itself, and the taboo towards ego-driven posturing is kept alive by
+valuing humility. 
+
+These customs become evident in several ways:
+
+ * Technical competence is never attacked publicly. <b>Criticism is always 
+   project labelled</b>.
+ * Hackers flame each other over ideological issues but do not attack technical 
+ competence.
+
+The reputation-game model encourages founding <b>new and innovative projects</b>.
+Homesteading the noosphere refers to the tendency to found <b>new and innovative projects</b>
+rather than cloning projects that are recognized as category killers, because it would
+be too hard to gain attention. This has dictated the trend in open source projects:
+
+ * 1970s: toys and demos
+ * 1980s: internet tools
+ * 1990s: Operating Systems
+ * 2000s: applications for non techies
+
+The following are the main patterns according to which hacker culture values 
+contribution:
+
+  * It was to work as well as I have been led to expect it will
+  * Extending is better than duplicating
+  * Work that makes it into major distribution is better then work that does not
+  * Work used by lot of people is better than work used by few
+  * Continued devotion to hard, boring work is more pairseworthy then cherrypicking
+  the fun and easy hacks
+  * Nontrivial extensions of function are better then low-level patches and debugging
+
+When it comes to conflicts, the following rules apply (considering the model
+of a <b>benevolent dictator</b>)
+
+  * Project owner makes binding decisions
+  * Project owner is obliged to credit contributors fairly
+  * Subsystem owner controls implementation and interface, subject only to
+  correction by project leader
+
+There exist other models, for example the <b>voting committe</b> model which runs
+the Apache project. In general, <b>authority follows responsability</b>.
+
+The reputation-game gift culture is the best social organization for what the
+community is trying to do. This is supported by several psychology studies which
+report the following:
+
+  * Commissioned work is less creative than work done out of interest
+  * Complex activities are hurt by rewards
+  * Flat salaries do not demotivate, bonuses do (ref: psychologist Theresa Aambile of 
+  Brandeis University, 1984)
+
+The best course of action is to decouple salary from performance in programming
+and let people choose their projects.
+
+When creativity is needed, a group of open source developers is more productive
+than a group of closed source developers motivated by regards in a scarcity
+context.
