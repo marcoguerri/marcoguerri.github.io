@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Exploiting Heartbleed bug"
+title:  "Exploiting CVE-2014-0160 (Heartbleed)"
 date:   2014-08-23 13:31:48
 categories: jekyll update
 published: yes

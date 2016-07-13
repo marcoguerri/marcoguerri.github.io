@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Gentoo full disk encryption with dm-crypt"
+title:  "Gentoo full disk encryption with dm-crypt/LUKS"
 date:   2013-10-07 13:31:48
 categories: jekyll update
 summary: "This post sums up the installation procedure of a Gentoo Linux distribution with

@@ -1,15 +1,13 @@
 ---
 layout: post
-title:  "Tales of mystery and PXE boot failures"
+title:  "pxelinux 6.03 boot failure with Chelsio T520-LL-CR"
 date:   2016-03-20 21:00:00
 categories: jekyll update
 published: yes
 summary: "This a report of an interesting debugging session that followed an important
 regression after the update of the network boot infrastructure at CERN to PXELINUX
 6.03. It was an interesting dive into PXELINUX internals, down to the point where
-it meets the hardware. The journey was, at times, longer than what was strictly 
-necessary, but this was a Saturday adventure, so no time was stolen to daily work :)
-Curiosity is hard to tame. "
+it meets the hardware."
 ---
 
 Background and setup
@@ -25,7 +23,8 @@ anywhere. The ROM of the NIC was correctly initializing the stack, going through
 the whole DHCP discover, offer, request, ACK workflow, and it was finally loading
 correctly pxelinux image from the server, which was then being given control.
 PXELINUX initial banner was displayed and after a long delay, a timeout message
-was appearing: "Failed to load ldlinux.c32". And then a reboot.
+was appearing: "Failed to load ldlinux.c32". And then a reboot. (Picture below
+shows pxelinux 6.04, but all these notes have been taken while working with 6.03).
 
 <p align="center">
 <a id="single_image" href="/img/pxe_timeout.png"><img src="/img/pxe_timeout.png" alt=""/></a>
@@ -816,11 +815,12 @@ interrupt for no reason).
 Conclusions
 =======
 After the investigation we came to the conclusion that we need a new firmware which
-properly handles the *PXENV_UNDI_ISR_OUT_OURS* flag.
-The manufacturer has been made aware of the issue and hopefully this will be fixed soon.
+properly handles the *PXENV_UNDI_ISR_OUT_OURS* flag. The manufacturer has been made 
+aware of the issue and hopefully this will be fixed soon.
 
 Updates
 =======
-It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
+   * It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
 just fine if *PXENV_UNDI_ISR_OUT_OURS* is considered always set.
+   * Chelsio has provided a new firmware which allows to boot correctly with lpxelinux 6.03
 
