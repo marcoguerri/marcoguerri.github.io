@@ -46,7 +46,7 @@ result in a dump similar to the one shown below (bear in mind, payload is coming
 a000000
 {% endhighlight %}
 
-Definitely not good, bit flipped apparently at random. The timeframe necessary for 
+Definitely not good, bit flipped apparently at random. The time frame necessary for 
 data corruption to appear varied. I had two boards between my hands: with the first 
 it would be a matter of few seconds, with the second it would take longer than that, 
 up to 2 minutes. After a bit of hacking I came to the conclusion that there 
@@ -62,7 +62,7 @@ seemed to be a pattern. A further example of corrupted payload is the following.
 a000000
 {% endhighlight %}
 
-At first glance it looks different, but the 3 bits are placed at the same
+At first glance it looks different, but in fact the 3 bits are placed at the same
 distances as in the first example. The existence of a pattern seemed to rule
 out data corruption on the wire, but to have a clear picture of what was happening
 at the different layers I decided to carry out some experiments
@@ -79,20 +79,88 @@ Having corrupted data delivered to userspace means that an error has to go
 through these checks undetected, which is very unlikely. It would make much
 sense to start investigating from the FCS at layer 2, which is the one usually
 completely out of the control of the software stack. However, I decided to approach
-the problem top down and investigate all the relevant layers.
+the problem top down and investigate everything that was happening starting
+from the transport layer.
+
 
 
 TCP checksum
 =======
-The first question I wanted to address was the following: do the segments that
-are being delivered to userspace have a valid TCP checksum? What usually happens on 
+The first point I wanted to address was whether the segments that
+were being delivered to userspace had valid TCP checksums. What usually happens on 
 modern hardware is that checksum verification on the receiving side is offloaded to the NIC,
-and if it can't be validated the whole frame is discarded straight away. 
+and if it can't be validated the whole frame is discarded straight away. Tools
+like tcpdump or wireshark can be really useful in this case as they provide
+information on the correctness of the checksum. The easiest way that came to mind to test
+this use case was to develop a *netfilter* kernel module that would mangle outgoing
+packets at layer 2, preventing somehow the NIC to recompute the checksum when
+checksum offloading is enabled. Linux also provides ways to use a network scheduling
+algorithm (or queue discipline) that corrupt outgoing packets. In particular,
+the *netem* (Network Emulator) scheduler allows to perform randomized packet
+corruption.
 
-
-
-Adding queue discipline with 10% corrupted packets:
+{% highlight console %}
 sudo tc qdisc add dev lo root netem corrupt 10
+{% endhighlight %}
+
+However, there's not much space for tuning: with the line above what we are saying
+is "corrupt 10% of the *sk_buff*, with corruption meaning the flip of one random
+bit. The relevant code from *net/sched/sched_netem.c* which does the corruption 
+is the following:
+
+
+{% highlight C linenos %}
+    if (q->corrupt && q->corrupt >= get_crandom(&q->corrupt_cor)) {
+        if (skb_is_gso(skb)) {
+            segs = netem_segment(skb, sch);
+            if (!segs)
+                return NET_XMIT_DROP;
+        } else {
+            segs = skb;
+        }
+
+        skb = segs;
+        segs = segs->next;
+
+        if (!(skb = skb_unshare(skb, GFP_ATOMIC)) ||
+            (skb->ip_summed == CHECKSUM_PARTIAL &&
+             skb_checksum_help(skb))) {
+            rc = qdisc_drop(skb, sch);
+            goto finish_segs;
+        }
+
+        skb->data[prandom_u32() % skb_headlen(skb)] ^=
+            1<<(prandom_u32() % 8);
+    }
+{% endhighlight %}
+
+The most relevant parts are probably the call to *skb_checksum_help*, which computes
+in software the checksum of the packet and sets *skb->ip_summed* to *CHECKSUM_NONE*,
+which notifies the NIC that the checksum must not be recalculated in hardware. On
+line 20 and 21, the packet that has been chosen for corruption has a random bit flipped
+within the linear buffer of the sk_buff (i.e. modulo *skb_headlen()*. The paged data
+of the sk_buff is not considered for the corruption (I guess to keep things simple).
+\\
+However, this tool did not provide enough control for the test I wanted to perform, hence the decision
+to write a simple <a href="https://github.com/marcoguerri/packet-mangle" target="_blank">
+netfilter kernel module</a>, which registers a callback to the *NF_INET_POST_ROUTING* hook.
+The code acts in a very similar way as the netem discipline:
+
+  * it for a specific pattern in the application level payload. Again for simplicity
+    non-linear sk_buffs are ignored
+  * it calculates the checksum before the corruption. The code operates at layer
+    two just before the queue discipline, therefore the *sk_buff* is complete
+  * it prints some debug information
+  * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that the checksum is not recalculated
+    by the NIC
+
+
+
+
+
+ 
+
+
 
 To remove the queue discipline
 sudo tc qdisc del dev lo root
