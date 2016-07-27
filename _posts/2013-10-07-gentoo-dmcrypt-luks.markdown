@@ -199,11 +199,12 @@ Done.
 {% endhighlight %}
 
 An alternative way to install grub is to simply use *grub-install* on /dev/sda. 
-*update-grub* can then be used to update menu.lst (or grub.cfg) based on the kernels
- available under /boot. update-grub only works as long as df output reports correctly the 
-boot partition. If /etc/mtab is empty, an error is raised (df: cannot read table of 
-mounted file systems). A quick workaround is to manually add to /etc/mtab the 
-following entry for the boot partition:
+*update-grub* can normally be used to update menu.lst (or grub.cfg) based on the kernels
+ available under /boot, but in this case the configuration file is so simple that
+ it will be populated manually. As a aside note, update-grub relies on the output 
+ of df command, which must reports correctly an entry for the boot partition. If /etc/mtab is empty, 
+ an error is raised (df: cannot read table of mounted file systems). A quick workaround 
+ is to manually add to /etc/mtab the following line
 
 
 {% highlight console %}

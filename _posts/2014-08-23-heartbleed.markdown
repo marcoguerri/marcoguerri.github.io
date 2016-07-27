@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Exploiting CVE-2014-0160 (Heartbleed)"
+title:  "Exploiting CVE-2014-0160, also known as Heartbleed"
 date:   2014-08-23 13:31:48
 categories: jekyll update
 published: yes
@@ -183,7 +183,7 @@ libssl1.0.0:
 It is possible to revert to the old clean package by defining a
 specific version on the command line.
 
-{% highlight console lineos %} 
+{% highlight console lineos %}
 ➜  /tmp [1] at 16:38:25 [Sat 7] $ sudo apt-get install libssl1.0.0=1.0.1e-2+deb7u14
 Reading package lists... Done
 Building dependency tree       
