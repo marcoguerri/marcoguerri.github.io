@@ -26,8 +26,7 @@ situation is the following:
 vg1 is the only volume group on the system, consisting of the PV created on /dev/sda2.
 The volume group must be first activated with *vgchange*.
 
-{% highlight console lineos %}
-
+```text
 [root@localhost tmp]# vgdisplay
   --- Volume group ---
   VG Name               vg1
@@ -49,10 +48,8 @@ The volume group must be first activated with *vgchange*.
   Alloc PE / Size       23814 / 744.19 GiB
   Free  PE / Size       0 / 0
   VG UUID               KrtTpl-QW87-nhDT-mROs-HTPq-6iFN-6QMjIf
-
 [root@localhost tmp]# vgchange -a y vg1
-
-{% endhighlight %}
+```
 
 
 Resizing filesystems
@@ -62,24 +59,24 @@ possible, but before doing so, the filesystems needs to be resized. Each LV shou
 checked against the space occupied and modified accordingly. The test system 
 contains the following LVs:
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp]# lvdisplay  | grep Path
   LV Path                /dev/vg1/root
   LV Path                /dev/vg1/var
   LV Path                /dev/vg1/tmp
   LV Path                /dev/vg1/swap
-{% endhighlight %}
+```
 
 /dev/vg1/var will be taken as a reference. Mount the LV and check how much space
 is used on its filesystem.
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp] mount /dev/vg1/var mnt
 [root@localhost tmp]# df -h
 Filesystem           Size  Used Avail Use% Mounted on
 [...]
 /dev/mapper/vg1-var  683G  1.8G  646G   1% /tmp/mnt
-{% endhighlight %}
+```
 
 It is obvious that there is a significant margin of unused space and
 *resize2fs* comes in handy for ext filesystems (from e2fsprogs package). It is important
@@ -104,61 +101,52 @@ in [*resize/resize2fs.c*](http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/
 by that function, it raises an error followed by the minimum allowed size of the
 filesystem, as the number of 4K blocks. Add a small margin and proceed.
 
-{% highlight console lineos %}
-
+```text
 [root@localhost tmp]# resize2fs /dev/mapper/vg1-var 10K
 resize2fs 1.41.12 (17-May-2010)
 resize2fs: New size smaller than minimum (871426)
-
-{% endhighlight %}
-
-{% highlight console lineos %}
 [root@localhost tmp]# e2fsck -f /dev/vg1/var
 [root@localhost tmp]# resize2fs /dev/vg1/var 871450
 resize2fs 1.41.12 (17-May-2010)
 Resizing the filesystem on /dev/vg1/var to 871450 (4k) blocks.
 The filesystem on /dev/vg1/var is now 871450 blocks long.
-
-{% endhighlight %}
+```
 This roughly corresponds to 3.3GB. 
 
 
 Resizing the LVs
 =======
 The LV can be resized accordingly.
-{% highlight console lineos %}
 
+```text
 [root@localhost tmp]# lvreduce --size 5G /dev/vg1/var
   WARNING: Reducing active logical volume to 5.00 GiB
   THIS MAY DESTROY YOUR DATA (filesystem etc.)
 Do you really want to reduce var? [y/n]: y
   Size of logical volume vg1/var changed from 693.16 GiB (22181 extents) to 5.00 GiB (160 extents).
   Logical volume var successfully resized
-
-{% endhighlight %}
+```
 
 Check that the LV can be mounted correctly after being shrunk and that the sizes 
 are in line with the above. The swap filesystem is a special case, as the underlying
 LV can be shrunk straight away and a new swap filesystem created on top.
 
 
-{% highlight console lineos %}
-
+```text
 [root@localhost tmp]# lvreduce --size 1G /dev/vg1/swap
   WARNING: Reducing active logical volume to 1.00 GiB
   THIS MAY DESTROY YOUR DATA (filesystem etc.)
 Do you really want to reduce swap? [y/n]: y
   Size of logical volume vg1/swap changed from 31.47 GiB (1007 extents) to 1.00 GiB (32 extents).
   Logical volume swap successfully resized
-
 [root@localhost tmp]# mkswap /dev/vg1/swap
-
-{% endhighlight %}
+```
 
 Modifying the mapping of the Extents
 =======
 The current situation is shown below.
-{% highlight console lineos %}
+
+```text
 [root@localhost tmp]# lsblk
 [...]
 sda                       8:0    0 745.2G  0 disk
@@ -168,7 +156,7 @@ sda                       8:0    0 745.2G  0 disk
   ├─vg1-var (dm-3)      253:3    0     5G  0 lvm
   ├─vg1-tmp (dm-4)      253:4    0   9.8G  0 lvm
   └─vg1-swap (dm-5)     253:5    0     1G  0 lvm
-{% endhighlight %}
+```
 
 The LVs occupy around 30GB altogether, hence the underlying physical volume could be 
 resized to match this value with the usual safety margin. Unfortunately, this operation 
@@ -178,11 +166,9 @@ volume. The physical extents must be therefore collected at the beginning of the
 *pvdisplay* and *pvs* can be used to verify how many PEs are used and how these are mapped on 
 the PV.
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp]# pvdisplay | grep Allocated
     Allocated PE          818
-
-
 [root@localhost tmp]# pvs -v --segments /dev/sda2
     Using physical volume(s) on command line.
     Wiping cache of LVM-capable devices
@@ -194,15 +180,14 @@ the PV.
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g 22494   313 tmp      0 linear /dev/sda2:22494-22806
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g 22807    32 swap     0 linear /dev/sda2:22807-22838
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g 22839   975          0 free
-
-{% endhighlight %}
+```
 
 Luckily, this case is rather easy: PEs from 22494 to 22838 (345 PEs) are allocated for tmp 
 and swap. These should be moved right after var, starting from PE 473 until 817.
 This operation can be accomplished with *pvmove* command, which should result in
 the following situation.
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp]# pvmove --alloc anywhere /dev/sda2:22494:22838 /dev/sda2:473-817
 [...]
 [root@localhost tmp]# pvs -v --segments /dev/sda2
@@ -215,31 +200,28 @@ the following situation.
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g   473   313 tmp      0 linear /dev/sda2:473-785
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g   786    32 swap     0 linear /dev/sda2:786-817
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g   818 22996          0 free
-
-
-{% endhighlight %}
+```
 
 At this point it would be a good idea to check that the logical volumes can still
 be mounted and that e2fsck does not report any problem. We have now 818x32 MiB 
 Physical Extents allocated, which roughly corresponds to 25GB.
 
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp]# pvdisplay  | grep Size
   PV Size               744.21 GiB / not usable 24.00 MiB
   PE Size               32.00 MiB
-
 [root@localhost tmp]# echo "scale=2;818\*32/1024" | bc -l
 25.56
-{% endhighlight %}
+```
 
 The PV can be resized taking into consideration a safety margin.
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp]# pvresize --setphysicalvolumesize 30G /dev/sda2
   Physical volume "/dev/sda2" changed
   1 physical volume(s) resized / 0 physical volume(s) not resized
-{% endhighlight %}
+```
 
 
 Resizing the partition
@@ -252,12 +234,12 @@ which requires much attention. *fdisk* shows the information concerning the curr
 layout of the disk.
 
  
-{% highlight console lineos %}
+```text
    Device Boot      Start         End      Blocks   Id  System
 /dev/sda1   *           1         131     1048576   83  Linux
 Partition 1 does not end on cylinder boundary.
 /dev/sda2             131       97282   780361728   8e  Linux LVM
-{% endhighlight %}
+```
 
 Pre-GPT partition tables identify the boundaries of partitions both in CHS and 
 LBA coordinates. fdisk default displaying unit is cylinders. This comes from the 
@@ -284,7 +266,7 @@ deleted and recreated with the same Start cylinder. The End cylinder is obviousl
 defined based on the desired size, 35GB in this case or ~4571 cylinders. LVM type 
 must also be set with fdisk. The layout is now the following:
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp]# parted -l
 Model: ATA INTEL SSDSC2BB80 (scsi)
 Disk /dev/sda: 800GB
@@ -294,18 +276,17 @@ Partition Table: msdos
 Number  Start   End     Size    Type     File system  Flags
  1      1049kB  1075MB  1074MB  primary  ext4         boot
  2      1075MB  39.1GB  38.0GB  primary
-
-{% endhighlight %}
+```
 
 To obtain a compressed image of the disk, the LVs must be first disabled and /dev/sda
 dumped for around ~40GB from the beginning of the disk: everything else beyond this
 area is unallocated space and therefore not interesting.
 
 
-{% highlight console lineos %}
+```text
 vgchange -a n vg1
 dd if=/dev/sda conv=sync bs=128K count=328000| gzip -c  > /tmp/sda.img.gzip
-{% endhighlight %}
+```
 
 Make sure the live environment provides enough in-memory space for dumping the whole
 compressed file. My configuration led to a 14GB image, and RAM was large enough
@@ -314,7 +295,7 @@ the compression ratio can be improved significantly. To test the restore procedu
 the image can be simply decompressed and written on the disk.
 
 
-{% highlight console lineos %}
+```text
 [root@localhost tmp]# dd if=/dev/zero of=/dev/sda
 29973169+0 records in
 29973169+0 records out
@@ -322,7 +303,6 @@ the image can be simply decompressed and written on the disk.
 
 [root@localhost tmp]# dd if=<(gunzip -c -d sda.img.gzip) of=/dev/sda conv=sync bs=4M  
 [root@localhost tmp]# reboot
-
-{% endhighlight %}
+```
 
 If everything went well, the system should boot into the exact same environment as before.

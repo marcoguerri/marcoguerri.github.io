@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Python multiprocessing internals: lifetime of a Process"
+title: "The lifetime of Python multiprocessing.Process"
 date:   2016-07-24 20:00:00
 categories: jekyll python multiprocessing
 summary: "Few notes on the mechanisms that regulate the lifetime
@@ -13,7 +13,7 @@ Background
 Let's consider the following snippet of code, where the main thread spawns
 a worker node that requires some time to terminate.
 
-{% highlight python linenos %}
+```python
 from multiprocessing import Process
 import time
 
@@ -24,7 +24,7 @@ def worker():
 p = Process(target=worker)
 p.start()
 print "All done"
-{% endhighlight %}
+```
 When that code is executed, "All done" is immediately printed, then there is
 a 10 seconds delay followed by the message "Worker Process". What happens when
 the process is created and especially why the interpreter does not return until
@@ -39,24 +39,25 @@ Clearly I will skip the uninteresting parts and jump right to the relevant piece
 Since I want to see what both the parent and the child are doing, the *-f* flag
 is mandatory. The worker process is initially created via *clone* syscall.
 
-```
+
+```plaintext
 clone(child_stack=0, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fca99ea09d0) = 17498
 Process 17498 attached
 [...]
 [pid 17498] select(0, NULL, NULL, NULL, {10, 0}) = 0 (Timeout)
-[pid 17498] fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 6), ...}) = 0
+[pid 17498] fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 6), ...}) = 0[pid 17498] mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fca99ec8000
 [pid 17498] mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fca99ec8000
 [pid 17498] write(1, "Worker process\n", 15Worker process
-```
+``` 
 
 The absence of *CLONE_VM* (to enable sharing page tables) and *CLONE_FS* (to enable
-sharing the *fs_struct*  in *task_struct* containing root, pwd, umask, etc) when
-invoking *clone* clearly indicates that a new process is being created rather than a 
+sharing the fs\_struct  in task\_struct containing root, pwd, umask, etc) when
+invoking clone clearly indicates that a new process is being created rather than a 
 thread. *SIGCHLD* is also set, therefore a signal will be delivered to the parent upon 
-exiting. The child then waits 10 seconds via *select* syscall and finally prints its 
+exiting. The child then waits 10 seconds via select syscall and finally prints its 
 message. What is the parent doing meanwhile?
 
-```
+```text
 [pid 17497] write(1, "All done\n", 9All done
 )   = 9
 [pid 17497] wait4(17498, 0x7ffc65a9aab4, WNOHANG, NULL) = 0
@@ -89,7 +90,7 @@ First, python's debug symbols must be installed. On Debian,
 *python-dbg* contains the interpreter compiled with *-g* option. On Fedora,
 debug symbols can be downloaded separately with the following yum command:
 
-```
+```text
 yum --enablerepo=fedora-debuginfo install python-debuginfo
 ```
 
@@ -108,7 +109,7 @@ what control path led to its invocation. It is very easy to break on a specific
 syscall with gdb and to check which control path led there with *bt* command,
 which by defaults show only the trace of the current process.
 
-```
+```text
 (gdb) catch syscall wait4
 Catchpoint 1 (syscall 'wait4' [61])
 (gdb) run test.py
@@ -129,14 +130,14 @@ what is happening in the Python interpreter with the high level source code.
 I have trapped a *wait4* invocation, so the first item I expect to see is a libc 
 control path that indeed leads to that syscall:
 
-```
+```text
 #0  0x00007ffff7bce47c in __libc_waitpid (pid=19042, stat_loc=0x7fffffffd16c, options=1) at ../sysdeps/unix/sysv/linux/waitpid.c:31
 #1  0x00000000005f69d4 in posix_waitpid (self=0x0, args=(19042, 1)) at ../Modules/posixmodule.c:6207
 ```
 
 Great. Now, what led to that invocation?
 
-```
+```text
 #3  0x000000000052b7f6 in call_function (pp_stack=0x7fffffffd2e0, oparg=2) at ../Python/ceval.c:4033
 #4  0x00000000005266ca in PyEval_EvalFrameEx (
     f=Frame 0xa3f610, for file /usr/lib/python2.7/multiprocessing/forking.py, line 135, in poll (self=<Popen(returncode=None, pid=19042) at remote 0x7ffff6a263e0>, flag=1), throwflag=0)
@@ -153,7 +154,7 @@ link Python machine level instructions to the high level source code. gdb is ver
 smart and extract this information automatically pointing us to the source file 
 and the line number:
 
-```
+```text
 f=Frame 0xa3f610, for file /usr/lib/python2.7/multiprocessing/forking.py, line 135,
 ```
 
@@ -171,7 +172,7 @@ being executed.
 
 The inspection of these values leads to the following results:
 
-```
+```text
 (gdb) x/s ((PyStringObject*)f->f_code->co_filename)->ob_sval
 0x7ffff6a2075c: "/usr/lib/python2.7/multiprocessing/forking.py"
 (gdb) x/s ((PyStringObject*)f->f_code->co_name)->ob_sval
@@ -182,73 +183,68 @@ $3 = 131
 
 that definitely matches the actual Python source code from forking.py.
 
-{% highlight Python linenos %}
+```python
 131         def poll(self, flag=os.WNOHANG):                                        
 132             if self.returncode is None:                                         
 133                 while True:                                                     
 134                     try:                                                        
 135                         pid, sts = os.waitpid(self.pid, flag) 
-{% endhighlight %}
+```
 
 The actual source code line that corresponds to the bytecode instruction begin
 executed is a bit more tricky to obtain, but the interpreter abstracts all the 
 complexity by providing *PyFrame_GetLineNumber*.
 
-```
+```text
 (gdb) p PyFrame_GetLineNumber(f)
 $4 = 135
 ```
 
 Exactly what gdb already told us.
 After this little digression, let's go back to the stack trace. The *poll* function
-is a method of *Popen* class in multiprocessing lib. The previous invocation of 
-*PyEval_EvalFrameEx* points to process.py.
+is a method of *Popen* class in multiprocessing lib. The next invocation of
+*PyEval_EvalFrameEx* on the stack points to process.py, where *poll* is invoked in 
+function *_cleanup* to identify child processes that have terminated.
 
-```
+```text
 #8  0x00000000005266ca in PyEval_EvalFrameEx (
     f=Frame 0x7ffff6cd9a10, for file /usr/lib/python2.7/multiprocessing/process.py, line 79, in _cleanup (p=<Process(_daemonic=False, _target=<function at remote 0x7ffff6ee2648>, _args=(), _tempdir=None, _name='Process-1', _authkey=<AuthenticationString at remote 0x7ffff7e57880>, _parent_pid=19038, _kwargs={}, _identity=(1,), _popen=<Popen(returncode=None, pid=19042) at remote 0x7ffff6a263e0>) at remote 0x7ffff6ca4610>), throwflag=0) at ../Python/ceval.c:2679
 ```
 
-*poll* is invoked in *_cleanup*, which looks for child processes
-of the current process that have finished.
-
-{% highlight Python linenos %}
+```python
 def _cleanup():                                                                 
     # check for processes which have finished                                   
     for p in list(_current_process._children):                                  
         if p._popen.poll() is not None:                                         
             _current_process._children.discard(p)
-{% endhighlight %}
-
-Further down in the stack there another pointer to process.py
-
 ```
+
+Further down in the stack there another pointer to process.py where *_cleanup* 
+is called in *active_children*.
+
+```text
 #11 0x00000000005266ca in PyEval_EvalFrameEx (f=Frame 0x7ffff6cfcba0, for file /usr/lib/python2.7/multiprocessing/process.py, line 69, in active_children (), throwflag=0)
     at ../Python/ceval.c:2679
 ```
 
-*_cleanup* is called in *active_children*.
-
-{% highlight Python linenos %}
+```python
 def active_children():                                                          
     '''                                                                         
     Return list of process objects corresponding to live child processes           
     '''                                                                         
     _cleanup()                                                                  
     return list(_current_process._children)
-{% endhighlight %}
-
-Next frame points to util.py
-
 ```
+
+Next frame points to util.py where  *active_children* is called in *\_exit_function*.
+
+```text
 #14 0x00000000005266ca in PyEval_EvalFrameEx (
     f=Frame 0xacf490, for file /usr/lib/python2.7/multiprocessing/util.py, line 318, in _exit_function (info=<function at remote 0x7ffff6ce3648>, debug=<function at remote 0x7ffff6ce35a0>, _run_finalizers=<function at remote 0x7ffff6c9f840>, active_children=<function at remote 0x7ffff6ee2990>, current_process=<function at remote 0x7ffff6ee28e8>), throwflag=0)
     at ../Python/ceval.c:2679
 ```
 
-*active_children* is called in *_exit_function*:
-
-{% highlight Python linenos %}
+```python
 def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,        
                    active_children=active_children,                             
                    current_process=current_process):
@@ -257,11 +253,11 @@ def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
             if p._daemonic:                                                     
                 info('calling terminate() for daemon %s', p.name)               
                 p._popen.terminate()
-{% endhighlight %}
+```
 
 Next frame points to atexit.py and this is where the journey ends.
 
-```
+```text
 #19 0x0000000000526982 in PyEval_EvalFrameEx (
     f=Frame 0xaa5cb0, for file /usr/lib/python2.7/atexit.py, line 24, in _run_exitfuncs (exc_info=None, func=<function at remote 0x7ffff6c9fcd8>, targs=(), kargs={}), throwflag=0)
     at ../Python/ceval.c:2718
@@ -269,7 +265,7 @@ Next frame points to atexit.py and this is where the journey ends.
 
 What is atexit.py? From Python documentation:
 
-```
+```text
 The atexit module defines a single function to register cleanup functions. 
 Functions thus registered are automatically executed upon normal interpreter 
 termination. atexit runs these functions in the reverse order in which they 
@@ -277,9 +273,13 @@ were registered; if you register A, B, and C, at interpreter termination time
 they will be run in the order C, B, A.
 ```
 
-In util.py:330, the module register *_exit_function* within atexit:
+In util.py at line 330, the module registers *\_exit_function* as an atexit callback:
 
 
-{% highlight python %}
+```python
 atexit.register(_exit_function)
-{% endhighlight %}
+```
+
+With this mechanism, the multiprocessing library ensures that the interpreter does
+not return before having waited all the children, therefore not leaving orphaned
+processes running on the system.

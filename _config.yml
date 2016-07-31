@@ -1,2 +1,5 @@
 name: Marco's Blog
 highlighter: rouge
+markdown: kramdown
+kramdown:
+  input: GFM

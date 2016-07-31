@@ -190,45 +190,18 @@ figure {
     margin: 0;
 }
 
-.highlight {
-    width:auto;
-    padding-right:2em;
-}
 
-
-.highlight pre code {
+pre.highlight {
   width:100%;
   background: rgb(51, 51, 51);
   display: block; 
   padding: 1em;
   overflow-x: auto; 
   font-size:110%;
-  color: white !important;
+  color: #F7F7F7;
 }
 
-.highlight pre pre {
-    margin:auto;
-    padding-left:1em;
 
-}
-
-.highlighter-rouge {
-    font-size:100%;
-    font-style:Italic;
-    font-family:Open Sans;
-}
-
-.nostyle {
-  font-family: Curier,mono;
-  background: none;
-  border: none;
-  border-width: none;
-  padding: none;
-  overflow: auto;
-  font-size:80%;
-  color: none;
-  letter-spacing: 0;
-}
 table.post-list {
   width: 100%;
   border-collapse: collapse;

