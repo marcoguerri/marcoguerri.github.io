@@ -275,7 +275,9 @@ therefore the debug package *libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386* should
 not be necessary. A further simplification which makes the debugging easier is
 to set
 
+```text
 worker_processes 1;
+```
 
 in */etc/nginx/nginx.conf*, so that there is just one thread serving the requests
 coming from the clients. nginx must be stopped and restarted and gdb can

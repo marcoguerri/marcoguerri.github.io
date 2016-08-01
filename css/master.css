@@ -2,12 +2,12 @@ body {
   line-height: 150%;
   font-family: Open Sans;
   font-weight:300;
-  font-size:100%;
+  font-size:110%;
 }
 
 em {
     background-color: #EEE;
-    border: 1px solid #777;
+    border: 0px solid #777;
     border-radius: 3px;
     font-style: normal;
     padding: 0px 1px;
@@ -80,7 +80,6 @@ a {
   margin: auto;
   padding: 2em;
   width: 40%;
-  background: #FAFAFA;
 }
 
 .content-books {
@@ -89,7 +88,6 @@ a {
   text-align: justify;
   padding-left: 2em;
   padding-right: 2em;
-  background: #FAFAFA;
 }
 
 .content-books ul {
@@ -182,7 +180,6 @@ h3 {
   padding-left: 0em;
   padding-right: 0.5em;
   font-size: 1em;
-  color: white !important;
 }
 
 figure {
@@ -192,13 +189,14 @@ figure {
 
 
 pre.highlight {
-  width:100%;
-  background: rgb(51, 51, 51);
-  display: block; 
-  padding: 1em;
+  width: auto;
+  background: #FAFAFA;
+  padding-left: 1em;
+  padding-right: 1em;
   overflow-x: auto; 
+  border-radius: 5px;
+  border: 1px solid #ccc; 
   font-size:110%;
-  color: #F7F7F7;
 }
 
 

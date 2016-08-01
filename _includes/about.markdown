@@ -20,7 +20,8 @@ Hosted by GitHub and powered by Jekyll.
 
 How to contact me
 =================
-<div id='email'>I would recommend using public key encryption, especially when communicating via email,
+<div id='email'>I would recommend using public key encryption 
+(<a href="http://pgp.mit.edu/pks/lookup?op=get&search=0xD2C3A4BDB715E658" target="_blank">My GPG key</a>), especially when communicating via email,
 even if the content of the message would normally be considered as non-confidential.
 </div>
 
