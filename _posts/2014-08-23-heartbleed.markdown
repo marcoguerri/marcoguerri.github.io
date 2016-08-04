@@ -5,7 +5,7 @@ date:   2014-08-23 13:31:48
 categories: jekyll update
 published: yes
 pygments: true
-summary: "In this post I will sum up all the steps I have gone through to implement a 
+summary: "In this post I have summarized all the steps I have gone through to implement a 
 Hearbleed POC. The aim was to try to exploit the well known bug to
 steal the private keys from my local instance using a vulnerable version of OpenSSL.
 Unfortunately the outcome was not the one I was hoping for, but this has 
@@ -17,7 +17,7 @@ The bug
 =======
 
 Hearbleed, CVE-2014-0160 in the Common Vulnerabilities and Exposures system, 
-is a bug which affects OpenSSL library and allows an attacker to retrieve a 64KB 
+is a bug which affects OpenSSL library allowing an attacker to retrieve a 64KB 
 chunk of memory from the address space of the
 process which is using the library. The bug resides in the implementation of one
 of the features of the TLS protocol, the TLS Hearbeat Extension, and affects
@@ -76,9 +76,8 @@ the private keys exploiting the heartbleed bug, Fedor Indutny being the first on
 
 openssl package
 ===============
-
-My idea was to try to steal the private keys from my own instance. I am
-running Debian Wheezy 7.1 and, according to apt, the openssl version I have
+Following Cloudflare's example, I decided to try to steal the private keys from my 
+own instance. I am running Debian Wheezy 7.1 and, according to apt, the openssl version I have
 installed on my machine is *1.0.1e*.
 
 ```text
@@ -93,9 +92,9 @@ openssl:
      1.0.1e-2+deb7u13 0
         500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
 ```
-
-At a first glance, this might seem a vulnerable release, but the output
-of openssl version shows that the package has been compiled in early 2015.
+At a first glance, this might appear to be a vulnerable release, but the output
+of openssl version shows that the package has been compiled in early 2015, a
+significant amount of time after the discloure of the bug.
 
 ```text
 ➜  ~ [1] at 15:48:51 [Sun 1] $ openssl version -a
@@ -106,10 +105,8 @@ options:  bn(64,32) rc4(8x,mmx) des(ptr,risc1,16,long) blowfish(idx)
 [...]
 ```
 
-The changelog for *openssl_1.0.1e-2+deb7u14* is available 
-<a href="http://metadata.ftp-master.debian.org/changelogs/main/o/openssl/openssl_1.0.1e-2+deb7u14_changelog" target="_blank">here</a>.
-On April the 7th, heartbleed bug was fixed and a patch was applied to the package
-incrementing the release to deb7u5.
+The changelog for *openssl_1.0.1e-2+deb7u14* is available show that on April the 7th,
+heartbleed bug was fixed incrementing the release to deb7u5.
 
 ```text
 openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
@@ -127,8 +124,8 @@ openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 The openssl version installed on my machine is therefore not vulnerable. In order to
 restore the bug, the package must be rebuilt without applying
 the patch. When the source deb file is downloaded, the patches are applied automatically.
-The easiest way to build a vulnerable package it to apply a reverse patch. The 
-following commands can be used.
+The easiest way to build a vulnerable package it to apply a reverse patch with
+the following commands:
 
 ```text
 apt-get source openssl
@@ -139,11 +136,11 @@ cd ../..
 patch -p1 < hb_reversed.patch
 ```
 
-The patch should apply successfully. The changes must be committed with dpkg-source 
---commit (it is not possible to compile the new package until then). This will
+The changes must be committed with *dpkg-source --commit* 
+(it is not possible to compile the new package until then). This will
 create the "official" patch out of the differences in the codebase. When committing,
-a description of the fix must be entered: this will be appended on 
-top of the .patch file. In order to modify the changelog, dch can be used, which is part
+a description of the fix must be provided, which will eventually be appended
+on top of the .patch file. In order to modify the changelog, dch can be used, which is part
 of devscripts in Debian.
 
 *dch -i*  opens an editor where a new entry in the changelog can be added. 
@@ -162,7 +159,6 @@ Preparing to replace libssl1.0.0:i386 1.0.1e-2+deb7u14.1 (using libssl1.0.0_1.0.
 Unpacking replacement libssl1.0.0:i386 ...
 Setting up libssl1.0.0:i386 (1.0.1e-2+deb7u14.1) ...
 
-
 ➜  /tmp [1] at 16:33:31 [Sat 7] $ sudo apt-cache policy libssl1.0.0
 libssl1.0.0:
   Installed: 1.0.1e-2+deb7u14.1
@@ -176,8 +172,8 @@ libssl1.0.0:
         500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
 ```
 
-It is possible to revert to the old clean package by defining a
-specific version on the command line.
+It is possible to revert to the old clean package by passing a specific version to
+apt.
 
 ```text
 ➜  /tmp [1] at 16:38:25 [Sat 7] $ sudo apt-get install libssl1.0.0=1.0.1e-2+deb7u14
@@ -198,12 +194,11 @@ Unpacking replacement libssl1.0.0:i386 ...
 Setting up libssl1.0.0:i386 (1.0.1e-2+deb7u14) ...
 ```
 
-
 nginx installation
 ==================
 nginx can be configured to enable HTTPS connections by simply adding the following
-`server` entry in the configuration file within the `http` section, making sure it
-does not clash with other `server` definitions included from */etc/nginx/sites-enabled*.
+*server* entry in the configuration file within the *http* section, making sure it
+does not clash with other *server* definitions included from */etc/nginx/sites-enabled*.
 The default configuration file is */etc/nginx/nginx.conf*.
 
 ```text
@@ -239,14 +234,14 @@ instance.
 
 It turned out to be a bit more complicated than that. The heartbeat message is sent
 to the server but no response whatsoever is returned. The following picture shows
-that Wireshark decodes properly the SSL record, which means that the message can
+that Wireshark decodes properly the SSL record, which means the message can
 be considered as well-formatted.
 
 <p align="center">
 <a id="single_image" href="/img/hb_good_request_detail.png"><img  src="/img/hb_good_request_detail.png" alt=""/></a>
 </p>
 
-Even if the SSL handshake is not terminated, as shown by the traffic captured with Wireshark, 
+Even if the SSL handshake is not terminated, as shown by the traffic dump,
 the server should reply anyway with a heartbeat response message. After several 
 unsuccessful attempts, I decided to go more in depth by following step by 
 step the execution on the server side.
@@ -260,28 +255,26 @@ Executing libssl under gdb
 =========================
 
 In order to execute libssl code step by step, the sources must be compiled with
-debug symbols and without optimization. Step by step execution of optimized code is very tricky, as
-it's difficult to map the assembly code to the original source due to optimizations 
-like instruction reordering, loop unrolling, inlining. The easiest way is to simply
-turn off optimizations. CFLAGS used by dpkg can be set in */etc/dpkg/buildflags.conf*.
-In this specific case, the following directive does the job.
+debug symbols and without optimizations. Step by step execution of optimized code is very tricky, as
+it is difficult to map the assembly code to the original source due to instruction reordering, 
+loop unrolling, inlining. The easiest way is to simply turn off optimizations.
+*dbg* packages available in Debian repositories provide binaries containing debug
+symbols, however during this experiment I decided to compile once more everything from scratch.
+*CFLAGS* used by dpkg can be set in */etc/dpkg/buildflags.conf*. The following directive 
+enables debug symbols and disables optimizations:
 
 ```text
 SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  
 ```
 
-After recompiling  libssl1.0.0, the debugging symbols should be embedded in the library,
-therefore the debug package *libssl1.0.0-dbg\_1.0.1e-2+deb7u14.\_i386* should
-not be necessary. A further simplification which makes the debugging easier is
-to set
+A further simplification which makes the debugging easier is
+to add the following directive in */etc/nginx/nginx.conf* in order to spawn
+only one worker thread for serving incoming requests:
 
 ```text
 worker_processes 1;
 ```
-
-in */etc/nginx/nginx.conf*, so that there is just one thread serving the requests
-coming from the clients. nginx must be stopped and restarted and gdb can
-then be attached to the worker process.
+After restarting nginx, gdb can be attached to the worker process.
 
 ```text
 ➜  ~ [1] at 10:15:57 [Thu 12] $ ps aux | grep nginx
@@ -301,9 +294,8 @@ For bug reporting instructions, please see:
 (gdb) attach 5211
 ```
 
-gdb executes the ptrace system call and starts tracing nginx. It then tries to load the
-symbols of all the shared objects mapped in the address space of the process, including
-libssl.so.1.0.0. If gdb fails to load the symbols for libssl, then something went wrong.
+gdb tries to load the symbols of all the shared objects mapped in the address space of the process, 
+including libssl.so.1.0.0. The result should be something as follows:
 
 ```text
 Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
@@ -345,11 +337,8 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 (gdb)
 ```
 
-The control path which explains why a heartbeat response is not returned
-is not that trivial and without a proper knowledge of the
-library it's difficult to fully grasp what the code does. After
-a series of *step* and *next*, the single step execution led to the function
-*buffer_write* in *bf_buff.c*. 
+The control path which explains why a heartbeat response is not sent back to the 
+client leads to function *buffer_write* in *bf_buff.c*. 
 
 ```text
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
@@ -391,7 +380,7 @@ ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
 ```
 
 A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
-The *buffer_write* function is defined in *crypto/bio/bf_buf.c* as follows.
+The *buffer_write* function is defined in *crypto/bio/bf_buf.c*.
 
 ```c
 static int buffer_write(BIO *b, const char *in, int inl)
@@ -468,12 +457,12 @@ start:
         }
 ```
 
-This function writes the data passed as argument with pointer <em>\*in</em> into
+This function copies the data passed as argument with pointer <em>\*in</em> into
 the buffer pointed by the BIO object <em>\*b</em>. The decision whether to flush or not
 the buffer through the socket is taken based on the size of the data with respect to 
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
-not flushed (line 14). The heartbeat response message here is 28 bytes and the buffer is 4KB,
-the data is written on the buffer but not flushed.
+not flushed. In this case the heartbeat response message is 28 bytes and the buffer 
+is 4KB the data is written on the buffer but not flushed.
 
 ```text
 (gdb) print i
@@ -535,9 +524,9 @@ to send a well-formed heartbeat request while tracing *buffer_write*.
     $5 = 5000
 ```
 
-The loop at line 54 writes 5000 bytes in the output buffer, which is then flushed through 
+The loop at line 250 writes 5000 bytes in the output buffer, which is then flushed through 
 the socket; the client receives a well-formed heartbeat response with a payload
-which matches the one carried in the request message.
+that matches the data carried in the request message.
 
 <p align="center"> 
 <a id="single_image" href="/img/hb_working_response.png"><img src="/img/hb_working_response.png" alt=""/></a>
@@ -548,7 +537,7 @@ Heartbleed request
 =========================
 
 A malformed hearbeat request features a payload size which does not match the actual
-lenght of the data carried inside the message.
+length of the data carried inside the message.
 
 ```python
 0x18                    # Type: Heartbeat
@@ -579,13 +568,10 @@ Scanning leaked memory
 After setting up my local nginx instance with a newly generated private/public
 key pair, I tried to look for a prime factor that could divide *n* (part of the 
 public key) in the memory leaked by the server. I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/exploit.c" target="_blank">
-exploit.c</a> to exploit the bug. 
-
-
-
-With *ulimit*, I capped the maximum size of the virtual address space of the process 
-at 256MB and I fired up 8 parallel instances of the script. After ~3M requests, 
-I could not find any trace of the private keys.
+exploit.c</a> to exploit the bug.  With *ulimit*, I capped the maximum size of 
+the virtual address space of the process at 256MB and I fired up 8 parallel 
+instances of the script. After ~3M requests, I could not find any trace of the 
+private keys.
 
 
 
