@@ -3,39 +3,39 @@ layout: post
 title:  "Data corruption over SFP+ interfaces on Gigabyte MP30-AR0"
 date:   2016-06-19 21:00:00
 categories: jekyll update
-summary: "A summary of some steps I have gone through to debug a subtle data
-corruption issue encountered on the ARM64 platform from Gigabyte MP30-AR0 "
+summary: "In this post I have summed up some of the steps I have gone through to 
+debug a subtle data corruption issue encountered on a Gigabyte ARM64 R120-MP31 "
 ---
 
 Background
 =======
 
-After deploying and cabling two Gigabyte MP30-AR0 to a SFP+ switch, random failures 
-were noticed during ssh connections, yum install commands etc. Everything seemed
-to point to a data corruption issue, and a quick network test confirmed something was wrong.
-A simple client/server test is shown below, with the MP30-AR0 board being the server
- (zsh is needed for process substitution).
+After deploying and cabling two Gigabyte R120-P31 on a SFP+ switch, random failures 
+started to appear during daily operations. Everything seemed
+to point to a data corruption issue, and a quick network test confirmed something was wrong:
 
-{% highlight console %}
+```
 [root@client]~# loop=1; while [ $loop -eq 1 ]; do 
     dd if=/dev/zero bs=8K count=20480 2>&/dev/null | tee >(md5sum) | nc 10.41.208.28 8080; 
     if [ $? -ne 0 ]; then loop=0; fi; 
     done | uniq
 f5ffba20ce077a9f789a61ff8aedb471  -
 
-[root@mp30ar0 ~]# while [ 1 -eq 1 ]; do nc -l 8080 | md5sum; done  | uniq
+[root@r120p31 ~]# while [ 1 -eq 1 ]; do nc -l 8080 | md5sum; done  | uniq
 f5ffba20ce077a9f789a61ff8aedb471  -
 60e1904fda6b86ebdf703ed2b41c39f8  -
 f5ffba20ce077a9f789a61ff8aedb471  -
-{% endhighlight %}
+```
 
+After ruling out the most obvious factors, I wrote a slightly more elaborated
+<a href="https://github.com/marcoguerri/packet-mangle/tree/master/userspace" target="_blank">
+script</a>
+that would transfer a specific payload together with the corresponding checksum. Whenever
+the checksum did not match, the server would write on the disk the corrupted data.
+The dump of a payload coming from /dev/zero would look as follows:
 
-A closer look at what was transferred when checksums did not match would
-result in a dump similar to the one shown below (bear in mind, payload is coming from 
-/dev/zero).
-
-{% highlight console %}
-[root@mp30ar0 ~]# hexdump data 
+```
+[root@r120p31 ~]# hexdump data 
 0000000 0000 0000 0000 0000 0000 0000 0000 0000
 *
 5f207f0 0000 0000 0000 0000 0000 0200 0000 0000
@@ -43,28 +43,28 @@ result in a dump similar to the one shown below (bear in mind, payload is coming
 5f20810 0000 0000 0000 0000 0000 0000 0000 0000
 *
 a000000
-{% endhighlight %}
+```
 
-Definitely not good, bit flipped apparently at random positions. The time necessary for 
+At first glance, there seemed to be bits flipped at random positions. The time necessary for 
 data corruption to appear varied. I had two boards at my fingertips: with the first 
-it would be a matter of few seconds, with the second it would take longer than that, 
-up to 2 minutes. After a bit of hacking I came to the conclusion that there 
-seemed to be a pattern. A further example of corrupted payload is the following.
+it was a matter of few seconds for the issue to appear, with the second it would take 
+longer than that, up to 2 minutes. After a bit of hacking I came to the conclusion that there 
+seemed to be a pattern. A further example was the following:
 
-{% highlight console %}
-[root@mp30ar0 ~]# hexdump data 
+```
+[root@r120p31 ~]# hexdump data 
 0000000 0000 0000 0000 0000 0000 0000 0000 0000
 *
 54a78b0 0800 0000 0000 0004 0020 0000 0000 0000
 54a78c0 0000 0000 0000 0000 0000 0000 0000 0000
 *
 a000000
-{% endhighlight %}
+```
 
-At first glance it looks different, but in fact the 3 bits are placed at the same
+The 3 bits flipped in the second dump are placed at the same
 distances as in the first example. The existence of a pattern seemed to rule
 out data corruption on the wire, but to have a clear picture of what was happening
-at the different layers I decided to carry out some experiments
+at the different layers I decided to carry out some experiments.
 
 TCP/IP and data integrity
 =======
@@ -78,8 +78,7 @@ Having corrupted data delivered to userspace means that an error has to go
 through these checks undetected, which is very unlikely. It would make much
 sense to start investigating from the FCS at layer 2, which is the one usually
 completely out of the control of the software stack. However, I decided to approach
-the problem top down and investigate everything that was happening starting
-from the transport layer.
+the problem top down, starting the investigation from the transport layer.
 
 
 
@@ -93,17 +92,17 @@ like tcpdump or wireshark can be really useful in this case as they provide
 information on the correctness of the checksum. The easiest way that came to mind to test
 this use case was to develop a *netfilter* kernel module that would mangle outgoing
 packets at layer 2 on the client side, preventing somehow the NIC to recompute the checksum when
-offloading is enabled. Linux also provides ways to use a network scheduling
+offloading was enabled. Linux also provides ways to use a network scheduling
 algorithm (or queue discipline) that corrupts outgoing packets. In particular,
 the *netem* (Network Emulator) scheduler allows to perform randomized packet
 corruption via *tc* command as follows
 
-{% highlight console %}
+```
 sudo tc qdisc add dev lo root netem corrupt <CORRUPTION RATE>
-{% endhighlight %}
+```
 
-However, there's not much space for tuning when using netem: with the line above what we are saying
-is "corrupt \<CORRUPTION RATE\>% of the *sk_buff*, with corruption meaning flipping one random
+This methods does not give much space for tuning: with the line above what we are saying
+is "corrupt \<CORRUPTION RATE\>% of the *sk_buff*", with corruption meaning flipping one random
 bit. The relevant code from *net/sched/sched_netem.c* which does the corruption 
 is the following:
 
@@ -135,23 +134,26 @@ is the following:
 
 The most relevant parts are probably the call to *skb_checksum_help*, which computes
 in software the checksum of the packet and sets *skb->ip_summed* to *CHECKSUM_NONE*,
-which notifies the NIC that the checksum must not be recalculated in hardware. On
-line 20 and 21, the packet that has been chosen for corruption has a random bit flipped
+notifying the NIC that the checksum must not be recalculated in hardware. The packet 
+that has been chosen for corruption has a random bit flipped
 within the linear buffer of the sk_buff (i.e. modulo *skb_headlen()*). The paged data
-of the sk_buff is not considered for the corruption (I guess to keep things simple).
+of the sk_buff is not considered for the corruption, I guess to keep things simple.
 \\
 This capability of the Linux kernel did not provide enough control for the test I wanted to perform, hence the decision
-to write a simple <a href="https://github.com/marcoguerri/packet-mangle" target="_blank">
+to write a simple <a href="https://github.com/marcoguerri/packet-mangle/tree/master/kernelspace" target="_blank">
 netfilter kernel module</a>, which registers a callback to the *NF_INET_POST_ROUTING* hook.
 The code acts in a very similar way as the netem discipline:
 
   * it looks for a specific pattern in the application level payload. Again for simplicity
     non-linear sk_buffs are ignored
-  * it calculates the checksum before the corruption. The code operates at layer
+  * it calculates the checksum of the outgoing *sk_buff* before the corruption. 
+    The code operates at layer
     two just before the queue discipline, therefore the *sk_buff* is complete
   * it prints some debug information
   * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that the checksum is not recalculated
     by the NIC
+
+
 
 
 
