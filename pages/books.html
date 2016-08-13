@@ -1,7 +1,6 @@
 ---
 layout: master
 title: Books
-full_posts: 2
 ---
 
 <div style="width: 100%;">
@@ -22,15 +21,13 @@ full_posts: 2
     curtesy of the OpenLibrary project. </div>
 </div>
 
-
-{% for post in site.posts %}
-  {% if post.keywords contains 'Books' %}
-        <table class='post-list'>
-        <tr>
-          <th><a href='{{ post.url }}'><b>{{ post.title }}</b></a></th>
-          <td style="text-align:right">{{ post.date | date: "%-d %B %Y" }}</td>
-        </tr>
-        </table>
-    {% endif %}
+{% for book in site.books %}
+    <table class='post-list'>
+    <tr>
+      <th><a href='{{ book.url }}'><b>{{ book.title }}</b></a></th>
+      <td style="text-align:right">{{ book.date | date: "%-d %B %Y" }}</td>
+    </tr>
+    </table>
 {% endfor %}
+
 </div>

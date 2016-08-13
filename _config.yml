@@ -3,3 +3,8 @@ highlighter: rouge
 markdown: kramdown
 kramdown:
   input: GFM
+collections:
+    history:
+        output: true
+    books:
+        output: true

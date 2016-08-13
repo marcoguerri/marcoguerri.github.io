@@ -1,0 +1,73 @@
+---
+layout: history
+title:  "The Battle for Normandy - France"
+date:   2016-08-12 20:00:00
+categories: history
+introduction: "In September 2015 I visited Normandy, a region on the Atlantic Ocean
+in northern France. The 6th of June 1944, Allied troops landed ashore on this
+beautiful land as part of operation Overlord to liberate German-occupied Wester 
+Europe."
+flickr: https://www.flickr.com/photos/142976716@N08/albums/72157669334612003
+places: Caen, Bayeux, Sword beach, Juno beach, Gold beach, Omaha beach, Utah beach
+published: Yes
+
+images:
+    - image_path: "https://c1.staticflickr.com/9/8600/28339958744_0d0a8fb08f_h.jpg"
+      thumb: "https://c1.staticflickr.com/9/8600/28339958744_3f9477d493_m.jpg"
+      description: "Gigantic statue at the entrance of 'Mémorial de Caen', 
+      depicting Alfred Eisenstaedt's photograph 'V-J Day in Times Square',
+      portraying an American sailor kissing a woman in a white dress on Victory
+      over Japan Day (V-J Day) in Times Square in New York City"
+
+    - image_path: "https://c6.staticflickr.com/9/8583/28342818973_288ae75876_h.jpg"
+      thumb: "https://c6.staticflickr.com/9/8583/28342818973_6251f92cbd_m.jpg"
+      description: "Ruins of the Saint-Étienne-le-Vieux in Caen, severely damaged 
+      during the bombings of World War II"
+
+    - image_path: "https://c5.staticflickr.com/9/8667/28673753420_a207c8cd88_h.jpg"
+      thumb: "https://c5.staticflickr.com/9/8667/28673753420_175836b95f_m.jpg"
+      description: "Douglas DC-3 at the Merville battery, mostly a civil transport 
+      plane, from which the military version, the C-47, was derived"
+
+    - image_path: "https://c7.staticflickr.com/9/8215/28927523086_4db9f4c4c0_h.jpg"
+      thumb: "https://c7.staticflickr.com/9/8215/28927523086_393d40a65b_m.jpg"
+      description: "Casemates and 100mm guns positions at the Merville battery. 
+      Anti-aircraft defenses consisted in 20mm FlaKs. The site was taken by the
+      British 9th Parachute Battalion in the early morning of the 6th of June 1944"
+
+
+    - image_path: "https://c8.staticflickr.com/9/8668/28343273783_af7b875033_h.jpg"
+      thumb: "https://c8.staticflickr.com/9/8668/28343273783_3ce27cb508_m.jpg"
+      description: "Arromanche, also known as Gold Beach. On this beach the Allied
+      put in place a massive cargo offloading operation using portable harbours 
+      called Mulberry Harbours"
+
+    - image_path: "https://c2.staticflickr.com/9/8746/28343577753_bf049421df_h.jpg"
+      thumb: "https://c2.staticflickr.com/9/8746/28343577753_f428a80ba2_m.jpg"
+      description: "Remainders of the concrete caissons constituting the 
+      supporting structure of the Mulberry Harbours in Arromanche"
+
+
+    - image_path: "https://c1.staticflickr.com/9/8725/28341164984_5ef17ba240_h.jpg"
+      thumb: "https://c1.staticflickr.com/9/8725/28341164984_d364a17475_m.jpg"
+      description: "Casemates hosting 152mm navy guns at the battery in Longues-sur-Mer.
+      The site was part of the Atlantic Wall, the line of coastal fortifications
+      commanded by general Rommel"
+
+
+    - image_path: "https://c7.staticflickr.com/9/8682/28928025406_35fa50cc3b_h.jpg"
+      thumb: "https://c7.staticflickr.com/9/8682/28928025406_994e3c35ef_m.jpg"
+      description: "Closer view of a 152mm gun at Longues-sur-Mer"
+
+    - image_path: "https://c4.staticflickr.com/9/8732/28883897811_89e61faaff_h.jpg"
+      thumb: "https://c4.staticflickr.com/9/8732/28883897811_2f869db9db_m.jpg"
+      description: "Bayeux Commonwealth War Graves Commission Cemetery"
+
+    - image_path: "https://c1.staticflickr.com/9/8314/28928178496_58926245ab_h.jpg"
+      thumb: "https://c1.staticflickr.com/9/8314/28928178496_4d113518f7_m.jpg"
+      description: "Grave of an unknown soldier at the Bayeux Commonwealth War 
+      Graves Commission Cemetery" 
+---
+
+
+
