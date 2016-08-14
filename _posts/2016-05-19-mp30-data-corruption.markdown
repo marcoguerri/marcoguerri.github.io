@@ -4,7 +4,8 @@ title:  "Data corruption over SFP+ interfaces on Gigabyte MP30-AR0"
 date:   2016-06-19 21:00:00
 categories: jekyll update
 summary: "In this post I have summed up some of the steps I have gone through to 
-debug a subtle data corruption issue encountered on a Gigabyte ARM64 R120-MP31 "
+debug a subtle data corruption issue encountered on a Gigabyte ARM64 R120-MP31.
+This post is incomplete and being currently developed."
 ---
 
 Background
@@ -156,7 +157,7 @@ The code acts in a very similar way as the netem discipline:
 
 
 
-
+<!---
 
 
  
@@ -346,4 +347,5 @@ remain of the same size. Let's try to limit the wmem of the tcp socket,
 at some point also on the client side it should hang.. yes's, I think this theory is
 right, just check what the values with sysctl -w mean, in fact the client tells me
 I have written 2.7MB but in reality only 4032 bytes of data have been transmitted.
+--->
 
