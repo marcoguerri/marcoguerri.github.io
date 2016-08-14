@@ -13,25 +13,16 @@ layout: master
 
 <div class="summary">
 <h1 class='post_title'>{{page.title}}</h1>
+<div align="center">
+<a href="{{page.flickr}}" target="_blank">Album on flickr</a>
 </div>
+<br>
 {{ page.introduction }}
-
-<div style="display:table-row;">
-    <div style="display:table-cell; width:20%">
-    <b>Album on flickr</b>
-    </div>
-    <div style="display:table-cell;vertical-align:top">
-         <a href="{{ page.flickr }}" target="_blank">{{page.flickr}}</a>
-    </div>
 </div>
-
-<br>
-<br>
-<div style="display:table">
-
+<div style="display:table;padding-top:2em">
   {% for image in page.images %}
     <div style="display:table-row;">
-        <div style="display:table-cell; width:40%">
+        <div style="display:table-cell;padding-right:1em">
             <a id="single_image" href="{{ image.image_path }}">
             <img src="{{ image.thumb }}" alt=""/></a>
         </div>
@@ -42,4 +33,3 @@ layout: master
   {% endfor %}
 
 </div>
-</ul>

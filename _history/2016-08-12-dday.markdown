@@ -3,12 +3,19 @@ layout: history
 title:  "The Battle for Normandy - France"
 date:   2016-08-12 20:00:00
 categories: history
-introduction: "In September 2015 I visited Normandy, a region on the Atlantic Ocean
-in northern France. The 6th of June 1944, Allied troops landed ashore on this
-beautiful land as part of operation Overlord to liberate German-occupied Wester 
-Europe."
+introduction: "On the 6th of June 1944, Allied troops landed ashore at strategic
+points in Normandy as part of operation Overlord to liberate German-occupied 
+Western Europe. The Normandy landings are considered the largest seaborne invasion
+in history of humankind. The region is now a site of invaluable cultural heritage,
+where it is possible to visit museums of the Second World War, bunkers that formed
+the coastal defenses of the Third Reich and first and foremost, the beaches where
+Americans, British, Canadians, Norwegians came ashore with nearly 5000 landing and 
+assault crafts. Here I have collected the most relevant pictures I have taken
+when visiting Normandy together with a brief explanation of what they portray."
 flickr: https://www.flickr.com/photos/142976716@N08/albums/72157669334612003
-places: Caen, Bayeux, Sword beach, Juno beach, Gold beach, Omaha beach, Utah beach
+places: "Caen, Bayeux, Sword beach, Juno beach, Gold beach, Omaha beach, Utah beach
+Point du Hoc, Longues-sur-Mer"
+readings: The Battle for Normandy, Anthony Beevor
 published: Yes
 
 images:
@@ -17,47 +24,47 @@ images:
       description: "Gigantic statue at the entrance of 'Mémorial de Caen', 
       depicting Alfred Eisenstaedt's photograph 'V-J Day in Times Square',
       portraying an American sailor kissing a woman in a white dress on Victory
-      over Japan Day (V-J Day) in Times Square in New York City"
+      over Japan Day (V-J Day) in Times Square in New York City."
 
     - image_path: "https://c6.staticflickr.com/9/8583/28342818973_288ae75876_h.jpg"
       thumb: "https://c6.staticflickr.com/9/8583/28342818973_6251f92cbd_m.jpg"
       description: "Ruins of the Saint-Étienne-le-Vieux in Caen, severely damaged 
-      during the bombings of World War II"
+      during the bombings of World War II."
 
     - image_path: "https://c5.staticflickr.com/9/8667/28673753420_a207c8cd88_h.jpg"
       thumb: "https://c5.staticflickr.com/9/8667/28673753420_175836b95f_m.jpg"
       description: "Douglas DC-3 at the Merville battery, mostly a civil transport 
-      plane, from which the military version, the C-47, was derived"
+      plane, from which the military version, the C-47, was derived."
 
     - image_path: "https://c7.staticflickr.com/9/8215/28927523086_4db9f4c4c0_h.jpg"
       thumb: "https://c7.staticflickr.com/9/8215/28927523086_393d40a65b_m.jpg"
       description: "Casemates and 100mm guns positions at the Merville battery. 
       Anti-aircraft defenses consisted in 20mm FlaKs. The site was taken by the
-      British 9th Parachute Battalion in the early morning of the 6th of June 1944"
+      British 9th Parachute Battalion in the early morning of the 6th of June 1944."
 
 
     - image_path: "https://c8.staticflickr.com/9/8668/28343273783_af7b875033_h.jpg"
       thumb: "https://c8.staticflickr.com/9/8668/28343273783_3ce27cb508_m.jpg"
       description: "Arromanche, also known as Gold Beach. On this beach the Allied
       put in place a massive cargo offloading operation using portable harbours 
-      called Mulberry Harbours"
+      called Mulberry Harbours."
 
     - image_path: "https://c2.staticflickr.com/9/8746/28343577753_bf049421df_h.jpg"
       thumb: "https://c2.staticflickr.com/9/8746/28343577753_f428a80ba2_m.jpg"
       description: "Remainders of the concrete caissons constituting the 
-      supporting structure of the Mulberry Harbours in Arromanche"
+      supporting structure of the Mulberry Harbours in Arromanche."
 
 
     - image_path: "https://c1.staticflickr.com/9/8725/28341164984_5ef17ba240_h.jpg"
       thumb: "https://c1.staticflickr.com/9/8725/28341164984_d364a17475_m.jpg"
-      description: "Casemates hosting 152mm navy guns at the battery in Longues-sur-Mer.
+      description: "Casemates hosting 150mm navy guns at the battery in Longues-sur-Mer.
       The site was part of the Atlantic Wall, the line of coastal fortifications
-      commanded by general Rommel"
+      commanded by general Rommel."
 
 
     - image_path: "https://c7.staticflickr.com/9/8682/28928025406_35fa50cc3b_h.jpg"
       thumb: "https://c7.staticflickr.com/9/8682/28928025406_994e3c35ef_m.jpg"
-      description: "Closer view of a 152mm gun at Longues-sur-Mer"
+      description: "Closer view of a 150mm gun at Longues-sur-Mer."
 
     - image_path: "https://c4.staticflickr.com/9/8732/28883897811_89e61faaff_h.jpg"
       thumb: "https://c4.staticflickr.com/9/8732/28883897811_2f869db9db_m.jpg"
@@ -66,8 +73,33 @@ images:
     - image_path: "https://c1.staticflickr.com/9/8314/28928178496_58926245ab_h.jpg"
       thumb: "https://c1.staticflickr.com/9/8314/28928178496_4d113518f7_m.jpg"
       description: "Grave of an unknown soldier at the Bayeux Commonwealth War 
-      Graves Commission Cemetery" 
+      Graves Commission Cemetery died on the 6th of June 1944." 
+
+
+    - image_path: "https://c5.staticflickr.com/9/8780/28867490772_ec4334cfac_h.jpg"
+      thumb: "https://c5.staticflickr.com/9/8780/28867490772_4d79314d1b_m.jpg"
+      description: "Omaha beach, probably the most known part of the American
+      sector." 
+
+    - image_path: "https://c3.staticflickr.com/9/8437/28867498362_bb17cc2733_h.jpg"
+      thumb: "https://c3.staticflickr.com/9/8437/28867498362_b79beed322_m.jpg"
+      description: "Omaha beach" 
+
+    - image_path: "https://c8.staticflickr.com/8/7750/28895989911_50aea51c34_h.jpg"
+      thumb: "https://c8.staticflickr.com/8/7750/28895989911_1132d40e61_m.jpg"
+      description: "Memorial to the American 1st Infantry Division, 'The Big Red
+      One', at Omaha beach. Engraved on this momnument are the names of the 627
+      soldiers from the 1st Infantry who gave their lives to liberate Europe. Their
+      motto: 'No Mission Too Difficult, No Sacrifice Too Great, Duty First'." 
+
+    - image_path: "https://c3.staticflickr.com/9/8437/28867498362_bb17cc2733_h.jpg"
+      thumb: "https://c3.staticflickr.com/9/8437/28867498362_b79beed322_m.jpg"
+      description: "Memorial to the 5th Engineer Special Brigade, also deployed
+      on Omaha beach on D-Day." 
+
+
 ---
+
 
 
 
