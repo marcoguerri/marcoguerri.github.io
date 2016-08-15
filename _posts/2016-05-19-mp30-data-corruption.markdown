@@ -102,13 +102,13 @@ corruption via *tc* command as follows
 sudo tc qdisc add dev lo root netem corrupt <CORRUPTION RATE>
 ```
 
-This methods does not give much space for tuning: with the line above what we are saying
+This methods does not give much room for tuning: with the line above what we are saying
 is "corrupt \<CORRUPTION RATE\>% of the *sk_buff*", with corruption meaning flipping one random
 bit. The relevant code from *net/sched/sched_netem.c* which does the corruption 
 is the following:
 
 
-{% highlight C linenos %}
+```c
     if (q->corrupt && q->corrupt >= get_crandom(&q->corrupt_cor)) {
         if (skb_is_gso(skb)) {
             segs = netem_segment(skb, sch);
@@ -131,28 +131,120 @@ is the following:
         skb->data[prandom_u32() % skb_headlen(skb)] ^=
             1<<(prandom_u32() % 8);
     }
-{% endhighlight %}
+```
 
 The most relevant parts are probably the call to *skb_checksum_help*, which computes
 in software the checksum of the packet and sets *skb->ip_summed* to *CHECKSUM_NONE*,
 notifying the NIC that the checksum must not be recalculated in hardware. The packet 
-that has been chosen for corruption has a random bit flipped
-within the linear buffer of the sk_buff (i.e. modulo *skb_headlen()*). The paged data
-of the sk_buff is not considered for the corruption, I guess to keep things simple.
+singled out for corruption has a random bit flipped within the linear buffer of the 
+sk_buff (i.e. modulo *skb_headlen()*). The paged data of the sk_buff is not considered 
+for the corruption, I guess to keep things simple.
 \\
 This capability of the Linux kernel did not provide enough control for the test I wanted to perform, hence the decision
 to write a simple <a href="https://github.com/marcoguerri/packet-mangle/tree/master/kernelspace" target="_blank">
 netfilter kernel module</a>, which registers a callback to the *NF_INET_POST_ROUTING* hook.
 The code acts in a very similar way as the netem discipline:
 
-  * it looks for a specific pattern in the application level payload. Again for simplicity
-    non-linear sk_buffs are ignored
+  * it looks for a specific pattern in the application level payload. 
+    Again for simplicity non-linear sk_buffs are ignored. In my case the magic
+    world being sought was "0xDEADBEEF".
   * it calculates the checksum of the outgoing *sk_buff* before the corruption. 
     The code operates at layer
     two just before the queue discipline, therefore the *sk_buff* is complete
-  * it prints some debug information
-  * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that the checksum is not recalculated
-    by the NIC
+  * it prints some debug information (e.g. the expected checksum)
+  * it corrupts the checksum
+  * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that the checksum is not 
+  recalculated by the NIC
+
+This kernel module has been tested on CentOS 7 with kernel 3.10, it is not guardanteed
+to work on any other kernel version. The outcome of this experiment was definitely 
+interesting. On the client side, where the netfilter kernel module was running, 
+I could see the following output:
+
+```
+[ 4255.255119] Linear data: 564
+[ 4255.257251] TCP payload len is 512
+[ 4255.257944] TCP header len is 20
+[ 4255.265462] TCP checksum should be 0x75f6
+[ 4255.269345] Corrupting checksum to 0xBEEF
+```
+
+The length of the linear length basically indicates how much non-paginated 
+data the *sk_buff* contains. Follows the length of the TCP payload and header.
+The module then prints the expected checksum of the outgoing segments and notifies
+that the checksum is being corrupted to 0xBEEF. On the server side *tcpdump* shows, 
+among others, the following incoming segment:
+
+```
+    10.41.208.7.44550 > 10.41.208.29.webcache: Flags [P.], cksum 0xbeef (incorrect -> 0x75f6
+), seq 1:513, ack 1, win 229, options [nop,nop,TS val 3954650 ecr 151369], length 512
+        0x0000:  4500 0234 17d4 4000 4006 6c79 0a29 d007  E..4..@.@.ly.)..
+        0x0010:  0a29 d01d ae06 1f90 e817 4009 d567 3944  .)........@..g9D
+        0x0020:  8018 00e5 beef 0000 0101 080a 003c 57da  .............<W.
+        0x0030:  0002 4f49 dead beef 0000 0000 0000 0000  ..OI............
+        0x0040:  0000 0000 0000 0000 0000 0000 0000 0000  ................
+        [...]
+```
+
+The first 4 bytes of the payload correspond, as expected, to 0xDEADBEEF. The most
+interesting information shown by tcpdump is the incorrect TCP checksum notification,
+followed by the expected value *0x75f6*. 
+This is exactly the output of the netfilter kernel module!
+Considering that this segment makes it all the way to userspace, not just to layer 2,
+the following question arises: who is supposed to stop the corrupted segment? 
+The NIC or the software stack at layer 4? According to *ethtool*, TCP checksum 
+of incoming segments is software's responsibility:
+
+```
+[root@r120p31 ~]# ethtool -k eth2 | grep -i checksum
+rx-checksumming: off [fixed]
+tx-checksumming: on
+        tx-checksum-ipv4: on
+        tx-checksum-ip-generic: off [fixed]
+        tx-checksum-ipv6: off [fixed]
+        tx-checksum-fcoe-crc: off [fixed]
+        tx-checksum-sctp: off [fixed]
+```
+
+Now, the relevant code in the *xgene-enet* driver that handles the checksum
+of incoming frames is the following:
+
+```c
+skb->protocol = eth_type_trans(skb, ndev);
+if (likely((ndev->features & NETIF_F_IP_CSUM) &&
+           skb->protocol == htons(ETH_P_IP))) {
+        xgene_enet_skip_csum(skb);
+}
+```
+with *xgene_enet_skip_csum* begin:
+
+```c
+static void xgene_enet_skip_csum(struct sk_buff *skb)                           
+{                                                                               
+        struct iphdr *iph = ip_hdr(skb);                                        
+                                                                                
+        if (!ip_is_fragment(iph) ||                                             
+            (iph->protocol != IPPROTO_TCP && iph->protocol != IPPROTO_UDP)) {   
+                skb->ip_summed = CHECKSUM_UNNECESSARY;                          
+        }                                                                          
+}                                                                               
+```   
+
+If the protocol of the incoming frame is IP, i.e. *ETH_P_IP*, and the NIC reports 
+the *NETIF_F_IP_CSUM* flag, than *xgene_enet_skip_csum* is invoked. More conditions
+must be met in order for the checksum to be skipped: the datagram must not be
+a fragment or the datagram must be carrying something that is neither TCP nor UDP.
+In this case, we have indeed a TCP segment, but the IP datagram is not fragmented,
+therefore *ip_summed* is definitely set to *CHECKSUM_UNNECESSARY* and the checksum
+never verified again. Now, that *ndev->features & NETIF_F_IP_CSUM* condition looks very
+suspicious. Why is *NETIF_F_IP_CSUM* set, if the NIC is not checksumming incoming
+segments? This "misunderstanding" between software and hardware causes corrupted
+data to go through to the application layer.
+
+
+
+
+
 
 
 
@@ -307,6 +399,7 @@ Let's have a look at the server side....
 Wait, this data is definitely not /dev/zero, but it's not that corrupted as I would
 have expected it to be.. In fact, let's see how many retransmit we have with tcpinfo.
 
+    
 
 
 So let's see how many segments it's retransmitting in normal conditions:
