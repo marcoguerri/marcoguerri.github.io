@@ -1,14 +1,15 @@
 ---
 layout: post
-title:  "LVM disk backup"
+title:  "Dumping an LVM disk for debugging purposes"
 date:   2015-08-17 08:00:00
 published: yes
 categories: jekyll update
 pygments: true
-summary: "This post summarizes the backup procedure of a Linux installation based
+summary: "This post summarizes a possible procedure to dump a Linux installation based
 on a boot partition and three LVM logical volumes for root, var and swap. This proves
 useful when a Linux installation must be snapshotted and moved to another identical 
-machine using the lowest possible amount of space. Such a procedure does entail
+machine to reproduce an identical environment, using the lowest possible amount 
+of space. Such a procedure does entail
 a number of issues: all the machine specific parameters (e.g. /etc/hostname, MAC
 addresses in /etc/sysconfig/network-scripts) are deployed to the second machine
 and need to be adapted accordingly (not covered in this post). Bearing this in mind, 
