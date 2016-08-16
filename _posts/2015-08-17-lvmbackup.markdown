@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Dumping an LVM disk for debugging purposes"
+title:  "Dumping LVM volumes for debugging purposes"
 date:   2015-08-17 08:00:00
 published: yes
 categories: jekyll update

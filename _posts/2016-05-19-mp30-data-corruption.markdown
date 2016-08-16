@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Data corruption over SFP+ interfaces on Gigabyte MP30-AR0"
+title:  "Network data corruption on Gigabyte R120-P31"
 date:   2016-06-19 21:00:00
 categories: jekyll update
 summary: "In this post I have summed up some of the steps I have gone through to 
@@ -239,7 +239,95 @@ therefore *ip_summed* is definitely set to *CHECKSUM_UNNECESSARY* and the checks
 never verified again. Now, that *ndev->features & NETIF_F_IP_CSUM* condition looks very
 suspicious. Why is *NETIF_F_IP_CSUM* set, if the NIC is not checksumming incoming
 segments? This "misunderstanding" between software and hardware causes corrupted
-data to go through to the application layer.
+data to go through to the application layer. This is an open question for which I
+don't have an answer yet.
+
+
+Ethernet CRC
+=======
+The lowest level of the stack where corrupted data
+is likely to be discarded is at Layer 2. Ethernet frames carry a CRC32 code
+calculated over Layer 2 payload. The CRC is appended at the end of each outgoing
+frame and it is usually completely invisible to the software stack. In fact,
+the NIC calculates the checksum just before transmitting on the wire
+and at the receiving side the hardware validates it and eventually strips it off 
+the data that is passed to the software stack. Clearly if the CRC check fails,
+the frame is discarded. Bearing this in mind, if corruption happens on the medium, 
+then it must be detected at Layer 2, unless unlikely collisions happen. 
+At this point of the investigation it was not clear to me whether the corruption 
+was really happening on the wire: if that was really the case, then the CRC check 
+had to disregard those frames. 
+
+
+To asses whether hardware CRC verification was
+working properly, I wrote a <a href="https://github.com/marcoguerri/fcs_control">
+litte tool</a> that allows to send Layer 2 frames with corrupted CRC. As mentioned
+before, normally CRC calculation is the hardware's responsibility and it is 
+completely out of the control of the software/driver. Crafting customs Ethernet frames
+is very easy with *PF_PACKET* sockets. If used
+with *socket_type* set to *SOCK_RAW*, then it is possible to pass to the driver
+the complete layer 2 frame, including the header. However, even *PF_PACKET* sockets
+do not prevent the NIC from appending the CRC. This is where
+socket option *SO_NOFCS* comes to the rescue. *SO_NOFCS* is a very useful flag
+that, when supported by the driver, tells the NIC not to add any frame
+check sequence (i.e. CRC). The flag can be easily set with *setsockopt*  at
+the *SOL_SOCKET* level. In case the driver does not support it, *setsockopt* 
+returns *ENOPROTOOPT*.
+
+Let's see an example of *SO_NOFCS* in action. The tool expects the interface
+to be associated with the RAW socket and the destination MAC address. If not
+explicitly requested, a valid CRC is appended to the frame, as in the case below.
+The minium frame size allowed by the 803.2 standard is 64 bytes. Considering
+12 bytes for sender and receiver MAC, 2 bytes for protocol type and 4 bytes for
+CRC, the minimum payload size is 46 bytes, which in this case is randomly generated.
+
+
+```
+[root@client]~# ./corrupt -i ens9f1 -m fc:aa:14:e4:97:59
+Interface is ens9f1
+Destination MAC address is fc:aa:14:e4:97:59
+crc: d66bfef8
+Message sent correctly
+```
+
+On the server the frame is received correctly, but clearly the CRC is not visible,
+as it is stripped off by the NIC.
+
+```
+22:17:28.363202 aa:bb:cc:dd:ee:ff (oui Unknown) > fc:aa:14:e4:97:59 (oui Unknown), ethertype Unknown (0x1213), length 60: 
+        0x0000:  568c 0682 43c7 02a0 fc06 b47f 359f 53fd  V...C.......5.S.
+        0x0010:  aed0 9e1a c9ef 6169 19f2 5106 ab7d 6981  ......ai..Q..}i.
+        0x0020:  8aee 044d b607 ee34 8c23 b341 43f8       ...M...4.#.AC.
+```
+Is there any way to have visibility over the CRC of incoming frames? Well,
+normally the answer is no, the hardware simply removes it. However, this is
+not always the case. In fact, on the XGene-1, the hardware actually passes the frame
+check sequence over to the software stack and it is instead the driver's 
+responsibility to strip it off. This is what happens in the *xgene_enet_rx_frame*
+function, which is the NAPI polling function that handles the data which has been
+DMAed to memory by the NIC:
+
+```c
+        /* strip off CRC as HW isn't doing this */
+        datalen = GET_VAL(BUFDATALEN, le64_to_cpu(raw_desc->m1));
+        datalen = (datalen & DATALEN_MASK) - 4;
+        prefetch(skb->data - NET_IP_ALIGN);
+        skb_put(skb, datalen);
+```
+
+The CRC is being removed by subtracting the trailing 4 bytes from the total
+lenght of the frame. Removing the *-4* easily does the trick.
+
+
+
+
+
+
+
+
+
+
+
 
 
 

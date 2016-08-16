@@ -253,17 +253,17 @@ in common is overused and no further provisioning is encouraged (the latter bein
 referred to as the free-rider behavior). Three are the  possible outcomes of 
 this "tragedy of the commons":
     
-    * Resource is exhausted 
-    * A higher coercive power enforces allocation policy (basically what happens
-    in communist 
-    * Break-up of the resource and assigning property
+   * Resource is exhausted 
+   * A higher coercive power enforces allocation policy (basically what happens
+   in communist 
+   * Break-up of the resource and assigning property
 
 However, this theory does not apply to software, which is in this case the public good.
 <b>Software's value does not decreases with overuse, rather it increases.</b>
 The problem of re-previsioning does not exist either, for the following reasons:
     
-    * <b>Solutions are needed on time</b>, therefore people are more inclined to
+   * <b>Solutions are needed on time</b>, therefore people are more inclined to
     to do the work they need themselves.
-    * When a patch is created, it is more valuable if submitted upstream. 
+   * When a patch is created, it is more valuable if submitted upstream. 
     Maintaining a rogue patch becomes more difficult than merging it.
 
