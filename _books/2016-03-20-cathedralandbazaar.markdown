@@ -101,7 +101,8 @@ internal market in reputation exerts pressure on people not to launch developmen
 efforts they are not competent to follow through on. <b>Good people and communication
 skills are essentials for coordinators of bazaar mode projects.</b>
 
-If Brooke's law were the whole picture, the Linux would be impossible. A vital
+If Brooke's law were the whole picture, the Linux would be impossible. Open source
+does overturn this law. A vital
 correction consists in <b>egoless programming</b> (add to reading list: The Psychology of
 Computer Programming). When developers encourage other people to look at their code
 and fix bugs, improvement is much faster and Brooke's law is heavily mitigated.
@@ -167,7 +168,7 @@ Societies can be split into the following categories:
  in the absence of scarcity
 
 
-The society of opensource hackers is a gift culture. There is not shortage of hardware
+The society of opensource hackers is a gift culture. There is no shortage of hardware
 resources (storage, compute power) and software is freely shared. The Lockean
 property customs used within hackers are aimed at maximizing reputation incentives,
 making sure that credit goes to the right individuals.
@@ -191,14 +192,8 @@ These customs become evident in several ways:
 The reputation-game model encourages founding <b>new and innovative projects</b>.
 Homesteading the noosphere refers to the tendency to found <b>new and innovative projects</b>
 rather than cloning projects that are recognized as category killers, because it would
-be too hard to gain attention. This has dictated the trend in open source projects:
-
- * 1970s: toys and demos
- * 1980s: internet tools
- * 1990s: Operating Systems
- * 2000s: applications for non techies
-
-The following are the main patterns according to which hacker culture values 
+be too hard to gain attention. The following are the main patterns according 
+to which hacker culture values 
 contribution:
 
   * It was to work as well as I have been led to expect it will
@@ -217,21 +212,58 @@ of a <b>benevolent dictator</b>)
   * Subsystem owner controls implementation and interface, subject only to
   correction by project leader
 
-There exist other models, for example the <b>voting committe</b> model which runs
-the Apache project. In general, <b>authority follows responsability</b>.
+There exist other models, for example the <b>voting committee</b> model which runs
+the Apache project. In general, <b>authority follows responsibility</b>.
 
 The reputation-game gift culture is the best social organization for what the
 community is trying to do. This is supported by several psychology studies which
-report the following:
-
-  * Commissioned work is less creative than work done out of interest
-  * Complex activities are hurt by rewards
-  * Flat salaries do not demotivate, bonuses do (ref: psychologist Theresa Aambile of 
-  Brandeis University, 1984)
-
-The best course of action is to decouple salary from performance in programming
-and let people choose their projects.
-
-When creativity is needed, a group of open source developers is more productive
-than a group of closed source developers motivated by regards in a scarcity
+report that <b>commissioned work is less creative than work done out of interest</b>,
+complex activities are hurt by rewards and flat salaries do not demotivate, but
+rather bonuses do (reference: psychologist Theresa Aambile of
+Brandeis University, 1984). The best course of action is to decouple salary from 
+performance in programming and let people choose their projects. When creativity 
+is needed, a group of open source developers is more productive
+than a group of closed source developers motivated by rewards in a scarcity
 context.
+
+The gift-culture explanation does not fully address those mixed economic contexts 
+in which most open source projects operate. Goods either have <b>use value or sell value</b>.
+When it comes to software, the former is the value of a software as a tool to boost
+productivity, the latter is the value as a salable commodity. Most people assume
+software-production economies follow a "factory model", where the sale value of
+the software is proportional to the time it took to develop. This is usually false.
+First, most of programming jobs are founded by use value.
+<b>The sale value of a software is not proportional to its development cost.</b>
+The price is capped by the expected future value of vendor services (enhancements,
+upgrades, etc.). If the vendor goes out of business, nobody is willing to pay anything
+anymore for that software. <b> Software industry is therefore a service industry,
+not a manufacturing one</b>. When considering software a manufacturing product,
+supporting life cycle's cost with sales works only if the market is expanding quickly
+enough. One way to sustain the life cycle of a software is to release bug fixes
+as new products, but this does not work in the long run from the customer's
+perspective. Vendor lock-in is most of the times the only way to implement
+a sustainable life cycle of a software as a manufacturing product. The alternative
+to the factory model is a price structure based on service contracts and subscriptions,
+and this is there direction preferred by Open Source.
+
+Cooperative behaviour, and Open Source in this case, is always subject to the risk
+referred to as <b>"The Tragedy of the Commons"</b> (first defined by Garrett Hardin), 
+a situation where a resource held
+in common is overused and no further provisioning is encouraged (the latter being
+referred to as the free-rider behavior). Three are the  possible outcomes of 
+this "tragedy of the commons":
+    
+    * Resource is exhausted 
+    * A higher coercive power enforces allocation policy (basically what happens
+    in communist 
+    * Break-up of the resource and assigning property
+
+However, this theory does not apply to software, which is in this case the public good.
+<b>Software's value does not decreases with overuse, rather it increases.</b>
+The problem of re-previsioning does not exist either, for the following reasons:
+    
+    * <b>Solutions are needed on time</b>, therefore people are more inclined to
+    to do the work they need themselves.
+    * When a patch is created, it is more valuable if submitted upstream. 
+    Maintaining a rogue patch becomes more difficult than merging it.
+
