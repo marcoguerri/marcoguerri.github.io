@@ -1,11 +1,12 @@
 ---
 layout: post
-title:  "Network data corruption on Gigabyte R120-P31"
+title:  "Network data corruption on Gigabyte R120-P31 - Part 1"
 date:   2016-06-19 21:00:00
 categories: jekyll update
 summary: "In this post I have summed up some of the steps I have gone through to 
 debug a subtle data corruption issue encountered on a Gigabyte ARM64 R120-MP31.
-This post is incomplete and being currently developed."
+This first part covers integrity investigations at the transport layer (i.e.
+TCP checksums) and at link layer (i.e. Ethernet CRC32)."
 ---
 
 Background
@@ -274,9 +275,26 @@ check sequence (i.e. CRC). The flag can be easily set with *setsockopt*  at
 the *SOL_SOCKET* level. In case the driver does not support it, *setsockopt* 
 returns *ENOPROTOOPT*.
 
+
 Let's see an example of *SO_NOFCS* in action. The tool expects the interface
-to be associated with the RAW socket and the destination MAC address. If not
-explicitly requested, a valid CRC is appended to the frame, as in the case below.
+to be associated with the RAW socket and the destination MAC address. First a minor 
+remark: in the following
+examples, the MAC address being specified as destination MAC varies, even though
+the machine/interface I am using for the tests is the same. In fact, the machine has two
+SFP+ interfaces, and with the current UEFI firmware from AppliedMicro, version
+1.1.0, the second SFP+ port is not detected at all. The MAC address of the first
+interface varies depending on the version of the kernel. Normally it should be 
+*fc:aa:14:e4:97:59*, and this is what kernel 4.2.0-29 is reporting, but under 
+kernel 4.6.0, the interface with MAC address *fc:aa:14:e4:97:59* does not appear
+to have any link anymore and the actual MAC address of the interface under test
+magically becomes *22:f7:cb:32:eb:5c*. This is a very strange behaviour that
+however is not present with the latest UEFI firmware from Gigabyte, despite
+all the date corruption issue still being reproducible. It also true that, while 
+running tcpdump on the server side, the NIC is in promiscuous mode and it will
+accept anything, no matter the destination MAC, so the value specified on the
+command line does not really matter.
+
+If not explicitly requested, the tool appends a valid CRC at the end of the frame.
 The minium frame size allowed by the 803.2 standard is 64 bytes. Considering
 12 bytes for sender and receiver MAC, 2 bytes for protocol type and 4 bytes for
 CRC, the minimum payload size is 46 bytes, which in this case is randomly generated.
@@ -305,7 +323,8 @@ not always the case. In fact, on the XGene-1, the hardware actually passes the f
 check sequence over to the software stack and it is instead the driver's 
 responsibility to strip it off. This is what happens in the *xgene_enet_rx_frame*
 function, which is the NAPI polling function that handles the data which has been
-DMAed to memory by the NIC:
+DMAed to memory by the NIC (the following source code comes from the xgene-enet
+driver shipped with kernel 4.6.0):
 
 ```c
         /* strip off CRC as HW isn't doing this */
@@ -316,9 +335,70 @@ DMAed to memory by the NIC:
 ```
 
 The CRC is being removed by subtracting the trailing 4 bytes from the total
-lenght of the frame. Removing the *-4* easily does the trick.
+lenght of the frame. Removing the *-4* easily does the trick as it can be seen
+in the following trace (payload in now coming from /dev/zero):
 
+```
+10:13:53.697511 aa:bb:cc:dd:ee:ff (oui Unknown) > 22:f7:cb:32:eb:5c (oui Unknown), ethertype Unknown (0x1213), length 64: 
+        0x0000:  0000 0000 0000 0000 0000 0000 0000 0000  ................
+        0x0010:  0000 0000 0000 0000 0000 0000 0000 0000  ................
+        0x0020:  0000 0000 0000 0000 0000 0000 0000 0ffe  ................
+        0x0030:  979b
+```
+The message on the client side confirms the value of the CRC.
 
+```
+[root@client]~# ./corrupt -m 22:f7:cb:32:eb:5c -i ens9f1 
+Destination MAC address is 22:f7:cb:32:eb:5c
+Interface is ens9f1
+crc: ffe979b
+Message sent correctly
+```
+
+What happens if a corrupted CRC is appended to the frame? Normally any device
+that operates at layer 2 is expected to drop it, which means that a corrupted
+frame will never go past a switch or a NIC. However, at least for the latter,
+there are ways around it: ethtool compliant driver/NICs expose the *rx-all* parameter, which when
+supported and enabled, allows to receive all incoming frames, including those
+whose CRC could not be validated. On the xgene-enet, rx-all is set to off,
+as expected, and cannot be modified in any way. For the test to be meaningful,
+client and server must be connected back-to-back, or the switch will drop any
+corrupted data going through.
+Considering the previous frame, with a payload of all zeros, we have seen that
+the correct CRC is *0x0ffe979b*. If the tool appends a corrupted sequence, the result
+on the server is the following:
+
+```
+11:02:57.186851 aa:bb:cc:dd:ee:ff (oui Unknown) > 22:f7:cb:32:eb:5c (oui Unknown), ethertype Unknown (0x1213), length 64: 
+        0x0000:  0000 0000 0000 0000 0000 0000 0000 0000  ................
+        0x0010:  0000 0000 0000 0000 0000 0000 0000 0000  ................
+        0x0020:  0000 0000 0000 0000 0000 0000 0000 efbe  ................
+        0x0030:  adde 
+```
+The frame is not discarded, even though the checksum is set to *0xdeadbeef*, which
+is clearly not valid! As a side note, the CRC has been written on the frame as a 
+little endian uint32_t, so that is the reason it appears reversed.
+
+Conclusions
+=======
+The results of the experiments performed at application, transport and link have highlighted
+the following issues:
+    
+  * Corrupted data is being delivered to userspace applications. 
+  * The corruption happens both with a switched and back-to-back connection.
+  * The corruption seems to follow a pattern, which most likely would rule out 
+    data integrity issues on the medium (especially when the systems are connected
+    back-to-back).
+  * The device features reported by the driver include the *NETIF_F_IP_CSUM* flag.
+   However, corrupted TCP checksums are not discarded by the NIC.
+  * Corrupted link layer frames are not discarded by the NIC
+
+The last point is probably the most critical one. Without a proper CRC integrity
+check, it is hard to say whether the frame is being received on the wire already 
+corrupted or bits are flipping at a later stage. Given the possible presence of 
+a pattern in the corruption, an alternative explanation that came to mind envisioned
+bits flipping when stored already in system memory. In the second part of
+this post I will report some notes concerning the investigation of this last hypothesis.
 
 
 
