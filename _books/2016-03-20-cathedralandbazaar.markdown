@@ -254,16 +254,138 @@ referred to as the free-rider behavior). Three are the  possible outcomes of
 this "tragedy of the commons":
     
    * Resource is exhausted 
-   * A higher coercive power enforces allocation policy (basically what happens
-   in communist 
+   * A higher coercive power enforces allocation policy, as it happens in a
+   communist context
    * Break-up of the resource and assigning property
 
 However, this theory does not apply to software, which is in this case the public good.
 <b>Software's value does not decreases with overuse, rather it increases.</b>
-The problem of re-previsioning does not exist either, for the following reasons:
-    
-   * <b>Solutions are needed on time</b>, therefore people are more inclined to
-    to do the work they need themselves.
-   * When a patch is created, it is more valuable if submitted upstream. 
-    Maintaining a rogue patch becomes more difficult than merging it.
+The problem of the free-rider behavior does not exist either. In fact, 
+<b>solutions are needed on time</b>, therefore people are more inclined to
+to do the work they need themselves rather then waiting for others to do the
+work. Furthermore,  when a patch is created, it is more valuable if submitted 
+upstream. Maintaining a rogue patch becomes more difficult than merging it. Even
+if we could admit the existence of a free-rider behavior, then this would not
+get worse with the number of the users, the development community is not negatively
+affected by end users who do not contribute. 
+
+
+The reasons for software begin closed source is either preserving its sell value
+or denying its use to competitors. The argument against revealing confidential 
+aspects of the business plan applies only if the code is badly designed: the 
+business logic and knowledge should be separated from the engine. In addition, 
+it must be assessed whether the benefits from the contribution of the community 
+exceed the potential losses from the free-riders' competition. In case of Apache, 
+the use value alone funds the development of the project: in fact, the project 
+has no legal owner and market shares have been steadily increasing. 
+
+
+Open source community adopts a non-hostile attitude towards for-profit Linux 
+packagers like RedHat or SuSe. However, hostility is indeed felt against 
+<b>direct-revenue-capture licenses</b> for mostly three reasons:
+
+  * Symmetry: no party should be in a privileged position to extract profits 
+  * Restrictions on use/sale/modification/distribution causes overhead and legal risks
+  * It makes it impossible to fork, which is frowned upon, but must be possible
+
+Open Source fosters <b>indirect sale value models</b>:
+
+  * <b>Loss leader and market positioner</b>: open source used to develop a product 
+  that allows to maintain a market position with a complementary proprietary software.
+  One major example is Netscape Communicator, open sourced in 1998 to face Microsoft
+  quick acquisition of market shares after shipping Internet Explorer.
+
+  * <b>Widget Frosting</b>: this applies to hardware manufacturer. Software written
+  for hardware, like drivers, is overhead. This is an excellent situation where
+  to open source.
+  
+  * <b>Give away the recipe, open a restaurant </b>: this model is based on 
+  selling support and certifications. It's the model used by Red Hat for example.
+
+  <b>Accessorizing</b>: revenues comes from the sale of accessories, from T-shirts,
+  mugs to documentation. This is the model adopted by O'Reilly.
+
+  <b>Free the future, sell the present</b>: sell binary and sources with a closed
+  license, but with an expiration date on the closure provision.
+
+  <b>Free the software, sell the brand</b>: sell the compliance certification by
+  retaining compatibility criteria and test suite.
+  
+  <b>Free the software, sell the content</b>: sell subscriptions to the content.
+  The market expands as the software is ported to new platforms.
+  
+  
+One of the lessons coming from Linux's evolution is that peer review is the only
+way for achieving high reliability and high quality. Secrecy is enemy of quality,
+as it's more lucrative to collect the rent than to invest in improving the product.
+Open-sourcing a software product makes sense in the following cases:
+
+  * Reliability and scalability is required and correctness can only be verified
+  by peer review
+  * The software is critical for running a business
+  * When it is necessary to establish a computing and communication infrastructure
+  * Key methods are part of  common engineering knowledge
+  
+On the contrary, open source does not make sense for companies that have unique
+possession of of value-generating software technology. An interesting case study
+is Doom. At the beginning, it was very innovative and it didn't make sense for
+id Software to open source it. When it started losing market shares, specifications
+on how to created add-ons were released. This parallel market became bigger then the 
+primary one and Doom was open sourced.
+
+
+Sometimes Open Source also works as a strategic move against a company's 
+competition:
+
+  * <b>Cost-sharing as a competitive weapon</b>: lowering cost by sharing for
+  example the infrastructure allows to gain a market position that reassures
+  customers
+  * <b>Resetting the competition</b>: open sourcing and creating a new de-facto
+  standard neutralizes the advantage of other companies
+  * <b> Growing the Pond</b>: the growth of the ecosystem builds the market. This
+  is the reason why technology firms participate in public standards
+  * <b>Preventing a chokehold</b>: it often more important to prevent a competitor
+  from closing a technology rather then controlling it
+
+
+When imagining Linux's future, a necessary question is: will it fragment? 
+With Linux it won't be possible for Unix's history to repeat, as the license of
+the base of source code requires vendors to share modifications to all the parties
+to whom the software is distributed (GPL does allow to modify and not share 
+neither the modified version nor the sources). The only area in which vendors
+can compete is service and support.
+
+Some worry that the market value of software will go to zero because of all the 
+free source code out there and at some point use value will not attract enough 
+consumers. This does not make sense, because the world is evolving very fast and 
+there will always be demand for software.
+
+Hardware manufacturers may fear that open sourcing may reveal important aspects
+about how the hardware operates that competitors could copy. But the time
+competitors spend in understanding a design is time they don't dedicate
+to their own product, and by the time a copy is ready, it's already obsolete.
+By opening a driver you can focus on investing in innovation and let the
+community maintain, improve and port the code. This will also allow to continue
+support the hardware once it is discontinued. An intermediate way is to burn
+some code in a ROM and to open the interface to the ROM. 
+
+At the time of dispute between Netscape Navigator and Internet Explorer,
+the only Netscape's concern was to maintain a space for their server business.
+Microsoft would have bent Web's protocols away from open standards into proprietary
+channels that only Microsoft servers would be able to serve. Raymond's "The 
+Cathedral and the Bazaar" deeply affected Netscape's decision to open source
+their browser. The Mozilla project and the Mozilla public library were developed
+specifically for this case. Also, the term "Open Source" was created in 1998
+as part of a marketing campaign to promote Netscape browser. After
+Bruce Perens' suggestion, Debian's Free Software Guidelines became the Open Source
+definition. When the coverage of the media increased, it became clear that
+big companies started to be worried about the phenomenon (Halloween's documents).
+
+
+Beyond software, there are not as strong incentives to open source. Music
+and books don't need to be debugged, maintained and do not benefit from peer
+reviewing.
+
+  
+  
 

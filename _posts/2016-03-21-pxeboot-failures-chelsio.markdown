@@ -7,7 +7,13 @@ published: yes
 summary: "This a collection of some notes I have taken during an interesting debugging 
 session aimed at identifying the root cause of a regression the followed the update 
 of the network boot infrastructure at CERN to PXELINUX 6.03. It was an interesting 
-dive into PXELINUX internals, down to the point where it meets the hardware."
+dive into PXELINUX internals, down to the point where it meets the hardware. As
+a side note, when reading Eric Raymond's \"The Cathedral and the Bazaar\", I 
+especially remember the explanation why closing hardware driver's sources does not make sense.
+Raymond was presenting an intermediate model in-between open and closed source,
+i.g. having a closed source ROM and opening the interface to the ROM. I think
+this story is a good example on why this latter approach does nothing more
+than shifting the problem."
 ---
 
 Background and setup
