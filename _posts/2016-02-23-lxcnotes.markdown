@@ -1,47 +1,47 @@
 ---
 layout: post
-title:  "LXC notes "
+title:  "Linux containers, cgroups and namespaces "
 date:   2016-02-23 15:28:23
 categories: jekyll update
 published: no
-summary: "Just some notes on the creation and operation of Linux containers.
-Still work in progress..."
+summary: "Some notes on the \"bare-metal\" operation of Linux container, focusing
+on lxc and on the underlying Linux internal mechanisms, such as cgroups and
+namespaces."
+
 ---
 
 
 Setup of the machine
 =======
 All the steps below refer to a host system running Linux Debian 8.2.
-*lxc* package is needed to operate Linux containers in userspace.
-This will install lxc templates under /usr/share/lxc/templates/. These templates
-are basically shell script responsible for the creation of the rootfs that will
-be mounted by the container.
+*lxc* package is required to operate Linux containers in userspace.
+This will install lxc templates under /usr/share/lxc/templates, which are
+basically shell scripts that build the rootfs that will be mounted by the
+container itself.
 
 
 Creation of the container
 =======
-To create a Debian based container, the lxc-debian template can be used. This uses
-debootstrap to to create a Debian based roots, which in my case is located under
-/var/lib/lxc/DebianTestContainer/rootfs.
+*lxc-debian* template allows to create a Debian container. This uses
+*debootstrap* to to create a Debian based roots, which will be located in 
+*/var/lib/lxc/\<CONTAINER-NAME\>/rootfs*.
 
-
-{% highlight console lineos %}
+```
 sudo lxc-create -n DebianTestContainer -t /usr/share/lxc/templates/lxc-debian
-{% endhighlight %}
+```
 
-The container can be started as follows:
+The container can be started with *lxc-start*.
 
-
-{% highlight console lineos %}
+```
 sudo lxc-start -d -n DebianTestContainer
-{% endhighlight %}
-This will start the container in the background, and a getty will be spawned on
-tty[1..4], according to the template I have on my machine. lxc-console can be used
-to connect to a tty that can be specified with -t option (0 is the console, any other 
-number is a tty).
+```
 
-{% highlight console lineos %}
-➜ mguerri-lenovo ~/nas/Data/Technical [] at 21:54:32 [Tue 23] $ sudo lxc-console -n DebianTestContainer -t 1
+This will start the container in background. With *lxc-debian* template, a getty 
+is spawned on tty{1..4} and *lxc-console* can be used to connect to any of those
+terminals with -t option (0 is the console, any other number is a tty).
+
+```
+sudo lxc-console -n DebianTestContainer -t 1
 
 Connected to tty 1
 Type <Ctrl+a q> to exit the console, <Ctrl+a Ctrl+a> to enter Ctrl+a itself
@@ -49,53 +49,31 @@ Type <Ctrl+a q> to exit the console, <Ctrl+a Ctrl+a> to enter Ctrl+a itself
 Debian GNU/Linux 8 DebianTestContainer tty1
 
 DebianTestContainer login:
-{% endhighlight %}
+```
 
-The newly created container is endowed only with a loopback interface. Network interface
-must be defined at creation time and LXC provides all the tools to abstract most
-of the complexity. Each container can be configured using a file deployed under
-/var/lib/lxc/<ContainerName>/config. After the creation of the container, without
-any other addition, the config file of my DebianTestContainer looks like the following
-
-
-{% highlight console lineos %}
-# Template used to create this container: /usr/share/lxc/templates/lxc-debian
-# Parameters passed to the template:
-# For additional config options, please look at lxc.container.conf(5)
-lxc.network.type = empty
-lxc.rootfs = /var/lib/lxc/DebianTestContainer/rootfs
-
-# Common configuration
-lxc.include = /usr/share/lxc/config/debian.common.conf
-
-# Container specific configuration
-lxc.mount = /var/lib/lxc/DebianTestContainer/fstab
-lxc.utsname = DebianTestContainer
-lxc.arch = amd64
-lxc.autodev = 1
-lxc.kmsg = 0
-{% endhighlight %}
-
+The newly created container is endowed only with a loopback interface. The network
+subsystem can be customized at creation time with a configuration file deployed under
+*/var/lib/lxc/\<CONTAINER-NAME\>/config*.
 
 
 Networking
 =======
-The simplest network configuration for the container is based on bridges and veth
-devices.
-
-
-
+The newly created container is endowed only with a loopback interface. The network
+subsystem can be customized at creation time with the configuration file deployed under
+*/var/lib/lxc/<CONTAINER-NAME>/config* and it is normally based on bridges and 
+virtual ethernet devices.
 
 Linux bridges
 =======
-Linux bridges are expose to userspace as network device whose job is to forward
+Linux bridges are expose to userland as network devices whose job is to forward
 traffic between two networks at Layer 2, i.e. based on hardware addresses (just
-like a switch). Forwarding decisions are taken based on a table of MAC addresses that is filled in after
-discovering which hosts are connected to which network. A software bridge is normally
-created to link a physical network interface to a virtual network interface belonging
+like a switch). Forwarding decisions are taken based on a table of MAC addresses 
+that is filled in afterdiscovering which host is connected to which network. 
+A software bridge is normally created to link a physical network interface to 
+a virtual network interface belonging
 to a virtual network. Once the bridge is up and running, the OS will reply to all 
 ARP queries for MAC addresses belonging to the virtual network and will forward
-incoming frames, via the bridge, to the virtual network. Under Debian, the bridge
+incoming frames, via the bridge, to the virtual network. Under Debian, bridges
 can be set up in several different ways:
 
 * Via */etc/network/interfaces*
@@ -105,62 +83,94 @@ can be set up in several different ways:
 I will be using the second method. The following commands can be used to create
 a bridge and add a physical interface.
 
-{% highlight console lineos %}
+```
 ip link add name br0 type bridge
 ip link set br0 up
 ip link set eth0 master br0
-{% endhighlight %}
+```
 
-Bridge can be removed with *ip link del br0*. The bridge is now visible as a 
-network interface, which does not have level 3 presence yet, as an IP has not been
-assigned to it.
+*bridge link* shows the existing bridges and associated interfaces, while 
+ *ip link del br0* removes the bridge. *br0* now appears among the network
+ interfaces:
 
-{% highlight console lineos %}
-➜ mguerri-lenovo ~ [] at 21:59:40 [Tue 8] $ ip a
-
+```
 7: br0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
     link/ether 3c:97:0e:6e:e1:54 brd ff:ff:ff:ff:ff:ff
+```
+ 
+In the context of Linux containers, *br0* will be linking the physical interface 
+of the host with the virtual interface assigned to the container. The immediate side 
+effect of adding *eth0* to *br0* is a complete halt of network 
+activity. When trying to ping the remote gateway for instance, *ip* reports the 
+following neighbours (aka ARP table): 
 
-➜ mguerri-lenovo ~ [] at 21:59:38 [Tue 8] $ sudo brctl show
-bridge name bridge id       STP enabled interfaces
-br0     8000.3c970e6ee154   no      eth0
-docker0     8000.02425570456f   no
-{% endhighlight %}
-
-After adding eth0 to br0, the network stops working, I can't even ping my default 
-gateway. My arp table now looks like the following:
-
-
-{% highlight console lineos %}
-➜  ~ [] at 22:41:38 [Tue 8] $ sudo ip neigh                     
-192.168.0.1 dev br0 lladdr fc:c8:97:b7:a2:74 REACHABLE
-192.168.0.3 dev eth0 lladdr f8:32:e4:ea:bc:96 STALE
+```
 192.168.0.1 dev eth0  INCOMPLETE
-{% endhighlight %}
-
-The MAC address of the default gateway is indeed fc:c8:97:b7:a2:74, but this
-entry is associated with br0, not eth0. In fact, what happens is that my 
-host keeps on broadcasting ARP requests for 192.168.0.1, even though the response
-is correctly received, but associated with br0. Once routing decision has been taken
-and eth0 is chosen for sending traffic on the local network, the ARP resolution
-is not available for layer 2 forwarding. An entry can be manually added (or
-replaced, as there is already an INCOMPLETE entry in the table) as follows:
-
-{% highlight console lineos %}
-➜  ~ [] at 22:58:01 [Tue 8] $ sudo ip neigh replace 192.168.0.1 lladdr fc:c8:97:b7:a2:74 dev eth0 nud reachable
-➜ mguerri-lenovo ~ [] at 22:58:05 [Tue 8] $ sudo ip neigh
-192.168.0.3 dev br0 lladdr f8:32:e4:ea:bc:96 STALE
 192.168.0.1 dev br0 lladdr fc:c8:97:b7:a2:74 REACHABLE
-192.168.0.3 dev eth0  FAILED
-192.168.0.1 dev eth0 lladdr fc:c8:97:b7:a2:74 REACHABLE
-{% endhighlight %}
+```
 
-Now local network and everything behind the gateway can be reached.
+The MAC address of the default gateway appears to be associated with *br0* rather
+then *eth0*. In fact, what happens when trying to reach the gateway is that the 
+host keeps on broadcasting ARP requests for 192.168.0.1 via eth0, even though 
+the response is correctly received, but associated with br0. 
+Obviously when outgoing packets are routed through eth0, the ARP resolution is 
+not available for layer 2 forwarding. This is the expected behavior
+as eth0 is now an interface of the bridge (think, virtual switch), which
+is supposed to do only layer 2 forwarding. Hence, the situation is the following:
 
-{% highlight console lineos %}
-➜ mguerri-lenovo ~ [] at 22:26:15 [Tue 8] $ ping 192.168.0.1
-PING 192.168.0.1 (192.168.0.1) 56(84) bytes of data.
-64 bytes from 192.168.0.1: icmp_seq=1 ttl=64 time=0.519 ms
-{% endhighlight %}
+  * *eth0* does not need an IP anymore, it's a dumb layer 2 interface
+  * *eth0* must be removed as a routing interface towards any subnetwork
+  * *br0* must be assigned an IP and used as default gateway on the host to access
+  any of the bridged networks. As *eth0* is the master 
+ interface of the bridge, the MAC of *eth0* and *br0* is shared
+  * All the subnets that were routed through *eth0*, must now be routed
+  through *br0*
 
-So, why is the ARP entry associated to br0 in the first place?
+
+This is summarized as follows:
+
+```
+➜ mguerri-lenovo ~ [] at 22:28:20 [Thu 25] $ sudo route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.0.1     0.0.0.0         UG    0      0        0 eth0
+0.0.0.0         192.168.0.1     0.0.0.0         UG    1024   0        0 eth0
+192.168.0.0     0.0.0.0         255.255.255.0   U     0      0        0 eth0
+
+➜ mguerri-lenovo ~ [] at 22:29:05 [Thu 25] $ sudo ip addr flush eth0
+➜ mguerri-lenovo ~ [] at 22:29:11 [Thu 25] $ dhclient br0
+➜ mguerri-lenovo ~ [] at 22:30:10 [Thu 25] $ sudo route del default
+➜ mguerri-lenovo ~ [] at 22:36:16 [Thu 25] $ sudo ip route flush dev eth0
+
+➜ mguerri-lenovo ~ [] at 22:36:21 [Thu 25] $ sudo route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.0.1     0.0.0.0         UG    0      0        0 br0
+169.254.0.0     0.0.0.0         255.255.0.0     U     1000   0        0 br0
+192.168.0.0     0.0.0.0         255.255.255.0   U     0      0        0 br0
+```
+
+*br0* is now the entry point to all bridged networks. *brctl*
+allows to list all the MACs that have been discovered by the bridge together
+with the port on which they have been discovered.
+
+```
+➜  ~ [] at 22:45:33 [Thu 25] $ sudo brctl showmacs br0
+port no mac addr        is local?   ageing timer
+  1 00:1f:bc:0e:2c:b1   no         1.23
+  1 3c:97:0e:6e:e1:54   yes        0.00
+  1 70:10:6f:3e:18:72   no        21.06
+  1 f8:32:e4:ea:bc:96   no         8.77
+  1 fc:c8:97:b7:a2:74   no         0.84
+```
+
+Port 1 is indeed the subnet reachable via *eth0*:
+
+```
+➜  ~ [] at 22:56:21 [Thu 25] $ sudo brctl showstp br0
+br0
+[...]
+eth0 (1)
+[...]
+```
+
