@@ -1,6 +1,6 @@
 ---
 layout: books
-title:  "Particle at the end of the Universe"
+title:  "Collider"
 date:   2016-06-28 20:00:00
 categories: books
 keywords: Books
@@ -124,7 +124,39 @@ in the gain or loss of energy and the emission of a photon with a specific energ
 This perfectly explained the spectral lines of the hydrogen. <b>Heisenberg</b>
 later developed a model that explained the probability of an electron jumping
 from a quantum state to another. He introduced the laws of quantum mechanics,
-were position and momentum cannot be measured at the same time. In 1926,
+where position and momentum cannot be measured at the same time. In 1926,
 <b>Schrodinger</b> proposed the theory of wave mechanics, where wave functions
 defines distribution of probability of an electron being in different points in
 space. Heisenberg's and Schrodinger's descriptions are completely equivalent.
+Heisenberg received the Nobel prize in 1932, Shrodinger and Dirac in 1933,
+Einstein in 1921 and Bohr in 1922.
+
+British physicist **John Cockcroft** was the first one who started studying how
+to split the nucleus by means of collisions with other particles. The very fist
+accelerator was built by Rolf Wideroe at Aachen University, it was a linear accelerator
+with multiple kicking steps, the attempts to build a circular accelerator failed
+as he could not keep the circular trajectory for more then 1.5 round trip.
+The **Cockroft-Walton** generator was used to power a 1MW particle accelerator
+build on Rutherford's commission. In 1929, **Robert Jamison Van der Graaf** built
+an electrostatic generator that was capable of producing 7MV. At University of
+California Berkeley, **Ernest Orlando Lawrence** build a magnetic resonance
+accelerator which later became known as cyclotron. A radio frequency oscillator offered
+a cyclic voltage boost. The building where he building his second prototype later
+became the **Lawrence Berkeley National Laboratory**. The race for splitting the
+nucleus was won by Cockroft and Walton's accelerator, which succeeded into 
+smashing a Lithium nucleus into two alpha particles. This achievement was
+awarded the Nobel prize in 1951. After his death, Rutherford was buried at
+Westminster Abbey, next to Isaac Newton and Lord Kelvin.
+
+In 1939, Bohr arrived in Princeton knowing that Nazi Germany had been working
+on nuclear fission. Fermi later developed a model showing that a chain of reactions
+could be triggered when splitting an uranium isotope. When Roosevelt was informed,
+the **Manhattan project** was started. Fermi developed in 1933 a model of beta decay
+during which a neutrino is emitted to account for unobserved extra energy.
+
+Japanese physicist **Yukawa** postulated the existence of a fourth fundamental
+force, the strong force which binds together nuclei. The missing piece was a 
+corresponding force carrier,
+that was later discovered and called pi meson or pion by a group in which 
+**Giuseppe Occhialini** was working. The discovery followed the observation of 
+the tracks produced by cosmic rays.
