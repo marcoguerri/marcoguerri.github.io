@@ -11,7 +11,7 @@ dive into PXELINUX internals, down to the point where it meets the hardware. As
 a side note, when reading Eric Raymond's \"The Cathedral and the Bazaar\", I 
 especially remember the explanation why closing hardware driver's sources does not make sense.
 Raymond was presenting an intermediate model in-between open and closed source,
-i.g. having a closed source ROM and opening the interface to the ROM. I think
+i.e. having a closed source ROM and opening the interface to the ROM. I think
 this story is a good example on why this latter approach does nothing more
 than shifting the problem."
 ---
@@ -801,20 +801,28 @@ that flag, which worked as long as pxelinux was not involved in the interrupt ha
 Unfortunately, this marked the end of the  investigation: I could not 
 fix the issue myself as I did not have any control over the sources of the firmware of the NIC. 
 Considering *PXENV\_UNDI\_ISR\_OUT\_OURS* as always set was not an 
-option, as it could break the execution on hardware with multiple NICs sharing the 
+option either, as it could break the execution on hardware with multiple NICs sharing the 
 same IRQ (or in the best case, it would result in the invocation of the routine for servicing the 
 interrupt for no reason). 
 
 
 Conclusions
 =======
-After the investigation we came to the conclusion that we need a new firmware which
-properly handles the *PXENV\_UNDI\_ISR\_OUT\_OURS* flag. The manufacturer has been made 
-aware of the issue and hopefully this will be fixed soon.
+When dealing with closed source software, the only possible course of action when hitting a bug
+is clearly to file a bug report to the owners of the code, hoping there is enough interest
+on their side to fix the issue in a timely manner. This is a great example
+of how the *widget frosting* business model explained by Eric Raymond in *The Cathedral
+and the Bazaar* would simplify everybody's life. This indirect-sale value model
+applies specifically to hardware manufacturers, for which, developing and maintaining the software/firmware
+is often just an overhead. The number of benefits that would arise as a consequence of 
+releasing the software under an open license are to be seriously taken into consideration. For the moment,
+let's fire up the email client (rather than the IDE) and beg for a fix...
+
 
 Updates
 =======
    * It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
-just fine if *PXENV\_UNDI\_ISR\_OUT\_OURS* is considered always set.
-   * Chelsio has provided a new firmware which allows to boot correctly with lpxelinux 6.03
+just fine if *PXENV\_UNDI\_ISR\_OUT\_OURS* is  always set. However, this NIC has been
+discontinued and no fixes whatsover will be provided. *Widget frosting*, anybody...?
+   * Chelsio has provided a firmware fix which allows to boot correctly with lpxelinux 6.03
 
