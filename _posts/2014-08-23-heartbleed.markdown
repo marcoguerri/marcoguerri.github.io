@@ -462,7 +462,7 @@ the buffer pointed by the BIO object <em>\*b</em>. The decision whether to flush
 the buffer through the socket is taken based on the size of the data with respect to 
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed. In this case the heartbeat response message is 28 bytes and the buffer 
-is 4KB the data is written on the buffer but not flushed.
+is 4KB, therefore the data is written on the buffer but not flushed.
 
 ```text
 (gdb) print i
