@@ -5,11 +5,11 @@ date:   2015-08-17 08:00:00
 published: yes
 categories: jekyll update
 pygments: true
-summary: "This post presents a possible procedure to "snapshot" a Linux installation based
+summary: "This post presents a possible procedure to \"snapshot\" a Linux installation based
 on a boot partition and three LVM logical volumes for root, var and swap. This proves
 useful when an identical environment must be reproduced on a different machine
 sharing the same hardware configuration but without network connectivity. One 
-of the requirements is to obtain the smallest possible "image", so that it can
+of the requirements is to obtain the smallest possible \"image\", so that it can
 be easily transferred and rewritten on the second machine. Such a procedure does entail
 a number of issues: all the machine specific parameters (e.g. /etc/hostname, MAC
 addresses in /etc/sysconfig/network-scripts) are deployed to the second machine
