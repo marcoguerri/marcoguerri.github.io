@@ -32,12 +32,12 @@ the worker has completed the execution?
 
 A deeper look with strace
 =======
-*strace* comes in handy as always. It might be a bit of an overkill to trace the
-interpreter in order to understand what happens at
-the Python multiprocessing library level, but I find it always very insightful.
+*strace* might seem a bit of an overkill in this case, as normally *pdb* would be just 
+enough to understand what happens at the Python multiprocessing library level.
+However, I find it always very insightful and I wanted to give it a try.
 Clearly I will skip the uninteresting parts and jump right to the relevant pieces.
 Since I want to see what both the parent and the child are doing, the *-f* flag
-is mandatory. The worker process is initially created via *clone* syscall.
+is required. The worker process is initially created via *clone* syscall:
 
 
 ```plaintext
@@ -86,7 +86,7 @@ and to go as deep as possible, gdb is the best tool for the trade.
 
 Tracing with gdb
 =======
-First, python's debug symbols must be installed. On Debian,
+First, python debug symbols must be installed. On Debian,
 *python-dbg* contains the interpreter compiled with *-g* option. On Fedora,
 debug symbols can be downloaded separately with the following yum command:
 
@@ -183,11 +183,11 @@ $3 = 131
 ```
 
 ```python
-131 def poll(self, flag=os.WNOHANG):
-132     if self.returncode is None:
-133         while True:
-134             try:
-135                 pid, sts = os.waitpid(self.pid, flag)
+def poll(self, flag=os.WNOHANG):
+    if self.returncode is None:
+        while True:
+            try:
+                pid, sts = os.waitpid(self.pid, flag)
 ```
 
 The actual source code line that corresponds to the bytecode instruction begin
@@ -212,12 +212,11 @@ is a method of *Popen* class in multiprocessing lib. The next invocation of
 *poll* is invoked in function *_cleanup* to identify child processes that have terminated.
 
 ```python
-76 def _cleanup():
-77     # check for processes which have finished
-78     for p in list(_current_process._children):
-79         if p._popen.poll() is not None:
-80             _current_process._children.discard(p)
-81
+def _cleanup():
+    # check for processes which have finished
+    for p in list(_current_process._children):
+        if p._popen.poll() is not None:
+            _current_process._children.discard(p)
 ```
 
 Further down the stack there is another pointer to process.py.
@@ -230,10 +229,10 @@ Further down the stack there is another pointer to process.py.
 of live child processes.
 
 ```python
-65 def active_children():
-       [...]
-69     _cleanup()
-70     return list(_current_process._children)
+def active_children():
+    [...]
+    _cleanup()
+    return list(_current_process._children)
 ```
 
 Next frame points to util.py.
@@ -246,18 +245,17 @@ Next frame points to util.py.
 Here  *active_children* is called in *\_exit_function*.
 
 ```python
-294 def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
-295                    active_children=active_children,
-296                    current_process=current_process):
-            [...]
-318         for p in active_children():
-319             if p._daemonic:
-320                 info('calling terminate() for daemon %s', p.name)
-321                 p._popen.terminate()
-322
-323         for p in active_children():
-324             info('calling join() for process %s', p.name)
-325             p.join()
+def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+                   active_children=active_children,
+                   current_process=current_process):
+        [...]
+        for p in active_children():
+            if p._daemonic:
+                info('calling terminate() for daemon %s', p.name)
+                p._popen.terminate()
+        for p in active_children():
+            info('calling join() for process %s', p.name)
+            p.join()
 ```
 
 Next and last frame of interest points to atexit.py. 
@@ -274,7 +272,7 @@ registers *\_exit_function* as an atexit callback:
 
 
 ```python
-330 atexit.register(_exit_function)
+atexit.register(_exit_function)
 ```
 
 With this mechanism, the multiprocessing library ensures that the interpreter does

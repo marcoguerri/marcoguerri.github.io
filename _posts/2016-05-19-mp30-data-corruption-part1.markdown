@@ -3,7 +3,7 @@ layout: post
 title:  "Network data corruption on Gigabyte R120-P31 - Part 1"
 date:   2016-06-19 21:00:00
 categories: jekyll update
-summary: "In this post I have summed up some of the steps I have gone through to 
+summary: "In this post I have summarized some of the steps I have gone through to 
 debug a subtle data corruption issue encountered on a Gigabyte ARM64 R120-MP31.
 This first part covers integrity investigations at the transport layer (i.e.
 TCP checksums) and at link layer (i.e. Ethernet CRC32)."
@@ -12,8 +12,8 @@ TCP checksums) and at link layer (i.e. Ethernet CRC32)."
 Background
 =======
 
-After deploying and cabling two Gigabyte R120-P31 on a SFP+ switch, random failures 
-started to appear during daily operations. Everything seemed
+After deploying and cabling two Gigabyte R120-P31 on a 10GbE SFP+ switch, random failures 
+started appearing during daily operations. Everything seemed
 to point to a data corruption issue, and a quick network test confirmed something was wrong:
 
 ```

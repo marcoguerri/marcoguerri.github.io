@@ -5,11 +5,12 @@ date:   2015-08-17 08:00:00
 published: yes
 categories: jekyll update
 pygments: true
-summary: "This post summarizes a possible procedure to dump a Linux installation based
+summary: "This post presents a possible procedure to "snapshot" a Linux installation based
 on a boot partition and three LVM logical volumes for root, var and swap. This proves
-useful when a Linux installation must be snapshotted and moved to another identical 
-machine to reproduce an identical environment, using the lowest possible amount 
-of space. Such a procedure does entail
+useful when an identical environment must be reproduced on a different machine
+sharing the same hardware configuration but without network connectivity. One 
+of the requirements is to obtain the smallest possible "image", so that it can
+be easily transferred and rewritten on the second machine. Such a procedure does entail
 a number of issues: all the machine specific parameters (e.g. /etc/hostname, MAC
 addresses in /etc/sysconfig/network-scripts) are deployed to the second machine
 and need to be adapted accordingly (not covered in this post). Bearing this in mind, 
@@ -28,37 +29,15 @@ vg1 is the only volume group on the system, consisting of the PV created on /dev
 The volume group must be first activated with *vgchange*.
 
 ```text
-[root@localhost tmp]# vgdisplay
-  --- Volume group ---
-  VG Name               vg1
-  System ID
-  Format                lvm2
-  Metadata Areas        1
-  Metadata Sequence No  5
-  VG Access             read/write
-  VG Status             resizable
-  MAX LV                0
-  Cur LV                4
-  Open LV               0
-  Max PV                0
-  Cur PV                1
-  Act PV                1
-  VG Size               744.19 GiB
-  PE Size               32.00 MiB
-  Total PE              23814
-  Alloc PE / Size       23814 / 744.19 GiB
-  Free  PE / Size       0 / 0
-  VG UUID               KrtTpl-QW87-nhDT-mROs-HTPq-6iFN-6QMjIf
 [root@localhost tmp]# vgchange -a y vg1
 ```
 
 
 Resizing filesystems
 =======
-All logical volumes created on top of vg1 must be shrunk to the minium size 
-possible, but before doing so, the filesystems needs to be resized. Each LV should be 
-checked against the space occupied and modified accordingly. The test system 
-contains the following LVs:
+All logical volumes created on top of vg1 must be shrunk to the minimum size 
+possible, but before doing so, the filesystems need to be resized. The test system 
+contains four LVs. The notes that follow will take /dev/vg1/var as a reference.
 
 ```text
 [root@localhost tmp]# lvdisplay  | grep Path
@@ -68,8 +47,7 @@ contains the following LVs:
   LV Path                /dev/vg1/swap
 ```
 
-/dev/vg1/var will be taken as a reference. Mount the LV and check how much space
-is used on its filesystem.
+*df* shows the available space on the LV as seen from userspace:
 
 ```text
 [root@localhost tmp] mount /dev/vg1/var mnt
@@ -79,8 +57,9 @@ Filesystem           Size  Used Avail Use% Mounted on
 /dev/mapper/vg1-var  683G  1.8G  646G   1% /tmp/mnt
 ```
 
-It is obvious that there is a significant margin of unused space and
-*resize2fs* comes in handy for ext filesystems (from e2fsprogs package). It is important
+There is clearly a significant margin of unused space on *vg1/var* and
+*resize2fs*, from *e2fsprogs*, can be used to find out the minimum allowed size of 
+the ext filesystem on top of it. It is important
 to notice that resize2fs uses the filesystem blocksize as default unit (normally 4K for ext),
 and that the space reported by *df* is the usable space as seen by the user. The actual
 minimum size, metadata included, of an ext filesystem is not trivial to calculate:
@@ -98,9 +77,11 @@ consists of block groups, each one being divided as follows:
 Taking into consideration all contributions of the metadata requires an in-depth 
 understanding of the filesystem, but resize2fs comes to the rescue. In fact, 
 this calculation is done by function *calculate\_minimum\_resize\_size* 
-in [*resize/resize2fs.c*](http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/resize/resize2fs.c#n2769). If resize2fs is invoked with a command line argument  which is lower than the value returned
-by that function, it raises an error followed by the minimum allowed size of the
-filesystem, as the number of 4K blocks. Add a small margin and proceed.
+in [*resize/resize2fs.c*](http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/resize/resize2fs.c#n2769).
+If resize2fs is invoked with a command line argument  which is lower than the value returned
+by *calculate\_minimum\_resize\_size*, it raises an error followed by the minimum 
+allowed size of the filesystem, as the number of 4K blocks. To this value, I usually
+add a small safety margin.
 
 ```text
 [root@localhost tmp]# resize2fs /dev/mapper/vg1-var 10K
@@ -117,7 +98,8 @@ This roughly corresponds to 3.3GB.
 
 Resizing the LVs
 =======
-The LV can be resized accordingly.
+The LV can be resized accordingly. The procedure outlined so far applies to all
+the LVs, with the exception of the swap volume.
 
 ```text
 [root@localhost tmp]# lvreduce --size 5G /dev/vg1/var
@@ -128,10 +110,8 @@ Do you really want to reduce var? [y/n]: y
   Logical volume var successfully resized
 ```
 
-Check that the LV can be mounted correctly after being shrunk and that the sizes 
-are in line with the above. The swap filesystem is a special case, as the underlying
-LV can be shrunk straight away and a new swap filesystem created on top.
-
+The swap filesystem is a special case, as the underlying LV can be shrunk straight 
+away and a new swap filesystem created on top.
 
 ```text
 [root@localhost tmp]# lvreduce --size 1G /dev/vg1/swap
@@ -145,7 +125,7 @@ Do you really want to reduce swap? [y/n]: y
 
 Modifying the mapping of the Extents
 =======
-The current situation is shown below.
+The situation after resizing the LVs is the following: 
 
 ```text
 [root@localhost tmp]# lsblk
@@ -163,9 +143,12 @@ The LVs occupy around 30GB altogether, hence the underlying physical volume coul
 resized to match this value with the usual safety margin. Unfortunately, this operation 
 is not immediately straightforward because the physical extents (PE) which map 
 the logical extends (LE) are normally fragmented throughout the whole physical 
-volume. The physical extents must be therefore collected at the beginning of the PV. 
-*pvdisplay* and *pvs* can be used to verify how many PEs are used and how these are mapped on 
-the PV.
+volume. *pvresize* will refuse to shrink the physical volume if there are extends
+allocated beyond the point where the new end would be. The documentation however
+states that future versions of lvm2 will support automatic relocation, so this workflow
+might be change. For now, the physical extents must be collected at the beginning of the PV. 
+*pvdisplay* and *pvs* can be used to verify how many PEs are used and how these are 
+mapped on the volume.
 
 ```text
 [root@localhost tmp]# pvdisplay | grep Allocated
@@ -183,10 +166,10 @@ the PV.
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g 22839   975          0 free
 ```
 
-Luckily, this case is rather easy: PEs from 22494 to 22838 (345 PEs) are allocated for tmp 
-and swap. These should be moved right after var, starting from PE 473 until 817.
-This operation can be accomplished with *pvmove* command, which should result in
-the following situation.
+PEs belonging to the same LVs are normally clustered together as shown in the output above.
+PEs from 22494 to 22838 (345 PEs) are allocated for tmp and swap. These should be moved right 
+after var, starting from PE 473 until 817. This operation can be accomplished with 
+*pvmove* command.
 
 ```text
 [root@localhost tmp]# pvmove --alloc anywhere /dev/sda2:22494:22838 /dev/sda2:473-817
@@ -203,9 +186,7 @@ the following situation.
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g   818 22996          0 free
 ```
 
-At this point it would be a good idea to check that the logical volumes can still
-be mounted and that e2fsck does not report any problem. We have now 818x32 MiB 
-Physical Extents allocated, which roughly corresponds to 25GB.
+There are now 818x32 MiB Physical Extents allocated, which roughly corresponds to 25GB.
 
 
 ```text
@@ -259,8 +240,7 @@ flash wearout, the latter maybe not being that critical anymore in 2016.
 A flawless redefinition of the partition boundaries must take into consideration 
 the optimal I/O size.
 
-Anyhow, I will be continuing considering cylinder
-coordinates.
+Anyhow, I will be continuing considering cylinder coordinates.
 
 fdisk reports that a cylinder corresponds to ~7.84MiB. /dev/sda2 must be
 deleted and recreated with the same Start cylinder. The End cylinder is obviously 
@@ -289,9 +269,9 @@ vgchange -a n vg1
 dd if=/dev/sda conv=sync bs=128K count=328000| gzip -c  > /tmp/sda.img.gzip
 ```
 
-Make sure the live environment provides enough in-memory space for dumping the whole
+The live environment must provide enough in-memory space for dumping the whole
 compressed file. My configuration led to a 14GB image, and RAM was large enough
-to host this file. With more careful rounding, 
+to host it. With more careful rounding, 
 the compression ratio can be improved significantly. To test the restore procedure, 
 the image can be simply decompressed and written on the disk.
 

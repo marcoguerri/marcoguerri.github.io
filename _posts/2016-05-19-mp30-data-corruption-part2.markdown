@@ -11,7 +11,7 @@ in system RAM. This post is being developed and it is not in its final state."
 
 The hardware-software interface
 =======
-When an incoming frame is received on the 10 Gbit interface of the XGene-1,  the controller is capable
+When an incoming frame is received on the 10GbE interface of the XGene-1,  the controller is capable
 of mastering the bus and copying directly the data into system memory. The controller
 maintains a hardware ring buffer of available DMAable memory regions where to copy
 incoming frames. When the NIC runs out of regions, the hardware ring buffer is
@@ -102,30 +102,91 @@ relocation error ("unsupported RELA") that was being raised when loading the mod
 
 Results from the probe
 =======
-After having transferred around 5 GB of data coming from /dev/zero, there were
-21 *sk_buff* for which the CRC could not be validated.
+It is necessary to remark that my code is definitely not
+optimized for speed. When loading the kernel module and transferring data
+over the SFP+ interface, the *softirq* which is running the NAPI handler
+goes 100\% CPU utilization and the throughput drops to a bare ~8MB/s. Nonetheless,
+the jprobe does its job: after having transferred around 30 GB of data coming from 
+/dev/zero, there were 69 *sk_buff* for which the CRC could not be validated.
 
 ```
-[1429112.141847] Calculated CRC is a2d36408,  CRC in frame is 8b925034, phys: 0000008059441b02, 0000008059441b02
-[1429124.734079] Calculated CRC is af541ab8,  CRC in frame is 35bb8384, phys: 0000008059440a02, 0000008059440a02
-[1429124.779804] Calculated CRC is b5169760,  CRC in frame is 22b1ff7b, phys: 0000008056607002, 0000008056607002
-[1429156.658810] Calculated CRC is 9731232f,  CRC in frame is ceb0547f, phys: 00000000ec2a2382, 00000000ec2a2382
-[1429194.443860] Calculated CRC is 7e84ece9,  CRC in frame is 49aed70b, phys: 0000008059440182, 0000008059440182
-[1429293.466305] Calculated CRC is d168a9aa,  CRC in frame is b09764be, phys: 0000008056914582, 0000008056914582
-[1429305.970368] Calculated CRC is 25dfe9b6,  CRC in frame is 7b5392d0, phys: 0000008056912c02, 0000008056912c02
-[1429338.497401] Calculated CRC is 7dfa81c7,  CRC in frame is f9425f37, phys: 000000805640de82, 000000805640de82
-[1429367.510559] Calculated CRC is db90052d,  CRC in frame is e070a4ed, phys: 0000008052052c02, 0000008052052c02
-[1429436.927157] Calculated CRC is a312ca99,  CRC in frame is 18bdc290, phys: 00000080590dc502, 00000080590dc502
-[1429462.237861] Calculated CRC is 1b855975,  CRC in frame is f6895477, phys: 000000805230bc82, 000000805230bc82
-[1429484.245503] Calculated CRC is ba37b0de,  CRC in frame is 43b7f9dd, phys: 00000080590dab82, 00000080590dab82
-[1429528.236024] Calculated CRC is 28cf29ee,  CRC in frame is 4019e4a0, phys: 000000805e0ade82, 000000805e0ade82
-[1429532.481739] Calculated CRC is 7286d056,  CRC in frame is f68f7442, phys: 0000008056827882, 0000008056827882
-[1429535.701872] Calculated CRC is 59ff0487,  CRC in frame is 50619d6d, phys: 0000008058872382, 0000008058872382
-[1429584.127514] Calculated CRC is 169ae170,  CRC in frame is a626e1d, phys: 000000805e0a7882, 000000805e0a7882
-[1429606.691764] Calculated CRC is baa7fc63,  CRC in frame is 625b2601, phys: 00000080597d7002, 00000080597d7002
-[1429617.873490] Calculated CRC is 3f7b531d,  CRC in frame is c9c682fa, phys: 000000805914c502, 000000805914c502
-[1429636.993778] Calculated CRC is 7e16a012,  CRC in frame is 14e829e9, phys: 000000805670cd82, 000000805670cd82
-[1429660.829641] Calculated CRC is 93e5c42a,  CRC in frame is efb3ab24, phys: 0000008058870182, 0000008058870182
-[1429661.196027] Calculated CRC is 23835a97,  CRC in frame is d98aeddd, phys: 0000008056850182, 0000008056850182
+[1513584.424677] Calculated CRC is 50b477c,  CRC in frame is 5ccfcebe, phys: 0000008051da2c02, 0000008051da2c02
+[1513628.119962] Calculated CRC is fd4e97fc,  CRC in frame is e34ba66c, phys: 000000805e182382, 000000805e182382
+[1513656.995813] Calculated CRC is 8c725bf1,  CRC in frame is 12953b1d, phys: 000000804c145682, 000000804c145682
+[1513677.473247] Calculated CRC is 22665372,  CRC in frame is 12bfc315, phys: 000000804c7a7002, 000000804c7a7002
+[1513685.219367] Calculated CRC is 4ad9905d,  CRC in frame is 424e3943, phys: 000000804c145f02, 000000804c145f02
+[1513704.518584] Calculated CRC is f7d94c71,  CRC in frame is 988a84c8, phys: 00000080565dab82, 00000080565dab82
+[1513734.334714] Calculated CRC is beeeefff,  CRC in frame is ae1af712, phys: 000000805e0d6782, 000000805e0d6782
+[1513755.461138] Calculated CRC is 48897fa7,  CRC in frame is 555ad1f9, phys: 000000805e180182, 000000805e180182
+[1513771.513057] Calculated CRC is 60a4a609,  CRC in frame is e25854a, phys: 000000805e184582, 000000805e184582
+[1513775.525500] Calculated CRC is df2c9ff1,  CRC in frame is 237bdda9, phys: 000000804c7a4e02, 000000804c7a4e02
+[1513788.081796] Calculated CRC is 5b8b3f44,  CRC in frame is 9d9aa8b6, phys: 0000008051da1282, 0000008051da1282
+[1513811.017600] Calculated CRC is 45aa6eb,  CRC in frame is 555931a1, phys: 000000805e185682, 000000805e185682
+[1513841.440076] Calculated CRC is 1c8bf89e,  CRC in frame is 9e4491b, phys: 0000008051daab82, 0000008051daab82
+[1514118.357560] Calculated CRC is a318c885,  CRC in frame is f42b8a06, phys: 0000008051dad602, 0000008051dad602
+[1514152.821200] Calculated CRC is afbbefbf,  CRC in frame is d20bd83, phys: 000000804c7a5682, 000000804c7a5682
+[1514204.658209] Calculated CRC is 2e840af6,  CRC in frame is dc3c188, phys: 00000000e8085f02, 00000000e8085f02
+[1514280.402150] Calculated CRC is 70bf75a8,  CRC in frame is 4746cd57, phys: 000000805e183482, 000000805e183482
+[1514293.204168] Calculated CRC is d59ac729,  CRC in frame is df3665aa, phys: 00000080565b6782, 00000080565b6782
+[1514308.288253] Calculated CRC is f60cb887,  CRC in frame is 106a9a3e, phys: 000000805e187882, 000000805e187882
+[1514414.397324] Calculated CRC is 576388e9,  CRC in frame is 3eb98801, phys: 0000008058877882, 0000008058877882
+[1514471.528828] Calculated CRC is bb9f8def,  CRC in frame is bbba15c8, phys: 0000008058879202, 0000008058879202
+[1514516.607016] Calculated CRC is 266f0f3e,  CRC in frame is 9ef16e9d, phys: 0000008056917002, 0000008056917002
+[1514738.814471] Calculated CRC is 91581eb8,  CRC in frame is 58275a3a, phys: 000000805e09bc82, 000000805e09bc82
+[1514803.825897] Calculated CRC is 8e8f8b3e,  CRC in frame is d2c11762, phys: 000000805695de82, 000000805695de82
+[1514814.908076] Calculated CRC is 7b9f3d62,  CRC in frame is da57fd3f, phys: 000000805695e702, 000000805695e702
+[1514920.876054] Calculated CRC is 1e82d02c,  CRC in frame is b5ce0013, phys: 000000805636ab82, 000000805636ab82
+[1514962.499993] Calculated CRC is 952f912,  CRC in frame is c3f14991, phys: 0000008056574582, 0000008056574582
+[1515026.855480] Calculated CRC is 1f7337ae,  CRC in frame is 107bb58d, phys: 0000008056267002, 0000008056267002
+[1515077.772721] Calculated CRC is 6666269a,  CRC in frame is 8661113c, phys: 000000805da19a82, 000000805da19a82
+[1515114.491968] Calculated CRC is b56d2893,  CRC in frame is 672aad0, phys: 00000000ec27a302, 00000000ec27a302
+[1515252.754865] Calculated CRC is 6d9312cf,  CRC in frame is d64b682e, phys: 000000805e09ef82, 000000805e09ef82
+[1515254.340562] Calculated CRC is 32b1b18c,  CRC in frame is f345c345, phys: 000000805e0a9a82, 000000805e0a9a82
+[1515286.577657] Calculated CRC is d6852884,  CRC in frame is 956b6129, phys: 000000805691de82, 000000805691de82
+[1515300.826041] Calculated CRC is c4f9b353,  CRC in frame is f5ed5981, phys: 000000805da1ef82, 000000805da1ef82
+[1515304.744759] Calculated CRC is 2a1eb8e2,  CRC in frame is d071ad0f, phys: 0000008056913d02, 0000008056913d02
+[1515307.938969] Calculated CRC is 6b526186,  CRC in frame is 3102a030, phys: 000000805e0a1b02, 000000805e0a1b02
+[1515317.962076] Calculated CRC is 7b3e46a5,  CRC in frame is 569a89f5, phys: 000000805e0a6782, 000000805e0a6782
+[1515454.116768] Calculated CRC is afd197fc,  CRC in frame is 8b55d2c3, phys: 0000008056367882, 0000008056367882
+[1515735.044157] Calculated CRC is 2157a3c4,  CRC in frame is f5c8fb56, phys: 000000805682e702, 000000805682e702
+[1515741.179024] Calculated CRC is b1ddda68,  CRC in frame is fad5d78, phys: 0000008056826782, 0000008056826782
+[1515759.376832] Calculated CRC is 26bed728,  CRC in frame is ed2e98a0, phys: 0000008056821282, 0000008056821282
+[1515863.004366] Calculated CRC is ce0240b6,  CRC in frame is 84591d31, phys: 000000805e1fc502, 000000805e1fc502
+[1515872.097586] Calculated CRC is c342d27b,  CRC in frame is 779c64fe, phys: 000000804c149202, 000000804c149202
+[1515929.222792] Calculated CRC is 4bbaaf81,  CRC in frame is 9cb81ae, phys: 000000805887e702, 000000805887e702
+[1516012.344787] Calculated CRC is 4f01dd3b,  CRC in frame is 78167e55, phys: 00000000e0061b02, 00000000e0061b02
+[1516121.978341] Calculated CRC is fb1f820,  CRC in frame is 7b7381e1, phys: 00000080565f1b02, 00000080565f1b02
+[1516178.439118] Calculated CRC is e4e2de8c,  CRC in frame is 877f4a35, phys: 00000080565b8102, 00000080565b8102
+[1516206.341141] Calculated CRC is defee768,  CRC in frame is 2dfbc2d1, phys: 0000008058876782, 0000008058876782
+[1516211.872288] Calculated CRC is 703f01bc,  CRC in frame is 4f2e8139, phys: 000000805887b402, 000000805887b402
+[1516565.746493] Calculated CRC is b5a1d5e4,  CRC in frame is d344a0cd, phys: 00000080565b7002, 00000080565b7002
+[1516706.461049] Calculated CRC is 4ab48c4a,  CRC in frame is becebe9, phys: 000000805655cd82, 000000805655cd82
+[1516722.705537] Calculated CRC is e70f7991,  CRC in frame is 200f0f12, phys: 000000804c148982, 000000804c148982
+[1516736.264293] Calculated CRC is 28b70c98,  CRC in frame is 765da62b, phys: 000000805657b402, 000000805657b402
+[1516776.113658] Calculated CRC is 12d507af,  CRC in frame is b9cc2bb1, phys: 0000008056572382, 0000008056572382
+[1516787.856475] Calculated CRC is 783818f7,  CRC in frame is 9919feae, phys: 000000805204ef82, 000000805204ef82
+[1516849.662018] Calculated CRC is 3bd2e77f,  CRC in frame is a20c2c81, phys: 000000805655e702, 000000805655e702
+[1516874.454143] Calculated CRC is 11b75802,  CRC in frame is dd6d359e, phys: 0000008056556782, 0000008056556782
+[1516968.868670] Calculated CRC is 62181f8b,  CRC in frame is 4d3608fa, phys: 000000805e1b4582, 000000805e1b4582
+[1517037.373283] Calculated CRC is 57dfe616,  CRC in frame is d73633ec, phys: 000000805e1db402, 000000805e1db402
+[1517068.822751] Calculated CRC is 7648dad6,  CRC in frame is dc051fd1, phys: 000000805e1dd602, 000000805e1dd602
+[1517102.258242] Calculated CRC is 1c2666e4,  CRC in frame is 36c1f32d, phys: 00000080563c2c02, 00000080563c2c02
+[1517197.593906] Calculated CRC is 8a6e37a5,  CRC in frame is 2a98653a, phys: 0000008051ddde82, 0000008051ddde82
+[1517297.532873] Calculated CRC is 67f2ce1d,  CRC in frame is b1043dfe, phys: 0000008052045f02, 0000008052045f02
+[1517505.224208] Calculated CRC is c0ec4c99,  CRC in frame is 356994c7, phys: 000000804c7abc82, 000000804c7abc82
+[1517505.906874] Calculated CRC is d28a702b,  CRC in frame is 89c3393b, phys: 00000080563ce702, 00000080563ce702
+[1517506.992264] Calculated CRC is 3a2d2727,  CRC in frame is 14c51c18, phys: 000000805f18de82, 000000805f18de82
+[1517573.021449] Calculated CRC is 119b2bde,  CRC in frame is 11f68161, phys: 0000008051dd0a02, 0000008051dd0a02
+[1517596.711465] Calculated CRC is ecd8f12e,  CRC in frame is bd01389d, phys: 000000805f186782, 000000805f186782
+[1517677.146006] Calculated CRC is e0ceaa33,  CRC in frame is 9bb44cc1, phys: 000000805e18de82, 000000805e18de82
+[1517779.738701] Calculated CRC is bae60ada,  CRC in frame is d4faba0c, phys: 000000805691b402, 000000805691b402
 ```
+
+Considering that the system is running with 64K pages, the distribution of the
+errors is the following:
+
+The following conclusions can be drawn from the dump above:
+
+    * Most of the frames are allocated in in the memory area 
+
 
