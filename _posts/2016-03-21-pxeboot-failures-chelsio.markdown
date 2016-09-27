@@ -4,12 +4,12 @@ title:  "pxelinux 6.03 boot failure with Chelsio T520-LL-CR"
 date:   2016-03-20 21:00:00
 categories: jekyll update
 published: yes
-summary: "This a collection of some notes I have taken during an interesting debugging 
-session aimed at identifying the root cause of a regression the followed the update 
+summary: "This a collection of notes I have taken during an interesting debugging 
+session aimed at identifying the root cause of a regression that followed the update 
 of the network boot infrastructure at CERN to PXELINUX 6.03. It was an interesting 
 dive into PXELINUX internals, down to the point where it meets the hardware. As
 a side note, when reading Eric Raymond's \"The Cathedral and the Bazaar\", I 
-especially remember the explanation why closing hardware driver's sources does not make sense.
+remember him explaining why closing hardware driver's sources does not make much sense.
 Raymond was presenting an intermediate model in-between open and closed source,
 i.e. having a closed source ROM and opening the interface to the ROM. I think
 this story is a good example on why this latter approach does nothing more
@@ -56,8 +56,8 @@ was the following:
 advanced stage of the process
 
 Limited control basically means "don't waste other's people time" control.
-Anyway, if you don't have a dog, you go hunt with the cat. At a second thought,
-some of these hurdles could be overcome without too much effort. After deciding
+At a second thought, some of these hurdles could be overcome without too much effort. 
+After deciding
 to focus on the first instance of the failure, the Chelsio T520-LL-CR, I set out
 on a journey that turned out very interesting.
 
@@ -76,15 +76,15 @@ after relinquishing control to pxelinux, there is no network activity whatsoever
 DHCP and TFTP servers
 =======
 The following piece that I needed was my own DHCP/TFTP infrastructure, so that
-I could bypass the official servers and point directly to my test instances where
+I could bypass the production servers and point directly to my test instances where
 I could deploy a custom pxelinux. This also turned out doable. What was necessary was
 the following:
 
 * Setting up a DHCP/TFTP server
 * Adding the DHCP server to a list that would be taken into consideration by
-the DHCP Relays when routing DHCP traffic (you need a good reason to be in that
-list!)
-* Disabling any kind of DHCP answer from the official servers for the host under test
+   the gateways when relaying DHCP traffic (you need a good reason to be in 
+   that list!)
+* Disabling any kind of DHCP answer from the production servers for the host under test
 * Configuring my own DHCP instance to provide an answer for the host under
 test, pointing to the test TFTP server and custom pxelinux.
 

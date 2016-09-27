@@ -129,7 +129,7 @@ Since I am tracing the Python interpreter I am expecting to see invocations of
 CPython internal methods. Luckily gdb is extremely smart and helps a lot in mapping
 what is happening in the Python interpreter with the high level source code.
 Having trapped *wait4* invocations, the first item I expect to see is a libc
-control path that indeed leads to that syscall:
+control path that leads to that syscall:
 
 ```text
 #0  0x00007ffff7bce47c in __libc_waitpid (pid=19042, stat_loc=0x7fffffffd16c, options=1) at ../sysdeps/unix/sysv/linux/waitpid.c:31
