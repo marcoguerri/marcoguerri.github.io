@@ -50,8 +50,6 @@ the kernel when needed. The most relevant fields of a *dentry* are the following
   the *inode* but rather of the *dentry*.
 
 
-
-
 Directories structure on the filesystem
 =======
 As mentioned before, directories are also represented on the filesystem with 
@@ -75,16 +73,18 @@ example the following hierarchy:
 
 ```
 temp
-├── [13261914]  file1
-├── [13279614]  temp2
-└── [13279615]  temp3
+ [13261914]  file1
+ [13279614]  temp2
+ [13279615]  temp3
 ```
 
 *debugfs* allows to dump the block numbers referenced by an inode representing a 
-file or a directory:
+file or a directory. In this case, directory *temp* has inode number 13279608 
+(*ls* with *-i* flag displays such information).
 
 ```
 $ sudo debugfs /dev/mapper/debian-debian--home
+debugfs:  stat <13279608>
 Inode: 13279608   Type: directory    Mode:  0755   Flags: 0x80000
 Generation: 791866861    Version: 0x00000000:00000004
 User:  1000   Group:  1000   Size: 4096
@@ -100,20 +100,18 @@ EXTENTS:
 (0):52965455
 ```
 
-This directory is stored in block (or extent, in this
-case the underlying device is a LVM volume so the term extent is more appropriate
-) 52965455. What is stored at that location? Let's first check the filesystem block
-size:
+This directory is stored in block 52965455. How does it look like?
+Let's first check the filesystem block size:
 
 ```
 $ sudo dumpe2fs /dev/mapper/debian-debian--home  | grep "Block size"
 dumpe2fs 1.42.12 (29-Aug-2014)
 Block size:               4096
 ```
-Now, extent 52965455. in 4K blocks corresponds to sector *52965455\*8*, i.e. 
-423723640, which can be dumped with *dd*. *stat* reports a size of 4K, which is the graularity 
-at the filesystem level (block), but the relevant data is most likely less than 4096 
-bytes.
+Extent 52965455 corresponds to sector *52965455\*8* when using 4K blocks, i.e. 
+423723640, which can be dumped with *dd*. *stat* reports a size of 4K, which is
+the allocation unit at the filesystem level, but the relevant data is most 
+likely less than 4096 bytes.
 
 ```
 $ sudo dd if=/dev/mapper/debian-debian--home skip=423723640 bs=512 count=4 of=block.bin

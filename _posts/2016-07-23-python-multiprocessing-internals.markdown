@@ -1,9 +1,9 @@
 ---
 layout: post
-title: "The lifetime of Python multiprocessing.Process"
+title: "The lifetime of a Python multiprocessing.Process"
 date:   2016-07-24 20:00:00
 categories: jekyll python multiprocessing
-summary: "Few notes on the mechanisms that regulate the lifetime
+summary: "Some notes on the mechanisms that regulate the lifetime
 of a Python multiprocessing Process, investigating in particular what happens
 when the interpreter terminates."
 ---
