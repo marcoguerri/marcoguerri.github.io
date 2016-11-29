@@ -5,10 +5,10 @@ date:   2016-11-26 08:00:00
 published: yes
 categories: programming cpp
 pygments: true
-summary: "A collection of some notes on move semantics, rvalue reference, universal
-reference and forwarding. Just to consolidate some knowledge that I don't get
-to apply on daily basis and, as a consequence, tends to fade out a bit in the long
-run. "
+summary: "A collection of some notes on move semantics, rvalue reference, type
+deduction and forwarding, just to consolidate some knowledge on C++11/14. The content
+of this post is mostly a re-elaboration of the information provided by
+Scott Meyer's \"Effective Modern C++\""
 
 ---
 
@@ -26,28 +26,23 @@ public:
   MyClass() {
     cout << "Default constructor " << endl;
   }
-
   MyClass(int value) {
     cout << "Constructor " << value <<  endl;
     this->_value = value;
   }
-
   MyClass(MyClass &rhs) {
      cout << "Copy constructor" << endl;
      this->_value = rhs._value;
   }
-
   MyClass& operator=(MyClass &rhs) {
       cout << "Copy assignment operator" << endl;
       this->_value = rhs._value;
   }
-
   MyClass& operator=(MyClass &&rhs) {
       cout << "Move assignment operator" << endl;
       this->_value = rhs._value;
       rhs._value = -1;
   }
-
   MyClass(MyClass &&rhs) {
       cout << "Move constructor" << endl;
       this->_value = rhs._value;
@@ -59,9 +54,8 @@ public:
 };
 ```
 
-I won't go into detail on what the difference is between *rvalue* and *lvalue*,
-I will limit myself to summing up some construction scenario. Some first basic
-cases, with the code on the left and the output on the right.
+Some first basic construction scenarios are shown below, with the code on the 
+left and the output on the right.
 
 ```
  1  MyClass a(10);    Constructor 10
@@ -77,15 +71,19 @@ out is the invocation of the copy constructor on line 2 and 4.
 In the context of C++11, the introduction of rvalue references allows to implement
 move semantics: when constructing an object from a reference to an rvalue, the code
 can transfer ownership of resources from that argument to the object being constructed, 
-with the awareness that the original one needs to be left in a consistent state but the caller
-will not expect it to hold an initialized value anymore. This
-is exactly what is being done in a very simplified way in the move constructor
+with the awareness that the original one needs to be left in a consistent state but 
+the caller will not expect it to hold an initialized value anymore. As a matter
+of fact, with a proper rvalue, the caller will not even be able to tell if the object
+has been modified or not, due to the temporary nature of rvalues. 
+\\
+\\
+A simplified example of move semantics is implemented the move constructor
 of *MyClass*. The old object loses ownership of a certain resource while still
-being left in a consistent state. In this case there is solely an integer value moved around:
-a more meaningful example would be the transfer of ownership of a dynamically allocated
-buffer, even though modern C++ offers plenty of ways to avoid having to deal with
-memory bookkeeping. In the examples below, lines 2 and 4 result
-in a call to the move assignment operator and move constructor.
+being left in a consistent state. In this case there is solely an integer value 
+moved around: a more meaningful example would involve transferring ownership of a 
+dynamically allocated buffer while setting the old object's pointer to *nullptr*.
+In the examples below, lines 2 and 4 result in a call to the move assignment 
+operator and move constructor.
 
 ```
  1  MyClass c(10);           Constructor 10
@@ -102,10 +100,38 @@ in a call to the move assignment operator and move constructor.
 One remark must be made concerning the creation on line 4: here a temporary 
 object is created, which is again an rvalue and object *a* is move constructed from it.
 This is however not the default behaviour of gcc (version *4.9* in my case). The 
-compiler, if not asked otherwise, optimizes away the creation of the temporary. 
-To disable this behavior, the *-fno-elide-constructors* flag must be used.
-The idea behind move semantics is to avoid the overhead of copy constructing an object
-when not strictly necessary. 
+compiler, if not asked otherwise, optimizes away the creation of the temporary.
+Something very similar happens with *RVO* (Return Value Optimization) and *NRVO*
+(Named return value optimization). *-fno-elide-constructors* will disable this behavior.
+
+Moving from lvalues: std::move and std::forward
+=======
+Sometimes it might be necessary to treat *lvalues* as *rvalues*, thus allowing the 
+function being invoked to move from a specific argument. *std::move* does exactly this,
+by returning an *rvalue reference* to its argument, which 
+will eventually bind to functions accepting *rvalues* like a move constructor (unless
+there is a *const* qualifier involved at some point). As *std::move*, *std::forward*
+is also responsible for casting the argument to an rvalue, but it does so
+only if certain conditions are met. The first and foremost scenario where
+*std::forward* comes to play is function templates which take universal references
+as arguments.
+
+
+Universal references and type deduction
+=======
+In C++98, type deduction is used only for function templates (not even for class
+templates, as I will show later). The usual signature of a function template is
+the following:
+
+```c++
+template <typename T> void func(ParamType arg) 
+{
+    [...]
+}
+```
+As templating is a sort of static dispatch at compile time, when invoking *func*
+the compiler will deduce T and the actual type of arg, regardless of what
+ParamType says. 
 
 [Work in progress...]
 
