@@ -86,6 +86,7 @@ a more meaningful example would be the transfer of ownership of a dynamically al
 buffer, even though modern C++ offers plenty of ways to avoid having to deal with
 memory bookkeeping. In the examples below, lines 2 and 4 result
 in a call to the move assignment operator and move constructor.
+
 ```
  1  MyClass c(10);           Constructor 10
  2  c = MyClass(20);         Constructor 20
@@ -97,13 +98,16 @@ in a call to the move assignment operator and move constructor.
  8                           Destructor
  9                           Destructor
 ```
+
 One remark must be made concerning the creation on line 4: here a temporary 
 object is created, which is again an rvalue and object *a* is move constructed from it.
 This is however not the default behaviour of gcc (version *4.9* in my case). The 
 compiler, if not asked otherwise, optimizes away the creation of the temporary. 
 To disable this behavior, the *-fno-elide-constructors* flag must be used.
 The idea behind move semantics is to avoid the overhead of copy constructing an object
-when not strictly necessary. Let's consider for example the two functions below:
+when not strictly necessary. 
+
+[Work in progress...]
 
 
 
