@@ -20,7 +20,6 @@ copy assignment operator and move assignment operator.
 
 ```c++
 class MyClass {
-
 public:
   int _value;
   MyClass() {
@@ -76,7 +75,6 @@ the caller will not expect it to hold an initialized value anymore. As a matter
 of fact, with a proper rvalue, the caller will not even be able to tell if the object
 has been modified or not, due to the temporary nature of rvalues. 
 \\
-\\
 A simplified example of move semantics is implemented the move constructor
 of *MyClass*. The old object loses ownership of a certain resource while still
 being left in a consistent state. In this case there is solely an integer value 
@@ -106,7 +104,7 @@ Something very similar happens with *RVO* (Return Value Optimization) and *NRVO*
 
 Moving from lvalues: std::move and std::forward
 =======
-Sometimes it might be necessary to treat *lvalues* as *rvalues*, thus allowing the 
+Sometimes it becomes necessary to treat *lvalues* as *rvalues*, thus allowing the 
 function being invoked to move from a specific argument. *std::move* does exactly this,
 by returning an *rvalue reference* to its argument, which 
 will eventually bind to functions accepting *rvalues* like a move constructor (unless
@@ -119,9 +117,10 @@ as arguments.
 
 Universal references and type deduction
 =======
-In C++98, type deduction is used only for function templates (not even for class
-templates, as I will show later). The usual signature of a function template is
-the following:
+Type deduction refers to the operation of statically dispatching a call at compile
+time based on the types involved in the invocation. The first and foremost scenario
+where the compiler implements type deduction is function templates, which are 
+normally declared as follows.
 
 ```c++
 template <typename T> void func(ParamType arg) 
@@ -129,9 +128,27 @@ template <typename T> void func(ParamType arg)
     [...]
 }
 ```
-As templating is a sort of static dispatch at compile time, when invoking *func*
-the compiler will deduce T and the actual type of arg, regardless of what
-ParamType says. 
+*ParamType* is basically *T* enriched with qualifiers (e.g. *const*), references,
+or pointers. Considering the template function defined above, there are three 
+possible scenarios:
+
+  * ParamType is a pointer or a reference, but does not have the form of *T&&*
+   (which instead would be a universal reference): in this case the reference part
+    of the argument passed to the function can be ignored and *T* deduced 
+    consequently.
+
+  * ParamType is a universal reference, i.e. a reference which binds to both
+    lvalues and rvalues (which appears as *T&&*). If the argument of the call is 
+    an *lvalue*, both *T* and *ParamType* are lvalue references. On the contrary
+    if the argument is an *rvalue* the analysis of case 1 applies.
+
+  * ParamType is neither a pointer nor a reference. In this case, the argument
+    is passed by value. If the argument is a reference, the reference part can
+    be ignored to deduce *T*. *arg* is copy constructed an therefore independent
+    of any additional qualifier like *const* or *volatile* (unless, in case of
+    a pointer, *const* refers to the data being pointed to).
+
+In the context of C++, type deduction is extended also to *auto* type and *decltype*. 
 
 [Work in progress...]
 
