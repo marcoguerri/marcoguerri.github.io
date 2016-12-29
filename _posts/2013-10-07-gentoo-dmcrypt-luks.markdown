@@ -322,7 +322,7 @@ EOF_init
 chmod a+x init
 ```
 The actual initrd image is then built with the following commands (cpio might
-need to be invoked with the full path on the stage3 binary).
+need to be invoked with the full path of the stage3 binary).
 
 ```text
 cd /mnt/gentoo/boot/initram
@@ -332,8 +332,8 @@ find . | cpio --quiet -o -H newc | gzip -9 > /mnt/gentoo/boot/initramfs
 
 Final steps
 ===========
-Once created the initrd, 
-grub.conf should be configured to load the kernel image and the initrd. 
+Once created the initrd, grub.conf should be configured to load the kernel image 
+and the initrd. 
 
 
 ```text

@@ -11,8 +11,8 @@ dive into PXELINUX internals, down to the point where it meets the hardware. As
 a side note, when reading Eric Raymond's \"The Cathedral and the Bazaar\", I 
 remember him explaining why closing hardware driver's sources does not make much sense.
 Raymond was presenting an intermediate model in-between open and closed source,
-i.e. having a closed source ROM and opening the interface to the ROM. I think
-this story is a good example on why this latter approach does nothing more
+i.e. having a closed source ROM and opening the interface to the ROM. I believe
+this experience is a good example of why this latter approach does nothing more
 than shifting the problem."
 ---
 
@@ -42,10 +42,8 @@ The components involved
 The infrastructure for PXE boot involves several components: a NIC,
 with its PXE-compliant firmware, a DHCP server, a TFTP server, a PXE implementation
 that does the heavy lifting, that is, loading and booting the kernel and initrd,
-and the network in-between the clients/servers. My group, Computing Facilities,
-was involved as it was clear that the issue was confined to specific NIC types.
-At first, I was skeptical that any useful debugging could happen. The situation
-was the following:
+and the network in-between the clients/servers. At first, I was skeptical that 
+any useful debugging could happen. The situation was the following:
 
 * Limited control over the network infrastructure (different team responsible for that)
 * No control over the firmware of the NIC (proprietary black box)
@@ -55,16 +53,11 @@ was the following:
 * All the freedom to change kernel/initrd, but that was already at a far too 
 advanced stage of the process
 
-Limited control basically means "don't waste other's people time" control.
 At a second thought, some of these hurdles could be overcome without too much effort. 
-After deciding
-to focus on the first instance of the failure, the Chelsio T520-LL-CR, I set out
-on a journey that turned out very interesting.
-
 
 A quick look at the network
 =======
-The first approach that I tried was to dump network traffic, in case something
+The first approach I tried was to dump network traffic, in case something
 obvious would turn up. I could not dump the traffic on the machine itself during
 PXE boot, and dumping at the other end of the communication was not a good idea
 either, so I asked the network team to set up port mirroring towards a host over
@@ -80,17 +73,12 @@ I could bypass the production servers and point directly to my test instances wh
 I could deploy a custom pxelinux. This also turned out doable. What was necessary was
 the following:
 
-* Setting up a DHCP/TFTP server
-* Adding the DHCP server to a list that would be taken into consideration by
-   the gateways when relaying DHCP traffic (you need a good reason to be in 
-   that list!)
+* Bringing up a DHCP/TFTP server
+* Adding the DHCP server to a list of machines to which DHCP traffic would be relayed
+   (you need a good reason to be in that list!)
 * Disabling any kind of DHCP answer from the production servers for the host under test
 * Configuring my own DHCP instance to provide an answer for the host under
 test, pointing to the test TFTP server and custom pxelinux.
-
-Once the test environment was in place, the debugging could start.
-
-
 
 Interaction with the machine
 =======
@@ -100,8 +88,7 @@ in the Data Centre. Clearly, you don't want to stand there with your keyboard/mo
 for long time, as the noise, heat, air exhausted by the systems, all contribute
 to make the experience very tiring. The obvious way to proceed was to use KVM over
 IP, in order to have complete control over the system, and to perform power
-management operations via IPMI. With such a setup, I didn't have to leave the office
-for a second :)
+management operations via IPMI.
 
 
 Deploying the correct binary
@@ -109,8 +96,8 @@ Deploying the correct binary
 pxelinux is part of syslinux project and it comes in two different flavors:
 *pxelinux.0* and *lpxelinux.0*. During this experiment, I was compiling and 
 testing the 32bits legacy version of pxelinux and I was working on git commit 138e850f.
-The first binary that I tried to deploy with my test environment was pxelinux.0,
-and this worked flawlessly, I could boot without any problem. With lpxelinux.0 instead, the
+The first binary that I tried to deploy with my test environment was pxelinux.0.
+That worked flawlessly, I could boot without any problem. With lpxelinux.0 instead, the
 behavior was identical to the production version: "Failed to load ldlinux.c32",
 and reboot. My understanding of the difference between the two was limited, but
 the idea is the following:
@@ -215,7 +202,7 @@ start_ldlinux [./core/elflink/load_env32.c]
 
 The upper layer of pxelinux was trying to load
 ldlinux.c32 via a file-like API that was abstracting the fact that the file was
- sitting on a remove TFTP server.
+ sitting on a remote TFTP server.
 In fact, many data structures and functions are involved in file operations,
 nothing very much different then what you would find on a Linux OS
 and libc. It is actually interesting to dive a bit deeper.
@@ -254,7 +241,7 @@ The function *opendev* shown below looks for a *file_info* structure available
 in the statically allocated array *__file_info* and sets the input operations 
 pointer, *iop*, to *__file_dev* . It then returns the corresponding fd 
 (the index within *__file_info*). From now on,
-the attempts to read from a file associated with the fd returned, will go
+any attempt to read from a file associated with the fd returned, will go
 through *__file_dev.read* function pointer, that is *__file_read*.
 
 ```c
@@ -471,7 +458,7 @@ cat ./bios/core/lpxelinux.map | grep -i 108e14
 0x0000000000108e14                tftp_open
 ```
 
-The control path proceeds as follows, without any error whatsover.
+The control path proceeds as follows, without any error whatsoever.
 
 ```text
  tftp_open [core/fs/pxe/tftp.c.]
@@ -623,8 +610,7 @@ in the stack. At this point <b>I realized that one of my assumptions, that no
 data was being sent/received from the NIC, was wrong</b>. When looking at the
 traffic dump, in order to filter out  uninteresting network activity, I was
 querying by IP, basically ruling out all traffic at the data link layer, ARP
-requests included! It was a quite a stupid mistake and in fact, after having another
-look at the network dump, the situation was pretty clear.
+requests included. After having another look at the network dump, the situation was pretty clear.
 
 <div align="center">
 <a id="single_image" href="/assets/img/pxe/PXETraffic.png">
@@ -641,7 +627,7 @@ Receiving data - Interrupt Service Routine
 =======
 The interrupt service routine used by *lpxelinux* is defined in *core/pxeisr.inc*.
 The ISR calls the *PXENV_UNDI_ISR* hook exported by the PXE capable firmware and
-then check one of the return flags, *PXENV_UNDI_ISR_OUT_OURS*, to make sure
+then checks one of the return flags, *PXENV_UNDI_ISR_OUT_OURS*, to make sure
 that the interrupt "belongs to us". From the PXE specification
 
 ```text
@@ -703,14 +689,13 @@ at different call depths as shown in the trace below.
                  pxe_start_isr [core/fs/pxe/isr.c]
 ```
 
-The most important routines which are responsible for setting up interrupts are
-*pxe_init_isr* and *pxe_start_isr*. The former starts the *pxe_receive_thread*
+*pxe_init_isr* starts the *pxe_receive_thread*
 thread, which basically loops indefinitely, first suspending on the
-*pxe_receive_thread_sem* semaphore and, when trigered, calling *pxe_process_irq*.
+*pxe_receive_thread_sem* semaphore and, when triggered, calling *pxe_process_irq*.
 
-The latter starts the *pxe_poll_thread* and detects whether the hardware correctly
+*pxe_start_isr* starts the *pxe_poll_thread* and detects whether the hardware correctly
 supports interrupts or polling is to be preferred. In the second case,
-*pxe_poll_thread* becomes responsible of handling interrupts. As shown in the debug
+*pxe_poll_thread* becomes responsible for handling interrupts. As shown in the debug
 trace above, *pxe_start_isr* detects that polling is to be preferred due to
 the *PXE_UNDI_IFACE_FLAG_IRQ* flag returned directly by the UNDI firmware. The code
 of the polling thread is shown below.
@@ -794,7 +779,7 @@ with
 return 1;
 ```
 
-Reboot and... it works! Loading initramfs, kernel and booting! Apparently, the flag
+Reboot and... it worked! Loading initramfs, kernel and booting! Apparently, the flag
 returned by the UNDI firmware was always cleared, preventing lpxelinux
 from properly handling incoming data. The firmware was probably ignoring altogether
 that flag, which worked as long as pxelinux was not involved in the interrupt handling.
@@ -813,16 +798,14 @@ is clearly to file a bug report to the owners of the code, hoping there is enoug
 on their side to fix the issue in a timely manner. This is a great example
 of how the *widget frosting* business model explained by Eric Raymond in *The Cathedral
 and the Bazaar* would simplify everybody's life. This indirect-sale value model
-applies specifically to hardware manufacturers, for which, developing and maintaining the software/firmware
+applies specifically to hardware manufacturers, for whom, developing and maintaining the software/firmware
 is often just an overhead. The number of benefits that would arise as a consequence of 
-releasing the software under an open license are to be seriously taken into consideration. For the moment,
-let's fire up the email client (rather than the IDE) and beg for a fix...
-
+releasing the software under an open license are to be seriously taken into consideration.
 
 Updates
 =======
-   * It turns out the QLogic cLOM8214 are affected by the same issue, and can boot
+   * It turns out the QLogic cLOM8214 is affected by the same issue, and can boot
 just fine if *PXENV\_UNDI\_ISR\_OUT\_OURS* is  always set. However, this NIC has been
-discontinued and no fixes whatsover will be provided. *Widget frosting*, anybody...?
+discontinued and no fixes whatsoever will be provided. Speaking of *widget frosting*...
    * Chelsio has provided a firmware fix which allows to boot correctly with lpxelinux 6.03
 
