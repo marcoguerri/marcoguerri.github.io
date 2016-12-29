@@ -2,7 +2,7 @@
 layout: post
 title:  "pxelinux 6.03 boot failure with Chelsio T520-LL-CR"
 date:   2016-03-20 21:00:00
-categories: jekyll update
+categories: linux pxe datacenter
 published: yes
 summary: "This a collection of notes I have taken during an interesting debugging 
 session aimed at identifying the root cause of a regression that followed the update 
