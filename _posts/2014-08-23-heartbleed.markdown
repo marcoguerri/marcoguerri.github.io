@@ -122,13 +122,14 @@ openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 ```
 
 The openssl version installed on my machine is therefore not vulnerable. In order to
-restore the bug, the package must be rebuilt without applying
-the patch. When the sources of the package are downloaded via apt, the patches are applied 
-automatically. The easiest way to build a vulnerable binary it to apply a 
-reverse patch with the following commands:
+restore the bug, the package must be rebuilt without applying the fix. The easiest
+way to do so is via a reverse patch, since by default apt applies
+automatically all the patches included in the package after having fetched the sources
+via *apt-get source*.
 
 ```text
 $ apt-get source openssl
+[...]
 cd openssl-1.0.1e/debian/patches/
 interdiff CVE-2014-0160.patch /dev/null > hb_reversed.patch
 mv hb_reversed.patch ../../
@@ -220,7 +221,7 @@ to the nginx instance, making sure the server echoes back the payload of the mes
 0x18                    # Type: Heartbeat
 0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2)
 0x00 0x17               # Record length, size of the heartbeat message
-0x01                    # hearbeat message type: request
+0x01                    # heartbeat message type: request
 0x00 0x04               # Payload size
 0xDE 0xAD 0xBE 0xEF     # Payload
 0xAB 0x9A 0xC1 0x97     # 16 bytes random padding

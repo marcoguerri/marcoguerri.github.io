@@ -2,12 +2,12 @@
 layout: post
 title:  "Gentoo full disk encryption with dm-crypt/LUKS"
 date:   2013-10-07 13:31:48
-categories: jekyll update
-summary: "This post sums up the installation procedure of a Gentoo Linux distribution with
-encrypted root and swap partitions using LUKS and dm\_crypt. Everything is
-done manually (kernel compilation, creation of the initrd): the aim is 
-therefore to show what happens under the hood when you click on the encryption checkbox 
-in the bottom of a common disk partitioning menu during Linux installation."
+categories: linux security
+summary: "This post covers the installation procedure of Gentoo Linux with
+encrypted root and swap partitions using LUKS and dm\_crypt. Each step is carried out
+manually (kernel compilation, creation of the initrd): the aim is to give an insight 
+into what happens under the hood when encryption is enabled in the disk partitioning 
+menu during the installation of a Linux distro."
 ---
 
 
@@ -28,21 +28,22 @@ paritioning the drive, compiling the Kernel and setting the initial ramdisk,
 several different steps must be carried out.
 
 I went through the whole process inside a Virtual Machine, using VMWare Player 
-as hypervisor. The Gentoo live image I have used is the weekly build 
-[install-x86-minimal-20130820](#sha512). Working "remotely" through ssh is much more convenient. RSA/DSA ssh keys must be generated with ssh-keygen, a root password set and sshd daemon started.
+as hypervisor. The Gentoo live image I used is the weekly build 
+[install-x86-minimal-20130820](#sha512). Working "remotely" through ssh is much 
+more convenient. RSA/DSA ssh keys must be generated with ssh-keygen, a root password 
+set and sshd daemon started.
 
 Drives configuration
 ====================
 
 The Gentoo Linux x86 Handbook can be followed up to step 4, which covers hard
 disks configuration. I will be using /dev/sda both for boot and root partitions.
-The first step is to create a plain primary boot partition with fdisk, /dev/sda1, and
-to format it with a Unix-like filesystem, ext4 in this case.
-As far as the size is concerned, 256M are enough. mkfs.ext4 can be used to 
-create the filesystem (mkfs.ext4 /dev/sda1). The second partition, which will 
+The first step is to create a plain primary boot partition with fdisk and
+to format it with a Unix-like filesystem, ext4 in this case, with mkfs.ext4.
+As far as the size is concerned, 256M are enough. The second partition, which will 
 be used as a LVM physical volume with on top two logical volumes for root and swap, 
-can take up all the space left on the device.  After the creation of the partitions, 
-/dev/sda2 must be formatted as a LUKS partition.
+can take up all the space left on the device.  This second partition must be 
+formatted as a LUKS partition.
    
 ```text
 livecd ~ # cryptsetup --verify-passphrase luksFormat /dev/sda2
@@ -75,7 +76,7 @@ livecd ~ # vgcreate vg /dev/mapper/vault
     Volume group "vg" successfully created
 ```
 
-Now the logical volumes can be created. Here I use a 4GB LV for swap
+Now the logical volumes can be created. I used a 4GB LV for swap
 and a LV for root which takes take up the remaining capacity of the 
 volume group.
 
@@ -140,7 +141,7 @@ make modules
 make modules_install
 ```
 
-After having compiled the kernel and copied bzImage into /mnt/gentoo/boot, 
+After having compiled the kernel and copied the bzImage into /mnt/gentoo/boot, 
 Gentoo Handbook can be resumed from Chapter 8. In section 8.a, the fstab file 
 is set up. Since I am using logical volumes, the procedure is slightly different 
 from the one outlined in the guide. My fstab looks like the following:
@@ -158,7 +159,7 @@ from the one outlined in the guide. My fstab looks like the following:
 Bootloader installation
 =======================
 
-Chapter 10 of the Gentoo Handbook deals with the installation of the bootloader.
+Chapter 10 of the Gentoo Handbook covers the installation of the bootloader.
 I will use grub legacy (i.e. v0.97), since I am quite familiar with it and it
 will help speed up the process.
 
@@ -200,8 +201,8 @@ Done.
 An alternative way to install grub is to simply use *grub-install* on /dev/sda. 
 *update-grub* can normally be used to update menu.lst (or grub.cfg) based on the kernels
  available under /boot, but in this case the configuration file is so simple that
- it will be populated manually. As a aside note, update-grub relies on the output 
- of df command, which must reports correctly an entry for the boot partition. If /etc/mtab is empty, 
+ it can be populated manually. As a aside note, update-grub relies on the output 
+ of df command, which must report correctly an entry for the boot partition. If /etc/mtab is empty, 
  an error is raised (df: cannot read table of mounted file systems). A quick workaround 
  is to manually add to /etc/mtab the following line
 
@@ -213,9 +214,8 @@ An alternative way to install grub is to simply use *grub-install* on /dev/sda.
 Creation of the initrd
 ======================
 
-The initial ramdisk responsible for mounting the encrypted device must then be
-created. This should contain cryptsetup tools and all the relative dependencies
-listed by ldd.
+The initial ramdisk responsible for mounting the encrypted device must contain 
+cryptsetup tools and all the dependencies listed by ldd.
 
 ```text
 livecd boot # ldd /sbin/cryptsetup 
@@ -321,15 +321,13 @@ EOF_init
 
 chmod a+x init
 ```
-The actual initrd image is then built with the following commands.
+The actual initrd image is then built with the following commands (cpio might
+need to be invoked with the full path on the stage3 binary).
 
 ```text
 cd /mnt/gentoo/boot/initram
 find . | cpio --quiet -o -H newc | gzip -9 > /mnt/gentoo/boot/initramfs
 ```
-I am not completely sure that cpio is part of the minimal gentoo image. 
-It should be in the Gentoo stage3 image just installed, so it might be necessary to 
-specify the absolute path with respect to /mnt/gentoo. 
 
 
 Final steps
@@ -346,7 +344,7 @@ initrd /initramfs
 ```
 
 After umounting /mnt/gentoo/boot, /mnt/gentoo/proc,
-/mnt/gentoo and rebooting the machine, the initrd should ask for the password of 
+/mnt/gentoo and rebooting the machine, the initrd should prompt for the password of 
 the encrypted volume and then mount the root filesystem.
 <hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
 <ul class="references">
