@@ -2,17 +2,17 @@
 layout: post
 title:  "Network data corruption on Gigabyte R120-P31 - Part 1"
 date:   2016-06-19 21:00:00
-categories: jekyll update
-summary: "In this post I have summarized some of the steps I have gone through to 
-debug a subtle data corruption issue encountered on a Gigabyte ARM64 R120-MP31.
-This first part covers integrity investigations at the transport layer (i.e.
-TCP checksums) and at link layer (i.e. Ethernet CRC32)."
+categories: linux hardware kernel
+summary: "This post covers an interesting, yet subtle, data corruption issue 
+encountered on a Gigabyte ARM64 R120-MP31. This first part covers integrity 
+investigations at the transport layer (i.e. TCP checksums) and at link layer 
+(i.e. Ethernet CRC32)."
 ---
 
 Background
 =======
 
-After deploying and cabling two Gigabyte R120-P31 on a 10GbE SFP+ switch, random failures 
+After deploying two Gigabyte R120-P31 connected to a 10GbE SFP+ switch, random failures 
 started appearing during daily operations. Everything seemed
 to point to a data corruption issue, and a quick network test confirmed something was wrong:
 
@@ -30,11 +30,11 @@ f5ffba20ce077a9f789a61ff8aedb471  -
 ```
 
 After ruling out the most obvious factors, I wrote a slightly more elaborated
-<a href="https://github.com/marcoguerri/packet-mangle/tree/master/userspace" target="_blank">
+<a href="https://github.com/marcoguerri/checksum-test" target="_blank">
 script</a>
-that would transfer a specific payload together with the corresponding checksum. Whenever
-the checksum did not match, the server would write on the disk the corrupted data.
-The dump of a payload coming from /dev/zero would look as follows:
+that would transfer a specific payload together with the corresponding checksum. 
+Upon encountering a non-matching checksum, the server would write on disk the 
+incoming data. The dump of a payload coming from /dev/zero would look as follows:
 
 ```
 [root@r120p31 ~]# hexdump data 
@@ -48,10 +48,10 @@ a000000
 ```
 
 At first glance, there seemed to be bits flipped at random positions. The time necessary for 
-data corruption to appear varied. I had two boards at my fingertips: with the first 
-it was a matter of few seconds for the issue to appear, with the second it would take 
-longer than that, up to 2 minutes. After a bit of hacking I came to the conclusion that there 
-seemed to be a pattern. A further example was the following:
+data corruption to appear varied. I had two boards available, and the MTBF ranged
+from few seconds to up to 2 minutes. After a bit of troubleshooting I came to the 
+conclusion that there seemed to be a pattern. A further instance of corrupted payload
+was the following:
 
 ```
 [root@r120p31 ~]# hexdump data 
@@ -66,7 +66,7 @@ a000000
 The 3 bits flipped in the second dump are placed at the same
 distances as in the first example. The existence of a pattern seemed to rule
 out data corruption on the wire, but to have a clear picture of what was happening
-at the different layers I decided to carry out some experiments.
+at the different layers I decided perform some experiments.
 
 TCP/IP and data integrity
 =======
@@ -86,28 +86,29 @@ the problem top down, starting the investigation from the transport layer.
 
 TCP checksum
 =======
-The first point I wanted to address was whether the segments that
-were being delivered to userspace had valid TCP checksums. What usually happens on 
+The first point I wanted to address was whether segments delivered
+to userspace had valid TCP checksums. What usually happens on 
 modern hardware is that checksum verification on the receiving side is offloaded to the NIC,
 and if it can't be validated the whole frame is discarded straight away. Tools
 like tcpdump or wireshark can be really useful in this case as they provide
 information on the correctness of the checksum. The easiest way that came to mind to test
 this use case was to develop a *netfilter* kernel module that would mangle outgoing
-packets at layer 2 on the client side, preventing somehow the NIC to recompute the checksum when
-offloading was enabled. Linux also provides ways to use a network scheduling
-algorithm (or queue discipline) that corrupts outgoing packets. In particular,
+packets at layer 2 on the client side, preventing the NIC from recomputing the checksum when
+offloading was enabled. This approach might sound like "re-inventing" the wheel
+as Linux also provides ways to use a network scheduling algorithm (or queue discipline) 
+that corrupts outgoing packets. In particular,
 the *netem* (Network Emulator) scheduler allows to perform randomized packet
-corruption via *tc* command as follows
+corruption via *tc* command as follows:
 
 ```
 sudo tc qdisc add dev lo root netem corrupt <CORRUPTION RATE>
 ```
 
-This methods does not give much room for tuning: with the line above what we are saying
-is "corrupt \<CORRUPTION RATE\>% of the *sk_buff*", with corruption meaning flipping one random
-bit. The relevant code from *net/sched/sched_netem.c* which does the corruption 
+However, this methods does not give much room for tuning: with the line above we
+are asking the network stack to "corrupt \<CORRUPTION RATE\>% of the *sk_buff*", 
+where corruption means flipping one random bit in the whole *sk_buff*. The 
+relevant code from *net/sched/sched_netem.c* which implements the *corrupt* policy 
 is the following:
-
 
 ```c
     if (q->corrupt && q->corrupt >= get_crandom(&q->corrupt_cor)) {
@@ -134,33 +135,32 @@ is the following:
     }
 ```
 
-The most relevant parts are probably the call to *skb_checksum_help*, which computes
+The most relevant part is the call to *skb_checksum_help*, which computes
 in software the checksum of the packet and sets *skb->ip_summed* to *CHECKSUM_NONE*,
-notifying the NIC that the checksum must not be recalculated in hardware. The packet 
-singled out for corruption has a random bit flipped within the linear buffer of the 
-sk_buff (i.e. modulo *skb_headlen()*). The paged data of the sk_buff is not considered 
-for the corruption, I guess to keep things simple.
+basically disabling checksum offloading. The packet 
+singled out for corruption has a random bit flipped within the linear data of the 
+*sk_buff* (i.e. modulo *skb_headlen()*). The paged data of the sk_buff is not considered 
+for corruption, I guess to keep things simple.
 \\
 This capability of the Linux kernel did not provide enough control for the test I wanted to perform, hence the decision
-to write a simple <a href="https://github.com/marcoguerri/packet-mangle/tree/master/kernelspace" target="_blank">
-netfilter kernel module</a>, which registers a callback to the *NF_INET_POST_ROUTING* hook.
-The code acts in a very similar way as the netem discipline:
+to write a simple <a href="https://github.com/marcoguerri/packet-mangle" target="_blank">
+netfilter kernel module</a>, which registers a callback for the *NF_INET_POST_ROUTING* hook.
+The code behaves in a very similar way as the netem discipline:
 
-  * it looks for a specific pattern in the application level payload. 
-    Again for simplicity non-linear sk_buffs are ignored. In my case the magic
-    world being sought was "0xDEADBEEF".
+  * it looks for a magic word in the application level payload. 
+    Again for simplicity non-linear sk_buffs are ignored
   * it calculates the checksum of the outgoing *sk_buff* before the corruption. 
     The code operates at layer
     two just before the queue discipline, therefore the *sk_buff* is complete
   * it prints some debug information (e.g. the expected checksum)
   * it corrupts the checksum
-  * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that the checksum is not 
-  recalculated by the NIC
+  * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that hardware offloading is disabled
+  for this *sk_buff*
 
 This kernel module has been tested on CentOS 7 with kernel 3.10, it is not guardanteed
-to work on any other kernel version. The outcome of this experiment was definitely 
+to work on any other kernel version. The outcome of the experiment was definitely 
 interesting. On the client side, where the netfilter kernel module was running, 
-I could see the following output:
+I could see the following debug information:
 
 ```
 [ 4255.255119] Linear data: 564
@@ -170,11 +170,10 @@ I could see the following output:
 [ 4255.269345] Corrupting checksum to 0xBEEF
 ```
 
-The length of the linear length basically indicates how much non-paginated 
-data the *sk_buff* contains. Follows the length of the TCP payload and header.
-The module then prints the expected checksum of the outgoing segments and notifies
-that the checksum is being corrupted to 0xBEEF. On the server side *tcpdump* shows, 
-among others, the following incoming segment:
+The length of the linear portion of the *sk_buff* basically indicates how much non-paginated 
+data is present. Follows the length of the TCP payload and header.
+The module then prints the expected checksum followed by the corrupted checksum,
+i.e. 0xBEEF. The associated *tcpdump* trace on the server side is the following:
 
 ```
     10.41.208.7.44550 > 10.41.208.29.webcache: Flags [P.], cksum 0xbeef (incorrect -> 0x75f6
@@ -187,11 +186,11 @@ among others, the following incoming segment:
         [...]
 ```
 
-The first 4 bytes of the payload correspond, as expected, to 0xDEADBEEF. The most
-interesting information shown by tcpdump is the incorrect TCP checksum notification,
-followed by the expected value *0x75f6*. 
-This is exactly the output of the netfilter kernel module!
-Considering that this segment makes it all the way to userspace, not just to layer 2,
+The first 4 bytes of the payload correspond to the application level magic word, *0xDEADBEEF*.
+The most interesting information shown by tcpdump is the incorrect TCP checksum notification,
+followed by the expected value *0x75F6*, which matches the output of the netfilter kernel module.
+Considering that this segment <b>makes it all the way to userspace</b>, not just to layer 2
+where *tcpdump* intercepts it,
 the following question arises: who is supposed to stop the corrupted segment? 
 The NIC or the software stack at layer 4? According to *ethtool*, TCP checksum 
 of incoming segments is software's responsibility:
@@ -254,7 +253,7 @@ data to go through to the application layer. It would be tempting to remove
 this would fix the data corruption issue until a TCP checksum collision, which is 
 not so unlikely considering the algorithm for the TCP checksum is rather weak.
 However, the XGene-1 NIC is expected to checksum incoming frame. Offloading 
-the calculation to the software severely affect the maximum throughput of tof the
+the calculation to the software severely affect the maximum throughput of the
 interface.
 
 
@@ -274,8 +273,8 @@ was really happening on the wire: if that was really the case, then the CRC chec
 had to disregard those frames. 
 
 
-To asses whether hardware CRC verification was
-working properly, I wrote a <a href="https://github.com/marcoguerri/fcs_control">
+To test whether hardware CRC verification was
+working properly, I wrote a <a href="https://github.com/marcoguerri/fcs-control">
 litte tool</a> that allows to send Layer 2 frames with corrupted CRC. As mentioned
 before, normally CRC calculation is the hardware's responsibility and it is 
 completely out of the control of the software/driver. Crafting customs Ethernet frames
@@ -283,30 +282,27 @@ is very easy with *PF_PACKET* sockets. If used
 with *socket_type* set to *SOCK_RAW*, then it is possible to pass to the driver
 the complete layer 2 frame, including the header. However, even *PF_PACKET* sockets
 do not prevent the NIC from appending the CRC. This is where
-socket option *SO_NOFCS* comes to the rescue. *SO_NOFCS* is a very useful flag
-that, when supported by the driver, tells the NIC not to add any frame
-check sequence (i.e. CRC). The flag can be easily set with *setsockopt*  at
-the *SOL_SOCKET* level. In case the driver does not support it, *setsockopt* 
-returns *ENOPROTOOPT*.
+socket option *SO_NOFCS* comes to the rescue. When supported by the driver, 
+*SO_NOFCS* tells the NIC not to add any frame check sequence (i.e. CRC). The flag 
+can be easily set with *setsockopt* at the *SOL_SOCKET* level. In case the driver 
+does not support it, *setsockopt* returns *ENOPROTOOPT*.
 
 
-Let's see an example of *SO_NOFCS* in action. The tool expects the interface
-to be associated with the RAW socket and the destination MAC address. First a minor 
-remark: in the following
-examples, the MAC address being specified as destination MAC varies, even though
-the machine/interface I am using for the tests is the same. In fact, the machine has two
-SFP+ interfaces, and with the current UEFI firmware from AppliedMicro, version
-1.1.0, the second SFP+ port is not detected at all. The MAC address of the first
-interface varies depending on the version of the kernel. Normally it should be 
-*fc:aa:14:e4:97:59*, and this is what kernel 4.2.0-29 is reporting, but under 
-kernel 4.6.0, the interface with MAC address *fc:aa:14:e4:97:59* does not appear
-to have any link anymore and the actual MAC address of the interface under test
-magically becomes *22:f7:cb:32:eb:5c*. This is a very strange behaviour that
-however is not present with the latest UEFI firmware from Gigabyte, despite
-all the date corruption issue still being reproducible. It also true that, while 
-running tcpdump on the server side, the NIC is in promiscuous mode and it will
-accept anything, no matter the destination MAC, so the value specified on the
-command line does not really matter.
+Let's see an example of *SO_NOFCS* in action. The tool expects as command line 
+arguments the interface to be associated with the RAW socket and the destination 
+MAC address. In the following examples, the destination MAC address passed as argument
+varies across the tests, even though the interface I am using is the same. The machine has two
+SFP+ interfaces and with the current UEFI firmware from AppliedMicro (version
+1.1.0) the second SFP+ port is not detected at all. The MAC address of the first
+interface varies depending on the version of the kernel. It is reported as
+*fc:aa:14:e4:97:59* when running kernel 4.2.0-29, but under kernel 4.6.0, the 
+interface with MAC address *fc:aa:14:e4:97:59* does not appear
+to have any link anymore and the MAC of the interface under test
+becomes *22:f7:cb:32:eb:5c*. This is behaviour is not present with the latest 
+UEFI firmware from Gigabyte, despite the data corruption issue still being reproducible. 
+It also true that, while running tcpdump on the server side, the NIC is in promiscuous 
+mode and it will accept anything, no matter the destination MAC, so the value 
+specified on the command line does not really matter.
 
 If not explicitly requested, the tool appends a valid CRC at the end of the frame.
 The minium frame size allowed by the 803.2 standard is 64 bytes. Considering
@@ -349,8 +345,8 @@ driver shipped with kernel 4.6.0):
 ```
 
 The CRC is being removed by subtracting the trailing 4 bytes from the total
-lenght of the frame. Removing the *-4* easily does the trick as it can be seen
-in the following trace (payload in now coming from /dev/zero):
+lenght of the frame. Removing the *-4* easily does the trick as shown by the 
+following trace (payload in now coming from /dev/zero):
 
 ```
 10:13:53.697511 aa:bb:cc:dd:ee:ff (oui Unknown) > 22:f7:cb:32:eb:5c (oui Unknown), ethertype Unknown (0x1213), length 64: 
@@ -359,7 +355,7 @@ in the following trace (payload in now coming from /dev/zero):
         0x0020:  0000 0000 0000 0000 0000 0000 0000 0ffe  ................
         0x0030:  979b
 ```
-The message on the client side confirms the value of the CRC.
+The debug output on the client side confirms the value of the CRC.
 
 ```
 [root@client]~# ./corrupt -m 22:f7:cb:32:eb:5c -i ens9f1 
@@ -375,7 +371,7 @@ frame will never go past a switch or a NIC. However, at least for the latter,
 there are ways around it: ethtool compliant driver/NICs expose the *rx-all* parameter, which when
 supported and enabled, allows to receive all incoming frames, including those
 whose CRC could not be validated. On the xgene-enet, rx-all is set to off,
-as expected, and cannot be modified in any way. For the test to be meaningful,
+as expected, and cannot be modified in any way. For the test to be relevant,
 client and server must be connected back-to-back, or the switch will drop any
 corrupted data going through.
 Considering the previous frame, with a payload of all zeros, we have seen that
@@ -390,8 +386,8 @@ on the server is the following:
         0x0030:  adde 
 ```
 The frame is not discarded, even though the checksum is set to *0xdeadbeef*, which
-is clearly not valid! As a side note, the CRC has been written on the frame as a 
-little endian uint32_t, so that is the reason it appears reversed.
+is clearly not valid. The CRC is written on the frame as a 
+little endian word and as a consequence bytes appear in reversed order.
 
 Conclusions
 =======
@@ -411,5 +407,5 @@ The last point is probably the most critical one. Without a proper CRC integrity
 check, it is hard to say whether the frame is being received on the wire already 
 corrupted or bits are flipping at a later stage. Given the possible presence of 
 a pattern in the corruption, an alternative explanation that came to mind envisioned
-bits flipping when stored already in system RAM. In the second part of
-this post I will report some notes concerning the investigation of this last hypothesis.
+bits flipping when stored already in system RAM. This last hypothesis will be covered
+in the second part of this post.

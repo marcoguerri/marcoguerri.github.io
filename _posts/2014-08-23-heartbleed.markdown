@@ -17,7 +17,7 @@ The bug
 =======
 
 Heartbleed, CVE-2014-0160 in the Common Vulnerabilities and Exposures system,
-is a bug which affects OpenSSL software allowing an attacker to retrieve a 64KB
+is a bug which affects OpenSSL library allowing an attacker to retrieve a 64KB
 chunk of memory from the address space of a process which is using libssl.
 The bug resides in the implementation of one of the features of the TLS protocol, 
 the TLS Heartbeat Extension, and affects OpenSSL from version 1.0.1 to 1.0.1f included.
@@ -68,13 +68,13 @@ steal the private keys from a nginx instance running on their servers. According
 to their very early experiments, they thought <a href="https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/" target="_blank">
 this would never happen</a>,
 but it turned out they were wrong. In fact, at least four people were able to steal
-the private keys exploiting using Heartbleed, Fedor Indutny being the first one.
+the private keys exploiting Heartbleed, Fedor Indutny being the first one.
 
 
 
 openssl package
 ===============
-Following Cloudflare's example, I decided to try to steal the private keys from my
+Following Cloudflare's example, I decided to try to obtain the private keys from my
 own instance. I am running Debian Wheezy 7.1 and, according to apt, the openssl 
 version I have
 installed on my machine is *1.0.1e*.
@@ -93,8 +93,8 @@ openssl:
 ```
 
 At a first glance, this might appear to be a vulnerable release, but the output
-of openssl version shows that the package has been compiled in early 2015, a
-significant amount of time after the disclosure of the bug.
+of openssl version shows that the package has been compiled in early 2015, 
+well after the disclosure of the bug.
 
 ```text
 $ openssl version -a
@@ -258,17 +258,16 @@ with *-dbg* packages. However, if the original binary has been compiled with opt
 enabled, a single-step execution will not result in a clean flow at the source 
 code level: associating assembly instructions to C code becomes difficult due to 
 instruction reordering, loop unrolling, inlining, etc. The *-dbg* package might be 
-enough to generate a meaningful stack trace when the program crashes, but some more
-work is needed for single step execution. *libssl* must therefore be 
-re-compiled with debug symbols and without optimizations. 
-*CFLAGS* used by dpkg are set in */etc/dpkg/buildflags.conf*. The following flags
+enough to generate a meaningful stack trace when the program crashes, but for single
+step execution *libssl* must be re-compiled with debug symbols and without optimizations. 
+*CFLAGS* used by dpkg are set in */etc/dpkg/buildflags.conf*. The following should
 do the job:
 
 ```text
 SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security
 ```
 
-A further simplification which makes the debugging easier is
+A further simplification which makes debugging easier is
 to add the following directive in */etc/nginx/nginx.conf* in order to spawn
 only one worker thread for serving incoming requests:
 
@@ -296,7 +295,7 @@ For bug reporting instructions, please see:
 ```
 
 gdb tries to load the symbols of all the shared objects mapped in the address space of the process,
-including libssl.so.1.0.0. This should result in the following messages:
+including libssl.so.1.0.0, which should result in the following messages:
 
 ```text
 Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
@@ -463,7 +462,7 @@ the buffer pointed by the BIO object <em>\*b</em>. The decision whether to flush
 the buffer through the socket is taken based on the size of the data with respect to
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed. In this case the heartbeat response message is 28 bytes and the buffer
-is 4KB, therefore the data is written on the buffer but not flushed.
+is 4KB, which prevents the data from being flushed.
 
 ```text
 (gdb) print i
@@ -567,9 +566,9 @@ Scanning leaked memory
 =============================
 
 After setting up my local nginx instance with a newly generated private/public
-key pair, I tried to look for a prime factor that could divide *n* (part of the
-public key) in the memory leaked by the server. I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/exploit.c" target="_blank">
-exploit.c</a> to exploit the bug.  With *ulimit*, I capped the maximum size of
+key pair, I tried to look for a prime factor that would divide *n* (part of the
+public key) in the memory leaked by the server using  <a href="https://github.com/marcoguerri/heartbleed/blob/master/exploit.c" target="_blank">
+exploit.c</a>.  With *ulimit*, I capped the maximum size of
 the virtual address space of the process at 256MB and I fired up 8 parallel
 instances of the script. After ~3M requests, I could not find any trace of the
 private keys.

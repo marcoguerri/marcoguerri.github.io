@@ -42,7 +42,7 @@ The components involved
 The infrastructure for PXE boot involves several components: a NIC,
 with its PXE-compliant firmware, a DHCP server, a TFTP server, a PXE implementation
 that does the heavy lifting, that is, loading and booting the kernel and initrd,
-and the network in-between the clients/servers. At first, I was skeptical that 
+and the network in-between the clients/servers. At first, I was doubtful that 
 any useful debugging could happen. The situation was the following:
 
 * Limited control over the network infrastructure (different team responsible for that)
@@ -57,18 +57,18 @@ At a second thought, some of these hurdles could be overcome without too much ef
 
 A quick look at the network
 =======
-The first approach I tried was to dump network traffic, in case something
+The first approach I attempted was to dump network traffic, in case something
 obvious would turn up. I could not dump the traffic on the machine itself during
 PXE boot, and dumping at the other end of the communication was not a good idea
-either, so I asked the network team to set up port mirroring towards a host over
-which I had complete control. It worked well, mixed up with tons of non relevant
+either, so I had port mirroring configured towards a host over
+which I had complete control. It worked well, mixed up with non-relevant
 traffic I could see my client loading pxelinux image and then going radio silence.
 Here I made the first assumption, that unfortunately turned out to be wrong later on:
 after relinquishing control to pxelinux, there is no network activity whatsoever.
 
 DHCP and TFTP servers
 =======
-The following piece that I needed was my own DHCP/TFTP infrastructure, so that
+The next component that I needed was my own DHCP/TFTP infrastructure, so that
 I could bypass the production servers and point directly to my test instances where
 I could deploy a custom pxelinux. This also turned out doable. What was necessary was
 the following:
@@ -93,7 +93,7 @@ management operations via IPMI.
 
 Deploying the correct binary
 =======
-pxelinux is part of syslinux project and it comes in two different flavors:
+pxelinux is part of syslinux project and comes in two different flavors:
 *pxelinux.0* and *lpxelinux.0*. During this experiment, I was compiling and 
 testing the 32bits legacy version of pxelinux and I was working on git commit 138e850f.
 The first binary that I tried to deploy with my test environment was pxelinux.0.
@@ -107,7 +107,7 @@ a full-fledged TCP/IP stack, lwIP, therefore interacting with the NIC only to
 transmit/receive layer 2 frames.
 * pxelinux relies instead on the firmware of the NIC to implement network communication,
 therefore having to provide only application level payload formatted as required 
-by the PXE standard).
+by the PXE standard.
 
 Debug messages
 =======
@@ -182,10 +182,10 @@ Deploy, reboot and finally some debug output on the screen.
 Tracing the execution
 =======
 
-I though a good idea was to start from *load_env32*. I tried to follow the control
-path, keeping an eye open for something that could be the root cause of the
+Starting from *load_env32*, I tried to follow the control
+path while keeping an eye open for something that could be the root cause of the
 failure to load ldlinux.c32 from the network. After some flawless execution,
-the following is the path that seemed relevant to me.
+the following seemed to be the relevant stack trace.
 
 ```text
 start_ldlinux [./core/elflink/load_env32.c]
@@ -204,7 +204,7 @@ The upper layer of pxelinux was trying to load
 ldlinux.c32 via a file-like API that was abstracting the fact that the file was
  sitting on a remote TFTP server.
 In fact, many data structures and functions are involved in file operations,
-nothing very much different then what you would find on a Linux OS
+nothing very much different then what one would find on a Linux OS
 and libc. It is actually interesting to dive a bit deeper.
 
 File-like API
@@ -241,8 +241,8 @@ The function *opendev* shown below looks for a *file_info* structure available
 in the statically allocated array *__file_info* and sets the input operations 
 pointer, *iop*, to *__file_dev* . It then returns the corresponding fd 
 (the index within *__file_info*). From now on,
-any attempt to read from a file associated with the fd returned, will go
-through *__file_dev.read* function pointer, that is *__file_read*.
+any attempt to read from a file associated with the file descriptor will go
+through *__file_dev.read* function pointer, i.e. *__file_read*.
 
 ```c
 int opendev(const struct input_dev *idev,
@@ -298,7 +298,7 @@ struct fs_ops {
 The *file* structure is identified by a handle (which is again basically an index
 within an array) returned by *searchdir* hook above. This handle is associated 
 to the corresponding *com32_filedata* within *file_info* in function *open_file* 
-in the excerpt below, which follows *opendev*.
+in the excerpt below, which is called after *opendev*.
 
 
 ```c
@@ -385,8 +385,9 @@ ROOT_FS_OPS:
         dd 0
 ```
 
-Indeed *fs_ops* in this case is *pxe_fs_ops*, defined in core/fs/pxe/pxe.c,
- which defines the API used to retrieve files via PXE (basically, TFTP).
+Indeed *fs_ops* in this case is *pxe_fs_ops*, defined in core/fs/pxe/pxe.c
+and initialized with the callbacks that implement file operations via 
+PXE (i.e.  TFTP).
 
 ```c
 const struct fs_ops pxe_fs_ops = {
@@ -432,7 +433,7 @@ pxe_searchdir [./core/fs/pxe/pxe.c]
        allocate_socket [./core/fs/pxe/pxe.c]
 ```
 
-*allocate_socket* returns without errors. Still no luck. *__pxe_searchdir* tries
+*allocate_socket* returns without errors. *__pxe_searchdir* tries
 then to locate a "URL scheme" suitable for opening the URL that points to the
 TFTP server.
 
@@ -449,9 +450,8 @@ for (us = url_schemes; us->name; us++) {
 }
 ```
 
-Identifying the function pointed by the *us->open* hook would have been more time
-consuming than simply printing its location. Once obtained its linear address,
-0x0000108e14, it was just a matter of a grep.
+Identifying the function pointed by the *us->open* hook is simply a matter of
+obtaining its linear address, 0x0000108e14, and grepping in the symbols file.
 
 ```text
 cat ./bios/core/lpxelinux.map | grep -i 108e14
@@ -493,9 +493,8 @@ interest.
 In the trace above, *netconn_new*  and *netconn_sendto* were the first occurrences
 of the transition to the lwIP stack. Plunging into lwIP meant that a new set
 of debug messages was also needed. lwIP defines several macros for debugging that
-can be set in core/lwip/src/include/lwipopts.h. Enabling debug messages coming from
-the UDP layer seemed to be the right approach
-
+can be set in core/lwip/src/include/lwipopts.h. First, I enabled debug messages
+coming from the UDP layer.
 
 ```c
 #define LWIP_DEBUG
@@ -518,10 +517,9 @@ udp_send: UDP checksum 0x7be9
 udp_send: ip_output_if (,,,,IP_PROTO_UDP,)
 ```
 
-*netconn_send* was returning 0,
-no error whatsoever. From the trace above, 
+*netconn_send* was returning successfully. From the trace above, 
 the maximum call depth was reached with *mbox_post*, which was also returning
-successfully. The function was appending the outgoing message on a list and it
+successfully. The function was appending the outgoing message to a list and it
 was increasing a semaphore to allow the main thread (*tcpip_thread* in
 core/lwip/src/api/tcpip.c) to service outgoing data. At this point, the relevant
 call trace initiated by the main thread was the following:
@@ -536,7 +534,7 @@ do_send [core/lwip/src/api/api_msg.c]
           ip_output_if_opt [core/lwip/src/core/ipv4/ip.c]
 ```
 
-Now, *ip_output_if_opt* was calling *netif->output()*, again difficult to trace
+*ip_output_if_opt* was calling *netif->output()*, again difficult to trace
 without pointing directly to the virtual address, 0x112646 in this case.
 
 ```text
@@ -550,7 +548,7 @@ without pointing directly to the virtual address, 0x112646 in this case.
 ```
 
 According to the mapping above, the output hook was residing somewhere
-etween *0x1121dc* and *0x11292f*, most likely in *core/lwip/src/netif/undiif.c*, where
+between *0x1121dc* and *0x11292f*, most likely in *core/lwip/src/netif/undiif.c*, where
 code which interfaces directly with the hardware is defined. From *undiif.c*:
 
 ```c
@@ -564,8 +562,7 @@ code which interfaces directly with the hardware is defined. From *undiif.c*:
 
 Layer 2 and below
 =======
-The first thing that seemed obvious to do was to enable debug messages at the
-UNDIIF layer.
+Enabling debug messages at the UNDIIF layer allowed to go down to layer 2.
 
 
 ```c
@@ -597,7 +594,7 @@ etharp_raw: sending raw ARP packet.
 ```
 
 Everything seemed to be fine up to this point, but mixed up with the other messages I
-could see the following entries
+could see the following entries:
 
 ```text
 etharp_timer: expired pending entry 0.
@@ -610,7 +607,7 @@ in the stack. At this point <b>I realized that one of my assumptions, that no
 data was being sent/received from the NIC, was wrong</b>. When looking at the
 traffic dump, in order to filter out  uninteresting network activity, I was
 querying by IP, basically ruling out all traffic at the data link layer, ARP
-requests included. After having another look at the network dump, the situation was pretty clear.
+requests included. After having had another look at the network dump, the situation was pretty clear.
 
 <div align="center">
 <a id="single_image" href="/assets/img/pxe/PXETraffic.png">
@@ -738,7 +735,7 @@ static void pxe_receive_thread(void *dummy)
 ```
 
 I tried first to understand whether *pxe\_process\_irq* was ever called. It tuned out,
-it <b>was not</b> and my attention was grabbed by *pxe\_isr\_poll*.
+it <b>was not</b> and my attention was caught by *pxe\_isr\_poll*.
 
 ```c
 static bool pxe_isr_poll(void)
@@ -766,7 +763,7 @@ Interrupt processing is now complete.
 
 After playing a bit with *pxe\_isr\_poll*, it turned out *PXENV\_UNDI\_ISR\_OUT\_OURS* was 
 <b>never set</b>, keeping *pxe\_receive\_thread* indefinitely suspended on the semaphore. 
-The first obvious course of action was to replaced the condition in the return statement
+The first naive attempt was to replace the condition in the return statement
 
 
 ```c
@@ -793,8 +790,8 @@ interrupt for no reason).
 
 Conclusions
 =======
-When dealing with closed source software, the only possible course of action when hitting a bug
-is clearly to file a bug report to the owners of the code, hoping there is enough interest
+At this point, the only possible course of action was to file a bug report to 
+the owners of the code, hoping there is enough interest
 on their side to fix the issue in a timely manner. This is a great example
 of how the *widget frosting* business model explained by Eric Raymond in *The Cathedral
 and the Bazaar* would simplify everybody's life. This indirect-sale value model
@@ -806,6 +803,6 @@ Updates
 =======
    * It turns out the QLogic cLOM8214 is affected by the same issue, and can boot
 just fine if *PXENV\_UNDI\_ISR\_OUT\_OURS* is  always set. However, this NIC has been
-discontinued and no fixes whatsoever will be provided. Speaking of *widget frosting*...
+discontinued and no fixes will be provided. Speaking of *widget frosting*...
    * Chelsio has provided a firmware fix which allows to boot correctly with lpxelinux 6.03
 
