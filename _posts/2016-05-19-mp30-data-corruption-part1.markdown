@@ -275,7 +275,7 @@ had to disregard those frames.
 
 To test whether hardware CRC verification was
 working properly, I wrote a <a href="https://github.com/marcoguerri/fcs-control">
-litte tool</a> that allows to send Layer 2 frames with corrupted CRC. As mentioned
+small tool</a> that allows to send Layer 2 frames with corrupted CRC. As mentioned
 before, normally CRC calculation is the hardware's responsibility and it is 
 completely out of the control of the software/driver. Crafting customs Ethernet frames
 is very easy with *PF_PACKET* sockets. If used
