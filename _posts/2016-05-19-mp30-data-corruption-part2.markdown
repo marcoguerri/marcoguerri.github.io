@@ -234,12 +234,12 @@ the fiber: apparently, the transceiver embedded on the Gigabyte motherboard does
 not cope well with copper for some reason, and by shifting the signal handling 
 responsabilities to an external module, the problem is "patched". However, all the issues highlighted when
 investigating TCP checksum and Ethernet FCS are still relevant. After all, the 
-optical transceiver does not add any layer with an additional consistency mechanism, 
+optical transceiver does not add any layer with additional checksumming, 
 therefore I believe data corruption on the wire would still pose a serious problem.
 After some further testing, I realised that also FCoE copper cables seemed
 to work just fine. In this case, the active transceiver encapsulates outgoing 
-Ethernet frames in to Fiber Channel frames, which include additional consistency
-mechanisms, therefore bits flipped on the wire would most likely be correctly 
+Ethernet frames into Fiber Channel frames, which include additional consistency
+checks, therefore bits flipped on the wire would most likely be correctly 
 detected.
 
 
