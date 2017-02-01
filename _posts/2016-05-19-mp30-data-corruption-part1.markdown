@@ -1,20 +1,21 @@
 ---
 layout: post
-title:  "Network data corruption on Gigabyte R120-P31 - Part 1"
+title:  "Network data corruption on a Gigabyte R120-P31 - Part 1"
 date:   2016-06-19 21:00:00
 categories: linux hardware kernel
 summary: "This post covers an interesting, yet subtle, data corruption issue 
-encountered on a Gigabyte ARM64 R120-MP31. This first part covers integrity 
-investigations at the transport layer (i.e. TCP checksums) and at link layer 
-(i.e. Ethernet CRC32)."
+encountered on a Gigabyte ARM64 R120-MP31. This first part is a summary of some
+initial tests I did at the transport layer (i.e. TCP checksums) and at 
+the data link layer (i.e. Ethernet CRC32)."
 ---
 
 Background
 =======
 
 After deploying two Gigabyte R120-P31 connected to a 10GbE SFP+ switch, random failures 
-started appearing during daily operations. Everything seemed
-to point to a data corruption issue, and a quick network test confirmed something was wrong:
+started appearing during daily operations. The system was cabled with a passive
+Direct Attached Copper cable: everything seemed to point to a data corruption issue, 
+and a quick network test confirmed something was wrong.
 
 ```
 [root@client]~# loop=1; while [ $loop -eq 1 ]; do 
@@ -66,7 +67,7 @@ a000000
 The 3 bits flipped in the second dump are placed at the same
 distances as in the first example. The existence of a pattern seemed to rule
 out data corruption on the wire, but to have a clear picture of what was happening
-at the different layers I decided perform some experiments.
+at the different layers I decided to perform some more experiments.
 
 TCP/IP and data integrity
 =======
@@ -76,7 +77,7 @@ In the TCP/IP stack there are three main ways to ensure data integrity:
   * IP header checksum at layer 3 (this actually protects only the IP header)
   * TCP checksum at layer 4
 
-Having corrupted data delivered to userspace means that an error has to go
+Having corrupted data delivered to userspace implies that an error has to go
 through these checks undetected, which is very unlikely. It would make much
 sense to start investigating from the FCS at layer 2, which is the one usually
 completely out of the control of the software stack. However, I decided to approach
@@ -104,7 +105,7 @@ corruption via *tc* command as follows:
 sudo tc qdisc add dev lo root netem corrupt <CORRUPTION RATE>
 ```
 
-However, this methods does not give much room for tuning: with the line above we
+However, this method does not give much room for tuning: with the line above we
 are asking the network stack to "corrupt \<CORRUPTION RATE\>% of the *sk_buff*", 
 where corruption means flipping one random bit in the whole *sk_buff*. The 
 relevant code from *net/sched/sched_netem.c* which implements the *corrupt* policy 
@@ -157,7 +158,7 @@ The code behaves in a very similar way as the netem discipline:
   * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that hardware offloading is disabled
   for this *sk_buff*
 
-This kernel module has been tested on CentOS 7 with kernel 3.10, it is not guardanteed
+This kernel module has been tested on CentOS 7 with kernel 3.10, it is not guaranteed
 to work on any other kernel version. The outcome of the experiment was definitely 
 interesting. On the client side, where the netfilter kernel module was running, 
 I could see the following debug information:
@@ -251,7 +252,7 @@ This "misunderstanding" between software and hardware causes corrupted
 data to go through to the application layer. It would be tempting to remove
 *NETIF_F_IP_CSUM* from the features of the device and, as a matter of fact,
 this would fix the data corruption issue until a TCP checksum collision, which is 
-not so unlikely considering the algorithm for the TCP checksum is rather weak.
+not so unlikely considering the algorithm used is rather weak.
 However, the XGene-1 NIC is expected to checksum incoming frame. Offloading 
 the calculation to the software severely affect the maximum throughput of the
 interface.
@@ -270,7 +271,7 @@ the frame is discarded. Bearing this in mind, if corruption happens on the mediu
 then it must be detected at Layer 2, unless unlikely collisions happen. 
 At this point of the investigation it was not clear to me whether the corruption 
 was really happening on the wire: if that was really the case, then the CRC check 
-had to disregard those frames. 
+had to discard those frames. 
 
 
 To test whether hardware CRC verification was
@@ -298,14 +299,14 @@ interface varies depending on the version of the kernel. It is reported as
 *fc:aa:14:e4:97:59* when running kernel 4.2.0-29, but under kernel 4.6.0, the 
 interface with MAC address *fc:aa:14:e4:97:59* does not appear
 to have any link anymore and the MAC of the interface under test
-becomes *22:f7:cb:32:eb:5c*. This is behaviour is not present with the latest 
+becomes *22:f7:cb:32:eb:5c*. This behaviour is not present with the latest 
 UEFI firmware from Gigabyte, despite the data corruption issue still being reproducible. 
 It also true that, while running tcpdump on the server side, the NIC is in promiscuous 
 mode and it will accept anything, no matter the destination MAC, so the value 
 specified on the command line does not really matter.
 
 If not explicitly requested, the tool appends a valid CRC at the end of the frame.
-The minium frame size allowed by the 803.2 standard is 64 bytes. Considering
+The minimum frame size allowed by the 803.2 standard is 64 bytes. Considering
 12 bytes for sender and receiver MAC, 2 bytes for protocol type and 4 bytes for
 CRC, the minimum payload size is 46 bytes, which in this case is randomly generated.
 
@@ -345,7 +346,7 @@ driver shipped with kernel 4.6.0):
 ```
 
 The CRC is being removed by subtracting the trailing 4 bytes from the total
-lenght of the frame. Removing the *-4* easily does the trick as shown by the 
+length of the frame. Removing the *-4* easily does the trick as shown by the 
 following trace (payload in now coming from /dev/zero):
 
 ```
@@ -368,7 +369,7 @@ Message sent correctly
 What happens if a corrupted CRC is appended to the frame? Normally any device
 that operates at layer 2 is expected to drop it, which means that a corrupted
 frame will never go past a switch or a NIC. However, at least for the latter,
-there are ways around it: ethtool compliant driver/NICs expose the *rx-all* parameter, which when
+there are ways around it: ethtool compliant drivers/NICs expose the *rx-all* parameter, which when
 supported and enabled, allows to receive all incoming frames, including those
 whose CRC could not be validated. On the xgene-enet, rx-all is set to off,
 as expected, and cannot be modified in any way. For the test to be relevant,
@@ -391,8 +392,8 @@ little endian word and as a consequence bytes appear in reversed order.
 
 Conclusions
 =======
-The results of the experiments performed at application, transport and link have highlighted
-the following issues:
+The results of the experiments performed at application, transport and data link 
+layer have highlighted the following issues:
     
   * Corrupted data is being delivered to userspace applications. 
   * The corruption happens both with a switched and back-to-back connection.

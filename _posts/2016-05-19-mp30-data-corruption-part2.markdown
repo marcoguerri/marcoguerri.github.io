@@ -4,23 +4,24 @@ title:  "Network data corruption on Gigabyte R120-P31 - Part 2"
 date:   2016-08-19 21:00:00
 categories: jekyll update
 summary: "After investigating a data corruption issue encountered on a Gigabyte 
-ARM64 R120-MP31 at the application, transport and link layer, I have performed some
+ARM64 R120-MP31 at the application, transport and date link layer, I performed some
 tests aimed at validating an alternative hypothesis, i.e. data corruption happening
 in system RAM."
 ---
 
 The hardware-software interface
 =======
-When an incoming frame is received on the 10GbE interface of the XGene-1,  the controller is capable
-of mastering the bus and copying directly the data into system memory. The controller
-maintains a hardware ring buffer of available DMAable memory regions where to copy
-incoming frames. When the NIC runs out of regions, the hardware ring buffer is
-refilled by the driver. The DMAable addresses are basically *sk_buff* allocated
-with *netdev_alloc_skb_ip_align*. This function allocates a virtual addresses that 
-is immediately mapped to a physical region. When user space processes allocate 
-memory via *malloc*, the underlying *brk* or *mmap* syscalls add a particular mapping to 
-the virtual address space of the process but a physical frame is normally not reserved 
-until the first page fault. In this case, however, the newly allocated address must be passed over to the hardware 
+When an incoming frame is received on the 10GbE interface of the XGene-1, 
+the controller is capable of mastering the bus and copying directly the data 
+into system memory. The controller maintains a hardware ring buffer of available 
+DMAable memory regions where to copy incoming frames. When the NIC runs out of 
+regions, the hardware ring buffer is refilled by the driver. The DMAable addresses 
+are basically *sk_buff* allocated with *netdev_alloc_skb_ip_align*. This function 
+allocates a virtual addresses that is immediately mapped to a physical region. 
+When user space processes allocate memory via *malloc*, the underlying *brk* or 
+*mmap* syscalls add a particular mapping to the virtual address space of the 
+process but a physical frame is normally not reserved until the first page fault. 
+In this case, however, the newly allocated address must be passed over to the hardware 
 which accesses system memory without going through the CPU MMU, making it necessary
 to have a mapping immediately available. Hardware devices are not always 
 capable of DMAing directly to physical addresses. There is usually IOMMU hardware 
@@ -103,7 +104,7 @@ relocation error ("unsupported RELA") that was being raised when loading the mod
 
 Results from the probe
 =======
-What was immediately stands out when running my jprobe is that the code is definitely not
+What immediately stands out when running the jprobe is that the code is definitely not
 optimized for speed. When loading the kernel module and transferring data
 over the SFP+ interface, the *softirq* which is running the NAPI handler
 goes 100\% CPU utilization and the throughput drops to a bare ~8MB/s. Nonetheless,
@@ -213,8 +214,32 @@ actually capable of working directly on a range of physical addresses, by
 making use of /dev/mem, but this is really a bad idea as the underlying memory
 pages are very likely to be in use by the kernel. In the best case, the tool would mistakenly 
 report data corruption due to the concurrent activity of other threads, in the
-worst case, the system would completely freeze. The proper course of action is
-to use memory testing utilities that do not run at the operating system level,
-e.g. uboot *mtest*.
+worst case, the system would completely freeze. The proper course of action would
+be to use bare-metal memory testing utilities like uboot *mtest*. 
+At this point however, I decided to halt all the debugging activities as the 
+memory corruption hypothesis seemed rather weak to me and the deadline I had set for
+coming up with a solution had been reached. Time came to ask for support to the 
+system integrator that supplied the systems
+  
+
+Conclusions
+=======
+After long discussions with the system integrator, we were recommended to try using 
+optical tranceivers (GBIC) for fiber cables rather than passive Direct Attached Copper. 
+With some initial disappointment, this approach worked. The system was 
+running fine at 10 Gibabit with no data corruption whatsover. Being used to passive 
+copper, the idea of testing optical transceivers unfortunately did not cross my mind. 
+The optical transceiver basically handles the generation of light signals over
+the fiber: apparently, the transceiver embedded on the Gigabyte motherboard does 
+not cope well with copper for some reason, and by shifting the signal handling 
+responsabilities to an external module, the problem is "patched". However, all the issues highlighted when
+investigating TCP checksum and Ethernet FCS are still relevant. After all, the 
+optical transceiver does not add any layer with an additional consistency mechanism, 
+therefore I believe data corruption on the wire would still pose a serious problem.
+After some further testing, I realised that also FCoE copper cables seemed
+to work just fine. In this case, the active transceiver encapsulates outgoing 
+Ethernet frames in to Fiber Channel frames, which include additional consistency
+mechanisms, therefore bits flipped on the wire would most likely be correctly 
+detected.
 
 
