@@ -1,17 +1,17 @@
 ---
 layout: post
-title: "The lifetime of a Python multiprocessing.Process"
+title: "Creation and termination of a Python multiprocessing.Process"
 date:   2016-07-24 20:00:00
 categories: jekyll python multiprocessing
-summary: "Some notes on the mechanisms that regulate the lifetime
-of a Python multiprocessing Process, investigating in particular what happens
-when the interpreter terminates."
+summary: "This post is a collection of notes on the mechanisms that regulate 
+the creation and termination of a Python multiprocessing Process, investigating in 
+particular what happens when the interpreter terminates."
 ---
 
 Background
 =======
-Let's consider the following snippet of code, where the main thread spawns
-a worker process that requires some time to terminate.
+In the following code snippet, the main thread spawns a worker process that 
+requires a certain amount of time to terminate.
 
 ```python
 from multiprocessing import Process
@@ -25,19 +25,19 @@ p = Process(target=worker)
 p.start()
 print "All done"
 ```
-When that code is executed, "All done" is immediately printed, then there is
-a 10 seconds delay followed by the message "Worker Process". What happens when
-the process is created and especially why the interpreter does not return until
+When this code is executed, "All done" is immediately printed, then a 10 seconds
+delay follows and the message "Worker Process" is printed on the tty. What happens 
+exactly when the process is created and why the interpreter does not return until
 the worker has completed the execution?
 
 A deeper look with strace
 =======
 *strace* might seem a bit of an overkill in this case, as normally *pdb* would be just 
 enough to understand what happens at the Python multiprocessing library level.
-However, I find it always very insightful and I wanted to give it a try.
-Clearly I will skip the uninteresting parts and jump right to the relevant pieces.
-Since I want to see what both the parent and the child are doing, the *-f* flag
-is required. The worker process is initially created via *clone* syscall:
+However, I find the level of understanding that comes from analyzing strace output 
+invaluable and definitely worth the effort of filtering out non-relevant stuff.
+In order to trace both the parent and the child, *-f* flag is required. The worker 
+process is initially created via *clone* syscall:
 
 
 ```plaintext
@@ -51,11 +51,11 @@ Process 17498 attached
 ```
 
 The absence of *CLONE_VM*, to enable sharing page tables, and *CLONE_FS*, to enable
-sharing the fs\_struct  in task\_struct, when invoking clone clearly indicates
-that a new process is being created rather than a
-thread. *SIGCHLD* is also set, therefore a signal will be delivered to the parent upon
-termination. The child then waits 10 seconds via *select* syscall and finally prints its
-message. What is the parent doing meanwhile?
+sharing the fs\_struct  in task\_struct (i.e. the open files table), when invoking clone 
+clearly indicates that a new process is being created rather than a
+thread. *SIGCHLD* is also set, which causes the parent to be signaled upon the
+termination of the child. The process then waits 10 seconds via *select* syscall and 
+finally prints its message. What is the parent doing meanwhile?
 
 ```text
 [pid 17497] write(1, "All done\n", 9All done
@@ -72,16 +72,15 @@ exit_group(0)                           = ?
 
 After printing its message on standard output, it starts a series of non-blocking
 wait on the child setting *WNOHANG* flag, which causes the syscall to return immediately
-if the child hasn't terminated yet. As a side note, by default *wait4* behaves as *waitpid*, i.e. returns
-only if the waited process has terminated. A SIGCHLD is then sent by the child, but
-given that the default policy for this signal is "ignore", there is no side effect
-on the parent, that is the system call is not interrupted with *EINTR* nor
-restarted via *SA_RESTART*.  wait4 returns the pid of
-the process which was being waited. It is interesting now to see how this behavior
+if the child hasn't terminated yet. Without that flag, *wait4* by default behaves as *waitpid*, i.e. it returns
+only if the process waiter for has terminated. A SIGCHLD is then sent by the child, but
+there is no side effect on the parent as the default policy for this signal is *SIG_IGN*:
+the system call is not interrupted with *EINTR* nor restarted via *SA_RESTART*.  
+wait4 returns the pid of the process which was being waited. It is interesting now to see how this behavior
 is triggered in the multiprocessing library, since it is not immediately obvious:
 shouldn't the interpreter just return after the final statement?.
-Normally Python code is debugged with pdb, but here it does not really prove useful
-and to go as deep as possible, gdb is the best tool for the trade.
+In this case pdb does not really prove useful and to go as deep as possible, 
+gdb is the best tool for the trade.
 
 
 Tracing with gdb
@@ -98,7 +97,7 @@ Note however that the package with debug symbols must match the version of
 the "plain" package: a mismatch will prevent gdb from loading the symbols.
 This mechanism is a bit different between Debian and Fedora. In fact, under Fedora
 the package *python-debug* contains an executable that does not have debug symbols,
-but it has been compiled with internal debug features useful when developing for
+but it has been compiled with internal debug features aimed at supporting development, for
 example extension for the interpreter. Debug symbols must be installed
 separately. Since I am interested in seeing what happens just before the interpreter
 exits, I need to obtain a backtrace at the right moment. Breaking at the *exit_group*
@@ -125,7 +124,7 @@ Catchpoint 1 (call to syscall wait4), 0x00007ffff7bce47c in __libc_waitpid (pid=
 
 Backtracing
 =======
-Since I am tracing the Python interpreter I am expecting to see invocations of
+Since I am tracing the Python interpreter I expect to see invocations of
 CPython internal methods. Luckily gdb is extremely smart and helps a lot in mapping
 what is happening in the Python interpreter with the high level source code.
 Having trapped *wait4* invocations, the first item I expect to see is a libc
@@ -190,7 +189,7 @@ def poll(self, flag=os.WNOHANG):
                 pid, sts = os.waitpid(self.pid, flag)
 ```
 
-The actual source code line that corresponds to the bytecode instruction begin
+The actual source code line that corresponds to the bytecode instruction being
 executed is a bit more tricky to obtain, but the interpreter abstracts all the
 complexity by providing *PyFrame_GetLineNumber*.
 
@@ -199,11 +198,9 @@ complexity by providing *PyFrame_GetLineNumber*.
 $4 = 135
 ```
 
-Exactly what gdb already told us.
-After this little digression, let's go back to the stack trace. The *poll* function
-is a method of *Popen* class in multiprocessing lib. The next invocation of
-*PyEval_EvalFrameEx* on the stack points to process.py.
-
+Exactly what gdb already told us. After this little digression, let's go back to 
+the stack trace. The *poll* function is a method of *Popen* class in multiprocessing 
+lib. The next invocation of *PyEval_EvalFrameEx* on the stack points to process.py.
 
 ```text
 #8  0x00000000005266ca in PyEval_EvalFrameEx (
@@ -226,7 +223,7 @@ Further down the stack there is another pointer to process.py.
     at ../Python/ceval.c:2679
 ```
 *_cleanup* function is now called in *active_children*, which returns a list
-of live child processes.
+of child processes which are alive.
 
 ```python
 def active_children():
@@ -242,7 +239,7 @@ Next frame points to util.py.
     f=Frame 0xacf490, for file /usr/lib/python2.7/multiprocessing/util.py, line 318, in _exit_function (info=<function at remote 0x7ffff6ce3648>, debug=<function at remote 0x7ffff6ce35a0>, _run_finalizers=<function at remote 0x7ffff6c9f840>, active_children=<function at remote 0x7ffff6ee2990>, current_process=<function at remote 0x7ffff6ee28e8>), throwflag=0)
     at ../Python/ceval.c:2679
 ```
-Here  *active_children* is called in *\_exit_function*.
+Here *active_children* is called in *\_exit_function*.
 
 ```python
 def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,

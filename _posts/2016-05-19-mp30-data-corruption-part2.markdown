@@ -224,22 +224,21 @@ system integrator that supplied the systems
 
 Conclusions
 =======
-After long discussions with the system integrator, we were recommended to try using 
-optical tranceivers (GBIC) for fiber cables rather than passive Direct Attached Copper. 
+After lengthy discussions with the system integrator, we were advised to try using 
+optical transceivers (GBIC) for fiber cables rather than passive Direct Attached Copper. 
 With some initial disappointment, this approach worked. The system was 
-running fine at 10 Gibabit with no data corruption whatsover. Being used to passive 
-copper, the idea of testing optical transceivers unfortunately did not cross my mind. 
+running fine at 10 Gbit/s with no data corruption whatsoever. Being used to passive 
+copper, this idea unfortunately did not cross my mind. 
 The optical transceiver basically handles the generation of light signals over
-the fiber: apparently, the transceiver embedded on the Gigabyte motherboard does 
-not cope well with copper for some reason, and by shifting the signal handling 
-responsabilities to an external module, the problem is "patched". However, all the issues highlighted when
-investigating TCP checksum and Ethernet FCS are still relevant. After all, the 
+the fiber: for some reason, the PHY embedded on the Gigabyte board does 
+not cope well with copper, and by shifting the signal handling 
+responsibilities to an external module, the problem seems to be "patched". However, all the issues 
+related to TCP checksum and Ethernet FCS are still relevant. After all, the 
 optical transceiver does not add any layer with additional checksumming, 
 therefore I believe data corruption on the wire would still pose a serious problem.
-After some further testing, I realised that also FCoE copper cables seemed
+After some further testing, I realised also FCoE copper cables seemed
 to work just fine. In this case, the active transceiver encapsulates outgoing 
 Ethernet frames into Fiber Channel frames, which include additional consistency
-checks, therefore bits flipped on the wire would most likely be correctly 
-detected.
+checks, hence data corruption on the wire would most likely be correctly detected.
 
 
