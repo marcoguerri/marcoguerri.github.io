@@ -79,7 +79,7 @@ a {
   margin-bottom: 50px;
   margin: auto;
   padding: 2em;
-  width: 40%;
+  width: 60%;
 }
 
 .content-books {
@@ -199,10 +199,26 @@ pre.highlight {
   font-size:110%;
 }
 
+table{
+    border-collapse: collapse;
+    border-spacing: 0;
+    border: 0.1em solid #E1E1E1;
+
+}
+
+th{
+    border: 0.1em solid #E1E1E1;
+}
+
+td{
+    border: 0.1em solid #E1E1E1;
+    padding: 0 1em 0 1em;
+}
 
 table.post-list {
   width: 100%;
   border-collapse: collapse;
+  border: 0px;
 }
 
 table.post-list a {
@@ -213,10 +229,12 @@ table.post-list a {
 
 table.post-list th {
   text-align: left;
+  border: 0px;
 }
 
 table.post-list td, table.post-list th {
   padding: 0.5em 0.3em;
+  border: 0px;
   border-bottom: 0.1em solid #E1E1E1;
 }
 
