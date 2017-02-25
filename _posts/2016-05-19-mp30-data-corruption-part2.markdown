@@ -233,9 +233,9 @@ The optical transceiver basically handles the generation of light signals over
 the fiber: for some reason, the PHY embedded on the Gigabyte board does 
 not cope well with copper, and by shifting the signal handling 
 responsibilities to an external module, the problem seems to be "patched". However, all the issues 
-related to TCP checksum and Ethernet FCS are still relevant. After all, the 
-optical transceiver does not add any layer with additional checksumming, 
-therefore I believe data corruption on the wire would still pose a serious problem.
+related to TCP checksum and Ethernet FCS are still relevant and for these to date unfortunately
+I don't have an explanation . The optical transceiver does not add any layer with additional checksumming, 
+therefore data corruption on the wire would still pose a serious problem.
 After some further testing, I realised also FCoE copper cables seemed
 to work just fine. In this case, the active transceiver encapsulates outgoing 
 Ethernet frames into Fiber Channel frames, which include additional consistency

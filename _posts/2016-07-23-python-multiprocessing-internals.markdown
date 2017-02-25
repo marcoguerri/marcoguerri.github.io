@@ -264,8 +264,9 @@ Next and last frame of interest points to atexit.py.
 ```
 
 atexit.py is a mechanism that allows to register cleanup functions that are
-executed upon normal interpreter termination. In util.py at line 330, the module 
-registers *\_exit_function* as an atexit callback:
+executed upon normal interpreter termination (the Python counterpart of the libc
+`atexit`). In util.py at line 330, the module registers *\_exit_function* as 
+an atexit callback:
 
 
 ```python
