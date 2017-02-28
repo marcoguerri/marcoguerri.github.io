@@ -46,14 +46,12 @@ relevant, the runtime on the two platforms was the following:
 ```
 [root@ivybridge ~]# time numactl --physcpubind=0 --membind=0 python lhcb.py
 8.62366333218
-
 real    0m58.239s
 user    0m58.007s
 sys 0m0.225s
 
 [root@haswell ~]# time numactl --physcpubind=0 --membind=0 python lhcb.py
 12.8205128205
-
 real    0m39.315s
 user    0m38.977s
 sys 0m0.319s
@@ -81,6 +79,7 @@ by the benchmarks. Ivy Bridge functions-breakdown, limited to the first 10
 contributors, was the following:
 
 ```
+#rank total-icount    % cumulative%   #times-called    address  function-name    image-name
 0:  78447041164  40.065  40.065      25000610      7fafdb921d00 PyEval_EvalFrameEx  IMG: /lib64/libpython2.7.so.1.0
 1:  20255778100  10.345  50.410             0      7fafdb88b700 _Py_add_one_to_index_C  IMG: /lib64/libpython2.7.so.1.0
 2:  12676220173   6.474  56.884             1      7fafdb8b07b0 PyFloat_GetInfo  IMG: /lib64/libpython2.7.so.1.0
@@ -95,7 +94,9 @@ contributors, was the following:
 
 Haswell functions-breakdown, also limited to the first 10 contributors, was
 the following:
+
 ```
+#rank total-icount    % cumulative%   #times-called    address  function-name    image-name
 0:  78443984168  40.061  40.061      25000613      7f547808ed00 PyEval_EvalFrameEx  IMG: /lib64/libpython2.7.so.1.0
 1:  20255041770  10.344  50.406             0      7f5477ff8700 _Py_add_one_to_index_C  IMG: /lib64/libpython2.7.so.1.0
 2:  12675720283   6.474  56.879             1      7f547801d7b0 PyFloat_GetInfo  IMG: /lib64/libpython2.7.so.1.0
@@ -106,7 +107,6 @@ the following:
 7:   5217908380   2.665  73.504      34214316      7f5477611450 __ieee754_log_avx  IMG: /lib64/libm.so.6
 8:   5001228296   2.554  76.059     125029216      7f5478033280 PyDict_GetItem   IMG: /lib64/libpython2.7.so.1.0
 9:   4450065996   2.273  78.331            76      7f547801fbb0 _PyFloat_Unpack8  IMG: /lib64/libpython2.7.so.1.0
-
 ```
 
 What immediately stood out from the traces above was the following:
@@ -119,35 +119,23 @@ What immediately stood out from the traces above was the following:
 
 For each function listed above, I created an histogram of the instructions executed.
 
-PyEval_EvalFrameEx
-=======
+{% assign list = "PyEval_EvalFrameEx, 
+                  Py_add_one_to_index_C,
+                  PyFloat_GetInfo,
+                  PyLong_Init,
+                  PyFloat_FromDouble,
+                  text,
+                  Py_UniversalNewlineFread,
+                  ieee754_log_avx,
+                  PyDict_GetItem,
+                  PyFloat_Unpack8" | remove: " " |split: "," %}
 
-_Py_add_one_to_index_C
-=======
-
-PyFloat_GetInfo
-=======
-
-_PyLong_Init
-=======
-
-PyFloat_FromDouble
-=======
-
-.text (_randommodule.so)
-=======
-
-Py_UniversalNewlineFread
-=======
-
-__ieee754_log_avx
-=======
-
-PyDict_GetItem
-=======
-
-_PyFloat_Unpack8
-=======
+{% for item in list %}
+<p align="center">
+<a id="single_image" href="/img/branch-prediction/{{item}}.png">
+<img  src="/img/branch-prediction/{{item}}.png" alt=""/></a>
+</p>
+{% endfor %}
 
 Interpreting the histograms
 =======
@@ -166,7 +154,7 @@ that dispatches the current opcode to the corresponding case branch
 for execution. In CPython 2.7.5, it looks like the following:
 
 
-```C
+```c
 switch (opcode) {
     case NOP:
         <NOP Instruction>
@@ -208,10 +196,10 @@ indeed interesting.
 
 The code can be found at <LINK>. The script implements a large switch
 statement dispatching in loop either a sequential opcode sequence or a random one.
-The results are as follows:
+The results are as follows (the number of case branches is 512):
 
 Ivy Bridge, sequential opcode, lenght of the sequence is 512
-(equal to the number of case branches)
+---
 ```
 # perf stat numactl --physcpubind=0 --membind=0 ./branch -l 512
 
@@ -229,11 +217,11 @@ Ivy Bridge, sequential opcode, lenght of the sequence is 512
        260,595,846      branch-misses             #   19.34% of all branches
 
       10.082002557 seconds time elapsed
-
-
 ```
 
 Ivy Bridge, random opcode, lenght of the sequence is 512
+---
+
 ```
 # perf stat numactl --physcpubind=0 --membind=0 ./branch -r -l 512
 
@@ -251,11 +239,10 @@ Ivy Bridge, random opcode, lenght of the sequence is 512
        257,970,218      branch-misses             #   19.15% of all branches
 
        9.677276472 seconds time elapsed
-
 ```
 
 Haswell, sequential opcode, lenght of the sequence is 512
-(equal to the number of case branches)
+---
 
 ```
 # perf stat numactl --physcpubind=0 --membind=0 ./branch  -l 512
@@ -275,6 +262,7 @@ Haswell, sequential opcode, lenght of the sequence is 512
 ```
 
 Haswell, random opcode, lenght of the sequence is 512
+---
 
 ```
 # perf stat numactl --physcpubind=0 --membind=0 ./branch  -r -l 512
