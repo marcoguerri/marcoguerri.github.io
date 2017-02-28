@@ -236,7 +236,8 @@ that Wireshark decodes properly the SSL record, which means the message can
 be considered as well-formatted.
 
 <p align="center">
-<a id="single_image" href="/img/hb_good_request_detail.png"><img  src="/img/hb_good_request_detail.png" alt=""/></a>
+<a id="single_image" href="/img/heartbleed/hb_good_request_detail.png">
+<img  src="/img/heartbleed/hb_good_request_detail.png" alt=""/></a>
 </p>
 
 Even if the SSL handshake is not terminated, as shown by the traffic dump,
@@ -245,7 +246,8 @@ unsuccessful attempts, I decided to go more in depth by following step by
 step the execution on the server side.
 
 <p align="center">
-<a id="single_image" href="/img/hb_good_request.png"><img src="/img/hb_good_request.png" alt=""/></a>
+<a id="single_image" href="/img/heartbleed/hb_good_request.png">
+<img src="/img/heartbleed/hb_good_request.png" alt=""/></a>
 </p>
 
 
@@ -529,7 +531,8 @@ the socket; the client receives a well-formed heartbeat response with a payload
 that matches the data carried in the request message.
 
 <p align="center">
-<a id="single_image" href="/img/hb_working_response.png"><img src="/img/hb_working_response.png" alt=""/></a>
+<a id="single_image" href="/img/heartbleed/hb_working_response.png">
+<img src="/img/heartbleed/hb_working_response.png" alt=""/></a>
 </p>
 
 
@@ -555,7 +558,7 @@ of payload, 16 bytes of padding and 4 bytes of header, 65556 in total.
 
 
 ```text
-➜  ~/heartbleed [1] at 12:35:56 [Thu 12] $ ./send_heartbleed
+$ ./send_heartbleed
 Initializing new connection...
 Connecting...
 Connected!

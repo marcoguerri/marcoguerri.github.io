@@ -13,8 +13,8 @@ menu during the installation of a Linux distro."
 
 {% comment %}
 <div align="center">
-<a id="single_image" href="/assets/img/gentoo-enc/encrypt.png">
-<img src="/assets/img/gentoo-enc/encrypt.thumb.png" alt=""/>
+<a id="single_image" href="/img/gentoo-encryption/encrypt.png">
+<img src="/img/gentoo-encryption/encrypt.thumb.png" alt=""/>
 </a>
 </div>
 {% endcomment %}
@@ -23,13 +23,14 @@ Initial setup
 =============
 
 The procedure is more or less the same as the
-one outlined in the [Gentoo Linux x86 Handbook](#gentoo_handbook). However, when it comes to
+one outlined in the [Gentoo Linux x86 Handbook](http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1). 
+However, when it comes to
 paritioning the drive, compiling the Kernel and setting the initial ramdisk,
 several different steps must be carried out.
 
 I went through the whole process inside a Virtual Machine, using VMWare Player 
 as hypervisor. The Gentoo live image I used is the weekly build 
-[install-x86-minimal-20130820](#sha512). Working "remotely" through ssh is much 
+*install-x86-minimal-20130820* (sha512: d3135b53). Working "remotely" through ssh is much 
 more convenient. RSA/DSA ssh keys must be generated with ssh-keygen, a root password 
 set and sshd daemon started.
 
@@ -346,16 +347,3 @@ initrd /initramfs
 After umounting /mnt/gentoo/boot, /mnt/gentoo/proc,
 /mnt/gentoo and rebooting the machine, the initrd should prompt for the password of 
 the encrypted volume and then mount the root filesystem.
-<hr width="30%" style="margin-bottom:20px;margin-top:20px"/>
-<ul class="references">
-<li>
-    <a name="gentoo_handbook">[1] <a target="_blank" href="http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?full=1">Gentoo Linux x86 Handbook</a>
-   </a> 
-</li>
-<li> 
-    <a name="sha512">[2] sha512: d3135b53770c9a5c8aed760fe5e8525ffd0fd9abc79509bcdca651e33327def2 </a>
-</li>
-</ul>
-[jekyll-gh]: https://github.com/mojombo/jekyll
-[jekyll]:    http://jekyllrb.com
-

@@ -33,7 +33,8 @@ was appearing: "Failed to load ldlinux.c32". And then a reboot. (Picture below
 shows pxelinux 6.04, but all these notes have been taken while working with 6.03).
 
 <p align="center">
-<a id="single_image" href="/img/pxe_timeout.png"><img src="/img/pxe_timeout.png" alt=""/></a>
+<a id="single_image" href="/img/pxelinux/pxe_timeout.png">
+<img src="/img/pxelinux/pxe_timeout.png" alt=""/></a>
 </p>
 
 
@@ -610,8 +611,8 @@ querying by IP, basically ruling out all traffic at the data link layer, ARP
 requests included. After having had another look at the network dump, the situation was pretty clear.
 
 <div align="center">
-<a id="single_image" href="/assets/img/pxe/PXETraffic.png">
-<img src="/assets/img/pxe/PXETraffic.png" alt=""/>
+<a id="single_image" href="/img/pxe/PXETraffic.png">
+<img src="/img/pxe/PXETraffic.png" alt=""/>
 </a>
 </div>
 
