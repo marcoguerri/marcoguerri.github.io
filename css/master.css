@@ -79,7 +79,7 @@ a {
   margin-bottom: 50px;
   margin: auto;
   padding: 2em;
-  width: 60%;
+  max-width: 850px;
 }
 
 .content-books {

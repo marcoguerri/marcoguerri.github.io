@@ -5,14 +5,14 @@ date:   2017-02-18 08:00:00
 published: yes
 categories: c linker
 pygments: true
-summary: "Some notes on LD_PRELOAD,  __attribute__((constructor)) and execve syscall"
+summary: "Some notes on LD_PRELOAD, attribute constructor and execve syscall"
 ---
 
 Introduction
 =======
 
-*__attribute__((constructor))* and *__attribute__((destructor))* is a mechanism
-that allows to execute functions when loading and unloading ELF executables and shared 
+*\_\_attribute\_\_((constructor))* and *\_\_attribute\_\_((destructor))* are mechanisms
+supported by ELF binaries which allow to execute functions when loading and unloading executables and shared 
 objects. These functions are defined at the translation unit level (object files) 
 and referenced in the *.ctor* and *.dtor* sections of the ELF binary. When an object 
 is loaded and unloaded, the interpreter specified in the *PT_INTERP* segment 
