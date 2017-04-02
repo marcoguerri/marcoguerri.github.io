@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "LD_PRELOAD and __attribute__((constructor))"
+title:  "LD_PRELOAD and attribute constructor"
 date:   2017-02-18 08:00:00
 published: yes
 categories: c linker
