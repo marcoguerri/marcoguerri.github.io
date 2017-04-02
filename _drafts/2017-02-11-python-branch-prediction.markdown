@@ -112,11 +112,14 @@ the following:
 What immediately stood out from the traces above was the following:
 
    * The two executions were pretty much identical
-   * The runtime was dominated by the Python interpreter, CPython, with
+   * The major contributor in terms of instructions executed was the Python interpreter, CPython, with
     *PyEval_EvalFrameEx*, the core function that executes Python bytecode
-   *  *_randommodule.so* contributed only for 3.5% of the execution time, while
-     all other contributions were mostly coming from CPython
-
+   *  *_randommodule.so* contributed only for 3.5% of the total instructions, while
+     all other contributions were mostly coming from CPython.
+     
+The percentage of instructions executed does not necessarily translate into the
+same execution time weight, although it is reasonable to expect 
+that *PyEval_EvalFrameEx* be also the major contributor in terms of time.
 For each function listed above, I created an histogram of the instructions executed.
 
 {% assign list = "PyEval_EvalFrameEx, 
@@ -139,10 +142,9 @@ For each function listed above, I created an histogram of the instructions execu
 
 Interpreting the histograms
 =======
-The plots were clear. The instruction set used on Ivy Bridge and
-Haswell was exactly the same. I considered worthwhile having a closer look at
-the main contributor, *PyEval_EvalFrameEx*, as it was accounting for
-40% of the runtime alone.
+The plots suggested that the instruction set used on Ivy Bridge and
+Haswell be exactly the same. I considered worthwhile having a closer look at
+the main contributor, *PyEval_EvalFrameEx*.
 
 
 Analyzing PyEval_EvalFrameEx
@@ -297,8 +299,6 @@ When using a random opcode sequence of lenght 512, the number of mispredicted br
 is 10 times higher on Ivy Bridge, with a difference in number of branches of
 only 0.2%. There is another interesting result that stands out: on Haswell,
 a sequential opcode sequence generates a higher number of mispredictions compared
-to a random one. This might seem to be defeating all expectations, but a possible
-explanation is provided further down. 
-
+to a random one.
 
 
