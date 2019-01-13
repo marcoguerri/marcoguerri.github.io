@@ -236,9 +236,4 @@ responsibilities to an external module, the problem seems to be "patched". Howev
 related to TCP checksum and Ethernet FCS are still relevant and for these to date unfortunately
 I don't have an explanation . The optical transceiver does not add any layer with additional checksumming, 
 therefore data corruption on the wire would still pose a serious problem.
-After some further testing, I realised also FCoE copper cables seemed
-to work just fine. In this case, the active transceiver encapsulates outgoing 
-Ethernet frames into Fiber Channel frames, which include additional consistency
-checks, hence data corruption on the wire would most likely be correctly detected.
-
 

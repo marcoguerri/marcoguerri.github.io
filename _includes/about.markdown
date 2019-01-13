@@ -1,9 +1,8 @@
 About
 =====
-I was born in Modena, Italy, a number of years ago which can be represented with
-5 bits, unsigned. I studied Computer Engineering 
-at University of Modena and Reggio Emilia and I currently work at CERN, the 
-European Organization for Nuclear Research.
+I was born in Modena, Italy, and I studied Computer Engineering 
+at University of Modena and Reggio Emilia. I currently work at Facebook as 
+a Production Engineer. I am based in the Dublin office.
 
 The usefulness of this blog is highly questionable. This is meant to be mostly a place
 for myself, a place where to dump ideas and experiments in a slightly more formal
