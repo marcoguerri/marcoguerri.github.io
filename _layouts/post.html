@@ -1,32 +1,47 @@
----
-layout: master
----
-<div class='summary'>
-<h1 class='post_title'>{{page.title}}</h1>
-    <div class="date">
-        <i class="fa fa-calendar"></i><span class='date'>{{page.date | date: "%-d %B %Y"}}</span>
+{% include header.html %}
+
+<div class="container container-left">
+    <div class="row">
+        <div class="col-md-3 hidden-xs">
+            {% include sidebar.html %}
+        </div>
+        <div class="col-md-9">
+          <div class="article">
+            <div class="well">
+                <h1><a href="{{ site.baseurl}}{{ page.url }}">{{ page.date | date: "%b %-d, %Y" }} - {{ page.title }}</a></h1>
+            {% if site.comments and page.comments %}
+                {% if site.disqus != '' %}
+                <p class="author"><a href="#disqus_thread" data-disqus-identifier="{{ page.url | slugify }}">Comments</a></p>
+                {% elsif site.isso != '' %}
+                <p class="author"><a href="{{ site.baseurl }}{{ page.url }}{{ site.isso_suffix }}#isso-thread">Comments</a></p>
+                {% endif %}
+            {% endif %}
+            <div class="post-content">
+            {{ content }}
+            </div>
+            {% if page.comments %}
+                {% if site.disqus != '' %}
+            <div id="disqus_thread">
+                <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+                <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+            </div>
+                {% elsif site.isso != '' %}
+                <section id="isso-thread"></section>
+                {% endif %}
+            {% endif %}
+            </div>
+          </div>
+          <div class="pagination">
+              {% if page.next %}
+                <a class="btn btn-default" href="{{ site.baseurl}}{{ page.next.url }}" class="next">Newer Post</a>
+              {% endif %}
+              {% if page.previous %}
+                <a class="btn btn-default" href="{{ site.baseurl}}{{ page.previous.url }}" class="previous">Older Post</a>
+              {% endif %}
+          </div>
+        </div>
     </div>
-    {{page.summary}}
-</div>
-<div class='post'>
-  <div class='body'>{{ content }}</div>
-
-  <script src="/javascripts/jquery.toc.js" type="text/javascript" charset="utf-8"></script>
-  <!--
-  <script type="text/javascript">
-      jQuery('').toc();
-  </script>
-  -->
-  <link rel="stylesheet" href="/css/jquery.fancybox.css" type="text/css" media="screen" />
-  <script type="text/javascript" src="/fancybox/jquery-1.4.3.min.js"></script>
-  <script type="text/javascript" src="/fancybox/jquery.fancybox-1.3.4.js"></script>
-  <script>
-  $(document).ready(function() {
-    $("a#single_image").fancybox();
-  });
-  </script>
-
-
 </div>
 
-
+{% include disqus-comments.html %}
+{% include footer.html %}

@@ -5,13 +5,15 @@ date:   2014-08-23 13:31:48
 categories: linux security
 published: yes
 pygments: true
-summary: "This post presents a Proof Of Concept of the Heartbleed bug.
-The aim was to attempt to exploit the well known bug to steal the private keys 
-from my local instance using a vulnerable version of OpenSSL. Unfortunately the 
-outcome was not the one being sought, but it has proven to be a very interesting 
-experiment anyway."
 ---
 
+Summary
+======
+This post presents a Proof Of Concept of the Heartbleed bug.
+The aim was to attempt to exploit the well known bug to steal the private keys
+from my local instance using a vulnerable version of OpenSSL. Unfortunately the
+outcome was not the one being sought, but it has proven to be a very interesting
+experiment anyway.
 
 The bug
 =======
@@ -22,7 +24,7 @@ chunk of memory from the address space of a process which is using libssl.
 The bug resides in the implementation of one of the features of the TLS protocol, 
 the TLS Heartbeat Extension, and affects OpenSSL from version 1.0.1 to 1.0.1f included.
 
-The bug lies in *ssl/t1_lib.c* in function tls1\_process\_heartbeat.
+The bug lies in `ssl/t1_lib.c` in function `tls1_process_heartbeat`.
 A heartbeat request is a way to check if the remote end of the connection is still
 alive. The client sends a request with a custom payload and the server is supposed
 to echo back the same data.
@@ -45,16 +47,16 @@ bp += payload;
 RAND_pseudo_bytes(bp, padding);
 ```
 
-*payload* is the length of the payload of the heartbeat request sent by the client,
-which is read directly from the incoming message. *pl* points to an area in memory
+`payload` is the length of the payload of the heartbeat request sent by the client,
+which is read directly from the incoming message. `pl` points to an area in memory
 where the payload itself is stored. The bug comes from a missing bounds check when
 echoing back the data of the heartbeat message: the payload length advertised by
 the client is never checked against the actual
 length of the buffer received. A client might specify a length of N bytes, but
 send instead only M bytes, with M < N. When sending back the response,
-the server copies *payload* bytes from the buffer pointed by *pl*. So, in principle a client can
+the server copies `payload` bytes from the buffer pointed by `pl`. So, in principle a client can
 send a heartbeat message with an arbitrary length value, and it will get back a chunk of memory
-from the server address space. The *payload* field is actually 16 bits long,
+from the server address space. The `payload` field is actually 16 bits long,
 so the maximum length is 64KB. The bug can be easily fixed by checking that the advertised
 length of the payload matches the actual length. A <a href="http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=731f431497f463f3a2a97236fe0187b11c44aead" target="_blank">patch</a>
 was released soon after the disclosure of the bug.
@@ -77,7 +79,7 @@ openssl package
 Following Cloudflare's example, I decided to try to obtain the private keys from my
 own instance. I am running Debian Wheezy 7.1 and, according to apt, the openssl 
 version I have
-installed on my machine is *1.0.1e*.
+installed on my machine is `1.0.1e`.
 
 ```text
 $ sudo apt-cache policy openssl
@@ -105,7 +107,7 @@ options:  bn(64,32) rc4(8x,mmx) des(ptr,risc1,16,long) blowfish(idx)
 [...]
 ```
 
-The changelog for *openssl_1.0.1e-2+deb7u14* shows that on April the 7th,
+The changelog for `openssl_1.0.1e-2+deb7u14` shows that on April the 7th,
 Heartbleed was fixed incrementing the release to deb7u5.
 
 ```text
@@ -125,7 +127,7 @@ The openssl version installed on my machine is therefore not vulnerable. In orde
 restore the bug, the package must be rebuilt without applying the fix. The easiest
 way to do so is via a reverse patch, since by default apt applies
 automatically all the patches included in the package after having fetched the sources
-via *apt-get source*.
+via `apt-get source`.
 
 ```text
 $ apt-get source openssl
@@ -137,18 +139,18 @@ cd ../..
 patch -p1 < hb_reversed.patch
 ```
 
-The changes must be committed with *dpkg-source --commit*
+The changes must be committed with `dpkg-source --commit`
 (it is not possible to compile the new package until then). This will
 create the "official" patch out of the differences in the codebase. When committing
 the changes, a description of the fix must be provided, which will eventually be appended
-on top of the .patch file. *dch -i*  (part of devscripts in Debian) opens an 
+on top of the .patch file. `dch -i`  (part of devscripts in Debian) opens an 
 editor where to add a new changelog entry: the version that appears there
- will be the one displayed by apt, *1.0.1e-2+deb7u14.1* in my case.
-The package can be finally built with  *dpkg-buildpackage -us -uc*.
+ will be the one displayed by apt, `1.0.1e-2+deb7u14.1` in my case.
+The package can be finally built with  `dpkg-buildpackage -us -uc`.
 
-Once done, *openssl\_1.0.1e-2+deb7u14.1\_i386.deb* and related packages will be
+Once done, `openssl_1.0.1e-2+deb7u14.1_i386.deb` and related packages will be
 available. Heartbleed vulnerability comes from libssl1.0.0 and the package
-that should be installed is *libssl1.0.0\_1.0.1e-2+deb7u14.1\_i386.deb*.
+that should be installed is `libssl1.0.0_1.0.1e-2+deb7u14.1_i386.deb`.
 
 ```text
 $ sudo dpkg -i libssl1.0.0_1.0.1e-2+deb7u14.1_i386.deb
@@ -195,9 +197,9 @@ Setting up libssl1.0.0:i386 (1.0.1e-2+deb7u14) ...
 nginx installation
 ==================
 nginx can be configured to enable HTTPS connections by simply adding the following
-*server* entry in the configuration file within the *http* section, making sure it
-does not clash with other *server* definitions included from */etc/nginx/sites-enabled*.
-The default configuration file is */etc/nginx/nginx.conf*.
+`server` entry in the configuration file within the `http` section, making sure it
+does not clash with other `server` definitions included from `/etc/nginx/sites-enabled`.
+The default configuration file is `/etc/nginx/nginx.conf`.
 
 ```text
 server {
@@ -256,13 +258,13 @@ Executing libssl under gdb
 
 In order to execute any piece of code under a debugger, two requirements are
 essential: debug symbols and source code. The former can be obtained under Debian
-with *-dbg* packages. However, if the original binary has been compiled with optimizations
+with `-dbg` packages. However, if the original binary has been compiled with optimizations
 enabled, a single-step execution will not result in a clean flow at the source 
 code level: associating assembly instructions to C code becomes difficult due to 
-instruction reordering, loop unrolling, inlining, etc. The *-dbg* package might be 
+instruction reordering, loop unrolling, inlining, etc. The `-dbg` package might be 
 enough to generate a meaningful stack trace when the program crashes, but for single
-step execution *libssl* must be re-compiled with debug symbols and without optimizations. 
-*CFLAGS* used by dpkg are set in */etc/dpkg/buildflags.conf*. The following should
+step execution `libssl` must be re-compiled with debug symbols and without optimizations. 
+`CFLAGS` used by dpkg are set in `/etc/dpkg/buildflags.conf`. The following should
 do the job:
 
 ```text
@@ -270,7 +272,7 @@ SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=f
 ```
 
 A further simplification which makes debugging easier is
-to add the following directive in */etc/nginx/nginx.conf* in order to spawn
+to add the following directive in `/etc/nginx/nginx.conf` in order to spawn
 only one worker thread for serving incoming requests:
 
 ```text
@@ -304,7 +306,7 @@ Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
 Loaded symbols for /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0
 ```
 
-gdb should also be pointed to the location of the source code with the *directory*
+gdb should also be pointed to the location of the source code with the `directory`
 command.
 
 ```text
@@ -312,7 +314,7 @@ command.
 Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
 ```
 
-A breakpoint on *tls1\_process\_heartbeat* can be set and the execution resumed.
+A breakpoint on `tls1_process_heartbeat` can be set and the execution resumed.
 
 ```text
 (gdb) break tls1_process_heartbeat
@@ -340,7 +342,7 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 ```
 
 The control path which explains why a heartbeat response is not echoed back to the
-client leads to function *buffer_write* in *bf_buff.c*.
+client leads to function `buffer_write` in `bf_buff.c`.
 
 ```text
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
@@ -382,7 +384,7 @@ ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
 ```
 
 A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
-The *buffer_write* function is defined in *crypto/bio/bf_buf.c*.
+The `buffer_write` function is defined in `crypto/bio/bf_buf.c`.
 
 ```c
 static int buffer_write(BIO *b, const char *in, int inl)
@@ -459,8 +461,8 @@ start:
         }
 ```
 
-This function copies the data passed as argument with pointer <em>\*in</em> into
-the buffer pointed by the BIO object <em>\*b</em>. The decision whether to flush or not
+This function copies the data passed as argument with pointer `*in` into
+the buffer pointed by the BIO object `*b`. The decision whether to flush or not
 the buffer through the socket is taken based on the size of the data with respect to
 the size of the BIO buffer. If the former is smaller than the latter, the buffer is
 not flushed. In this case the heartbeat response message is 28 bytes and the buffer
@@ -475,7 +477,7 @@ $2 = 28
 
 What happens if the size of the heartbeat message is bigger than the buffer, say 5000
 bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
-to send a well-formed heartbeat request while tracing *buffer_write*.
+to send a well-formed heartbeat request while tracing `buffer_write`.
 
 ```text
     (gdb)
@@ -569,9 +571,9 @@ Scanning leaked memory
 =============================
 
 After setting up my local nginx instance with a newly generated private/public
-key pair, I tried to look for a prime factor that would divide *n* (part of the
+key pair, I tried to look for a prime factor that would divide `n` (part of the
 public key) in the memory leaked by the server using  <a href="https://github.com/marcoguerri/heartbleed/blob/master/exploit.c" target="_blank">
-exploit.c</a>.  With *ulimit*, I capped the maximum size of
+exploit.c</a>.  With `ulimit`, I capped the maximum size of
 the virtual address space of the process at 256MB and I fired up 8 parallel
 instances of the script. After ~3M requests, I could not find any trace of the
 private keys.

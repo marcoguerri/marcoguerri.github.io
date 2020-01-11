@@ -1,0 +1,20 @@
+---
+layout: default
+title: History
+---
+
+<div class="well">
+<h1>Travelling through history</h1>
+I love travelling and visiting places of historical relevance. I am mostly interested
+in European history of the 20th century, but I am always eager to widen my little
+niche. Here I have collected some pictures and notes on interesting sites I have visited.
+
+{% for post in site.history %}
+    <table class='post-list'>
+    <tr>
+      <th style="padding-right:1em;padding-top:1em"><a href='{{ post.url }}'><b>{{ post.title }}</b></a></th> 
+      <td style="text-align:right;padding-top:1em">{{ post.date | date: "%-d %B %Y" }}</td>
+    </tr>
+    </table>
+{% endfor %}
+</div>

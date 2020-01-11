@@ -1,10 +1,45 @@
-name: Marco's Blog
+# Jekyll configuration
+
+name: Marco Guerri
+description: I am a Production Engineer working at Facebook, with an interest in infrastructure security and machine learning. Previously CERN.
+
+# url is currently only used only for the RSS feed in feed.xml
+url: https://scotte.github.io/jekyll-clean
+
+# baseurl will often be '', but for a project page on gh-pages, it needs to
+# be the project name.
+# *** IMPORTANT: If your local "jekyll serve" throws errors change this to '' or
+#     run it like so: jekyll serve --baseurl=''
+baseurl: /
+
+# These can be '' to hide the Github or Gitlab nav buttons
+github: 'marcoguerri'
+gitlab: ''
+
+# Set this to your UA-# value, or '' to disable the block completely
+gaaccount: ''
+
+# The 'comments' setting enables comments. You'll need to select either
+# disqus or isso below to choose a comment system. Individual posts can
+# override 'comments' to disable on a post-by-post basis.
+comments: true
+
+# Set this to your public isso URL to enable comments via isso. Set to '' to disable isso.
+isso: ''
+
+# Set this to your disqus shortname to enable comments via disqus. Set to '' to disable disqus.
+disqus: ''
+
+permalink: /:year/:month/:title
+paginate: 3
+
 highlighter: rouge
 markdown: kramdown
-kramdown:
-  input: GFM
+gems: ['jekyll-paginate']
+
+exclude: ['README.md', 'LICENSE']
+
 collections:
-    history:
-        output: true
-    books:
-        output: true
+        history:
+                output: true
+                permalink: /history/:name

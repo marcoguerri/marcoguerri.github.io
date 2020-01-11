@@ -1,0 +1,25 @@
+---
+layout: default
+---
+<script type="text/javascript">
+        $(document).ready(function() {
+            var p1 = 'marco.', p2 = 'guerri.blog', p4 = 'fastmail.fm';
+            element = document.getElementById('email');
+            e = p1 + p2  + '@' + p4;
+            element.innerHTML = 'You can get in touch by dropping me an email at <a href=\'mailto:' + e + '\'>' + e + '</a>. ' + element.innerHTML;
+        });
+</script>
+
+
+<div class="well">
+    <h1>About me</h1>
+     I was born in Modena, Italy, and I studied Computer Engineering
+     at University of Modena and Reggio Emilia. I currently work at Facebook as
+     a Production Engineer. I am based in the Dublin office.
+
+     <h1>How to contact me</h1>
+        <div id="email">
+
+	(<a href="http://pgp.mit.edu/pks/lookup?op=get&search=0xD2C3A4BDB715E658" target="_blank">use my GPG key</a>)
+   </div>
+</div>

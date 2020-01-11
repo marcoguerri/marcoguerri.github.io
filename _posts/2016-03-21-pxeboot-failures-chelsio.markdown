@@ -4,17 +4,20 @@ title:  "pxelinux 6.03 boot failure with Chelsio T520-LL-CR"
 date:   2016-03-20 21:00:00
 categories: linux pxe datacenter
 published: yes
-summary: "This a collection of notes I have taken during an interesting debugging 
-session aimed at identifying the root cause of a regression that followed the update 
-of the network boot infrastructure at CERN to PXELINUX 6.03. It was an interesting 
+---
+
+Summary
+=======
+This a collection of notes I have taken during an interesting debugging
+session aimed at identifying the root cause of a regression that followed the update
+of the network boot infrastructure at CERN to PXELINUX 6.03. It was an interesting
 dive into PXELINUX internals, down to the point where it meets the hardware. As
-a side note, when reading Eric Raymond's \"The Cathedral and the Bazaar\", I 
+a side note, when reading Eric Raymond's The Cathedral and the Bazaar. I
 remember him explaining why closing hardware driver's sources does not make much sense.
 Raymond was presenting an intermediate model in-between open and closed source,
 i.e. having a closed source ROM and opening the interface to the ROM. I believe
 this experience is a good example of why this latter approach does nothing more
-than shifting the problem."
----
+than shifting the problem.
 
 Background and setup
 =======
@@ -95,7 +98,7 @@ management operations via IPMI.
 Deploying the correct binary
 =======
 pxelinux is part of syslinux project and comes in two different flavors:
-*pxelinux.0* and *lpxelinux.0*. During this experiment, I was compiling and 
+`pxelinux.0` and `lpxelinux.0`. During this experiment, I was compiling and 
 testing the 32bits legacy version of pxelinux and I was working on git commit 138e850f.
 The first binary that I tried to deploy with my test environment was pxelinux.0.
 That worked flawlessly, I could boot without any problem. With lpxelinux.0 instead, the
@@ -113,7 +116,7 @@ by the PXE standard.
 Debug messages
 =======
 A good point where to start was where the error message itself was raised.
-A quick grep pointed to *./core/elflink/load_env32.c*, function load_env32.
+A quick grep pointed to `./core/elflink/load_env32.c`, function load_env32.
 
 ```c
     writestr("\nFailed to load ");
@@ -126,8 +129,8 @@ with the network traffic trace: the first time ldlinux tries to access the netwo
 for some reason it fails and eventually it times out.
 
 Something that I needed was debug messages, enabling those already present and adding more, if needed.
-*writestr* didn't seem something I could use: it was printing directly to the video buffer,
-but it didn't support format strings. *dprintf*, however, seemed to be more suitable
+`writestr` didn't seem something I could use: it was printing directly to the video buffer,
+but it didn't support format strings. `dprintf`, however, seemed to be more suitable
 for the job. But what does dprinf do? By default, it is defined as vdprintf, and
 a quick look at the code revealed that I could not expect messages to come up on
 the KVM. The code was in fact writing directly on the registers of the UART.
@@ -140,7 +143,7 @@ the KVM. The code was in fact writing directly on the registers of the UART.
     [...]
 ```
 
-It turns out that *DEBUG_STDIO* can be enabled to redefine dprintf
+It turns out that `DEBUG_STDIO` can be enabled to redefine dprintf
 as printf, having debug messages written directly on the video buffer. In my case,
 serial port was actually good enough, I could easily copy/paste, which would
 have been more difficult with KVM. Clearly, it was not my intention to go
@@ -154,7 +157,7 @@ ipmitool -H <BMC_HOSTNAME> -I lanplus -U <USERNAME> -P <PASSWORD> sol payload en
 ipmitool -H <BMC_HOSTNAME> -I lanplus -U <USERNAME> -P <PASSWORD> sol activate
 ```
 
-* Debug messages enabled in core/Makefile adding a couple of CFLAGS: *-DDEBUG_PORT=0x3f8* *-DCORE_DEBUG=1*
+* Debug messages enabled in core/Makefile adding a couple of CFLAGS: `-DDEBUG_PORT=0x3f8` `-DCORE_DEBUG=1`
 (there might have been a better way to do this...)
 
 ```makefile
@@ -183,7 +186,7 @@ Deploy, reboot and finally some debug output on the screen.
 Tracing the execution
 =======
 
-Starting from *load_env32*, I tried to follow the control
+Starting from `load_env32`, I tried to follow the control
 path while keeping an eye open for something that could be the root cause of the
 failure to load ldlinux.c32 from the network. After some flawless execution,
 the following seemed to be the relevant stack trace.
@@ -210,7 +213,7 @@ and libc. It is actually interesting to dive a bit deeper.
 
 File-like API
 =======
-*opendev* is called with a pointer to the *__file_dev* structure which
+`opendev` is called with a pointer to the `__file_dev` structure which
 defines the input operation hooks available (read/open/close)
 
 ```c
@@ -238,12 +241,12 @@ struct file_info {
 };
 ```
 
-The function *opendev* shown below looks for a *file_info* structure available 
-in the statically allocated array *__file_info* and sets the input operations 
-pointer, *iop*, to *__file_dev* . It then returns the corresponding fd 
-(the index within *__file_info*). From now on,
+The function `opendev` shown below looks for a `file_info` structure available 
+in the statically allocated array `__file_info` and sets the input operations 
+pointer, `iop`, to `__file_dev` . It then returns the corresponding fd 
+(the index within `__file_info`). From now on,
 any attempt to read from a file associated with the file descriptor will go
-through *__file_dev.read* function pointer, i.e. *__file_read*.
+through `__file_dev.read` function pointer, i.e. `__file_read`.
 
 ```c
 int opendev(const struct input_dev *idev,
@@ -270,10 +273,10 @@ int opendev(const struct input_dev *idev,
 }
 ```
 
-What does *__file_read* do? Well, it calls the protected mode I/O API, in particular
-*pmapi_read_file*, which relies on *file->fs->fs_ops->getfssec* (getfssec is the
+What does `__file_read` do? Well, it calls the protected mode I/O API, in particular
+`pmapi_read_file`, which relies on `file->fs->fs_ops->getfssec` (getfssec is the
 function that actually does the reading). The structures
-*file* and *fs_ops* are shown below.
+`file` and `fs_ops` are shown below.
 
 ```c
 struct file {
@@ -296,10 +299,10 @@ struct fs_ops {
 };
 ```
 
-The *file* structure is identified by a handle (which is again basically an index
-within an array) returned by *searchdir* hook above. This handle is associated 
-to the corresponding *com32_filedata* within *file_info* in function *open_file* 
-in the excerpt below, which is called after *opendev*.
+The `file` structure is identified by a handle (which is again basically an index
+within an array) returned by `searchdir` hook above. This handle is associated 
+to the corresponding `com32_filedata` within `file_info` in function `open_file`
+in the excerpt below, which is called after `opendev`.
 
 
 ```c
@@ -334,7 +337,7 @@ __export int open_file(const char *name, int flags, struct com32_filedata *filed
 
 From file-like API to network
 =======
-*searchdir*, is where things start to become specific to the medium that is used to
+`searchdir`, is where things start to become specific to the medium that is used to
 retrieve the file, in this case the network.
 
 ```c
@@ -361,12 +364,12 @@ int searchdir(const char *name, int flags)
 }
 ```
 
-A *file* structure is allocated and *this_fs* is set as the entry
-point for doing file operations, which results in a call to *getfssec* function,
+A `file` structure is allocated and `this_fs` is set as the entry
+point for doing file operations, which results in a call to `getfssec` function,
 the one actually responsible for the I/O. I was therefore
-expecting *this_fs* to point to a network API (we are still trying to load ldlinux.c32
-via TFTP). So, what is *this_fs*? It's initialized in *fs_init*, which is called indirectly by
-*pxelinux.asm* with a pointer to the desired *fs_ops*.
+expecting `this_fs` to point to a network API (we are still trying to load ldlinux.c32
+via TFTP). So, what is `this_fs`? It's initialized in `fs_init`, which is called indirectly by
+`pxelinux.asm` with a pointer to the desired `fs_ops`.
 
 
 ```c
@@ -386,7 +389,7 @@ ROOT_FS_OPS:
         dd 0
 ```
 
-Indeed *fs_ops* in this case is *pxe_fs_ops*, defined in core/fs/pxe/pxe.c
+Indeed `fs_ops` in this case is `pxe_fs_ops`, defined in core/fs/pxe/pxe.c
 and initialized with the callbacks that implement file operations via 
 PXE (i.e.  TFTP).
 
@@ -408,7 +411,7 @@ const struct fs_ops pxe_fs_ops = {
 };
 ```
 
-So, a call to *searchdir* was relinquishing control to *pxe_searchdir*.
+So, a call to `searchdir` was relinquishing control to `pxe_searchdir`.
 
 ```
 static void pxe_searchdir(const char *filename, int flags, struct file *file)
@@ -434,7 +437,7 @@ pxe_searchdir [./core/fs/pxe/pxe.c]
        allocate_socket [./core/fs/pxe/pxe.c]
 ```
 
-*allocate_socket* returns without errors. *__pxe_searchdir* tries
+`allocate_socket` returns without errors. `__pxe_searchdir` tries
 then to locate a "URL scheme" suitable for opening the URL that points to the
 TFTP server.
 
@@ -451,7 +454,7 @@ for (us = url_schemes; us->name; us++) {
 }
 ```
 
-Identifying the function pointed by the *us->open* hook is simply a matter of
+Identifying the function pointed by the `us->open` hook is simply a matter of
 obtaining its linear address, 0x0000108e14, and grepping in the symbols file.
 
 ```text
@@ -473,25 +476,25 @@ The control path proceeds as follows, without any error whatsoever.
                mbox_post [core/thread/mbox.c]
 ```
 
-A remark must be made regarding *core_udp_\** functions.
+A remark must be made regarding `core_udp_*` functions.
 There are three different implementations available:
 
-* In core/legacynet/core.c, *core_udp_\** functions invoke directly the hooks exported
-by the PXE firmware (e.g. *PXENV_UDP_WRITE*). This code is compiled
+* In core/legacynet/core.c, `core_udp_*` functions invoke directly the hooks exported
+by the PXE firmware (e.g. `PXENV_UDP_WRITE`). This code is compiled
 and linked when building pxelinux.0.
 
-* In core/fs/pxe/core.c, *core_udp_\** functions invoke the lwIP API to implement
+* In core/fs/pxe/core.c, `core_udp_*` functions invoke the lwIP API to implement
 network communication. This code is compiled and linked when building
 lpxelinux.0.
 
-* In efi/udp.c, *core_udp_\** functions invoke the UEFI firmware to implement
+* In efi/udp.c, `core_udp_*` functions invoke the UEFI firmware to implement
 network communication. This code is compiled and linked when building pxelinux for
 EFI.
 
 Since I was building lpxelinux.0 for BIOS, the second situation was the one of
 interest.
 
-In the trace above, *netconn_new*  and *netconn_sendto* were the first occurrences
+In the trace above, `netconn_new`  and `netconn_sendto` were the first occurrences
 of the transition to the lwIP stack. Plunging into lwIP meant that a new set
 of debug messages was also needed. lwIP defines several macros for debugging that
 can be set in core/lwip/src/include/lwipopts.h. First, I enabled debug messages
@@ -518,10 +521,10 @@ udp_send: UDP checksum 0x7be9
 udp_send: ip_output_if (,,,,IP_PROTO_UDP,)
 ```
 
-*netconn_send* was returning successfully. From the trace above, 
-the maximum call depth was reached with *mbox_post*, which was also returning
+`netconn_send` was returning successfully. From the trace above, 
+the maximum call depth was reached with `mbox_post`, which was also returning
 successfully. The function was appending the outgoing message to a list and it
-was increasing a semaphore to allow the main thread (*tcpip_thread* in
+was increasing a semaphore to allow the main thread (`tcpip_thread` in
 core/lwip/src/api/tcpip.c) to service outgoing data. At this point, the relevant
 call trace initiated by the main thread was the following:
 
@@ -535,7 +538,7 @@ do_send [core/lwip/src/api/api_msg.c]
           ip_output_if_opt [core/lwip/src/core/ipv4/ip.c]
 ```
 
-*ip_output_if_opt* was calling *netif->output()*, again difficult to trace
+`ip_output_if_opt` was calling `netif->output()`, again difficult to trace
 without pointing directly to the virtual address, 0x112646 in this case.
 
 ```text
@@ -549,8 +552,8 @@ without pointing directly to the virtual address, 0x112646 in this case.
 ```
 
 According to the mapping above, the output hook was residing somewhere
-between *0x1121dc* and *0x11292f*, most likely in *core/lwip/src/netif/undiif.c*, where
-code which interfaces directly with the hardware is defined. From *undiif.c*:
+between `0x1121dc` and `0x11292f`, most likely in `core/lwip/src/netif/undiif.c`, where
+code which interfaces directly with the hardware is defined. From `undiif.c`:
 
 ```c
 /*
@@ -579,12 +582,12 @@ undi: d:ff:ff:ff:ff:ff:ff s:00:07:43:2e:f8:50 t: 806 x0
 netconn_sendto succeded!
 ```
 
-From this new trace, I could derive that *undi_transmit* was being called, but
+From this new trace, I could derive that `undi_transmit` was being called, but
 the debug information that was showing the outcome of the ARP request was
 clearly wrong. Of course, since I was not seeing any traffic on the network,
-that didn't really come as a surprise. The source address *00:07:43:2e:f8:50* was
+that didn't really come as a surprise. The source address `00:07:43:2e:f8:50` was
 the one of the Chelsio card, but the destination MAC was resolved as
-*00:00:00:00:00:00*. To go a bit deeper, I enabled *UNDIIF_ARP_DEBUG*.
+`00:00:00:00:00:00`. To go a bit deeper, I enabled `UNDIIF_ARP_DEBUG`.
 
 ```text
 Called core_udp_sendto for lwip
@@ -611,7 +614,7 @@ querying by IP, basically ruling out all traffic at the data link layer, ARP
 requests included. After having had another look at the network dump, the situation was pretty clear.
 
 <div align="center">
-<a id="single_image" href="/img/pxe/PXETraffic.png">
+<a id="single_image" href="/img/pxelinux/PXETraffic.png">
 <img src="/img/pxe/PXETraffic.png" alt=""/>
 </a>
 </div>
@@ -623,9 +626,9 @@ traffic, but not to receive the responses.
 
 Receiving data - Interrupt Service Routine
 =======
-The interrupt service routine used by *lpxelinux* is defined in *core/pxeisr.inc*.
-The ISR calls the *PXENV_UNDI_ISR* hook exported by the PXE capable firmware and
-then checks one of the return flags, *PXENV_UNDI_ISR_OUT_OURS*, to make sure
+The interrupt service routine used by `lpxelinux` is defined in `core/pxeisr.inc`.
+The ISR calls the `PXENV_UNDI_ISR` hook exported by the PXE capable firmware and
+then checks one of the return flags, `PXENV_UNDI_ISR_OUT_OURS`, to make sure
 that the interrupt "belongs to us". From the PXE specification
 
 ```text
@@ -642,7 +645,7 @@ the interrupt was generated by this particular Network Interface or not.
 
 This flag tells pxelinux whether the interrupt was generated by the network card
 from which the system is PXE booting or not. The ISR is installed
-at the IRQ specified by the UNDI firmware itself, in *pxe_start_isr*,
+at the IRQ specified by the UNDI firmware itself, in `pxe_start_isr`,
 
 ```c
     int irq = pxe_undi_info.IntNumber;
@@ -670,7 +673,7 @@ pxe_start_isr: forcing pxe_need_poll
 
 The meaning of the second message will become clear very soon.
 The most important routines which are responsible for setting up interrupts are
-*pxe_init_isr* and *pxe_start_isr*, which are both called by *pxe_fs_init*, although
+`pxe_init_isr` and `pxe_start_isr`, which are both called by `pxe_fs_init`, although
 at different call depths as shown in the trace below.
 
 
@@ -687,15 +690,15 @@ at different call depths as shown in the trace below.
                  pxe_start_isr [core/fs/pxe/isr.c]
 ```
 
-*pxe_init_isr* starts the *pxe_receive_thread*
+`pxe_init_isr` starts the `pxe_receive_thread`
 thread, which basically loops indefinitely, first suspending on the
-*pxe_receive_thread_sem* semaphore and, when triggered, calling *pxe_process_irq*.
+`pxe_receive_thread_sem` semaphore and, when triggered, calling `pxe_process_irq`.
 
-*pxe_start_isr* starts the *pxe_poll_thread* and detects whether the hardware correctly
+`pxe_start_isr` starts the `pxe_poll_thread` and detects whether the hardware correctly
 supports interrupts or polling is to be preferred. In the second case,
-*pxe_poll_thread* becomes responsible for handling interrupts. As shown in the debug
-trace above, *pxe_start_isr* detects that polling is to be preferred due to
-the *PXE_UNDI_IFACE_FLAG_IRQ* flag returned directly by the UNDI firmware. The code
+`pxe_poll_thread` becomes responsible for handling interrupts. As shown in the debug
+trace above, `pxe_start_isr` detects that polling is to be preferred due to
+the `PXE_UNDI_IFACE_FLAG_IRQ` flag returned directly by the UNDI firmware. The code
 of the polling thread is shown below.
 
 ```c
@@ -719,9 +722,9 @@ static void pxe_poll_thread(void *dummy)
 }
 ```
 
-*pxe\_poll\_thread\_sem* is incremented by a callback function triggered
+`pxe_poll_thread_sem` is incremented by a callback function triggered
 at regular intervals. The thread checks the status of the receive thread semaphore
-and the return code of *pxe\_isr\_poll*, and, if necessary, ups *pxe\_receive\_thread\_sem*
+and the return code of `pxe_isr_poll`, and, if necessary, ups `pxe_receive_thread_sem`
 to trigger the receive thread.
 
 ```c
@@ -735,8 +738,8 @@ static void pxe_receive_thread(void *dummy)
 }
 ```
 
-I tried first to understand whether *pxe\_process\_irq* was ever called. It tuned out,
-it <b>was not</b> and my attention was caught by *pxe\_isr\_poll*.
+I tried first to understand whether `pxe_process_irq` was ever called. It tuned out,
+it <b>was not</b> and my attention was caught by `pxe_isr_poll`.
 
 ```c
 static bool pxe_isr_poll(void)
@@ -750,9 +753,9 @@ static bool pxe_isr_poll(void)
 }
 ```
              
-This function performs in polling mode the same checks as *pxe_isr* in *core/pxeisr.inc*,
-In particular, it returns true if *PXENV\_UNDI\_ISR\_OUT\_OURS* is set.
-Going back to PXENV\_UNDI\_ISR\_OUT\_OURS once again:
+This function performs in polling mode the same checks as `pxe_isr` in `core/pxeisr.inc`,
+In particular, it returns true if `PXENV_UNDI_ISR_OUT_OURS` is set.
+Going back to `PXENV_UNDI_ISR_OUT_OURS` once again:
 
 ```text
 If the value returned in FuncFlag is PXENV_UNDI_ISR_OUT_NOT_OURS, then the 
@@ -762,8 +765,8 @@ must start a handler thread and send an end-of-interrupt (EOI) command to the PI
 Interrupt processing is now complete.
 ```
 
-After playing a bit with *pxe\_isr\_poll*, it turned out *PXENV\_UNDI\_ISR\_OUT\_OURS* was 
-<b>never set</b>, keeping *pxe\_receive\_thread* indefinitely suspended on the semaphore. 
+After playing a bit with `pxe_isr_poll`, it turned out `PXENV_UNDI_ISR_OUT_OURS` was 
+<b>never set</b>, keeping `pxe_receive_thread` indefinitely suspended on the semaphore. 
 The first naive attempt was to replace the condition in the return statement
 
 
@@ -783,7 +786,7 @@ from properly handling incoming data. The firmware was probably ignoring altoget
 that flag, which worked as long as pxelinux was not involved in the interrupt handling.
 Unfortunately, this marked the end of the  investigation: I could not 
 fix the issue myself as I did not have any control over the sources of the firmware of the NIC. 
-Considering *PXENV\_UNDI\_ISR\_OUT\_OURS* as always set was not an 
+Considering `PXENV_UNDI_ISR_OUT_OURS` as always set was not an 
 option either, as it could break the execution on hardware with multiple NICs sharing the 
 same IRQ (or in the best case, it would result in the invocation of the routine for servicing the 
 interrupt for no reason). 
@@ -794,8 +797,8 @@ Conclusions
 At this point, the only possible course of action was to file a bug report to 
 the owners of the code, hoping there is enough interest
 on their side to fix the issue in a timely manner. This is a great example
-of how the *widget frosting* business model explained by Eric Raymond in *The Cathedral
-and the Bazaar* would simplify everybody's life. This indirect-sale value model
+of how the widget frosting* business model explained by Eric Raymond in The Cathedral
+and the Bazaar would simplify everybody's life. This indirect-sale value model
 applies specifically to hardware manufacturers, for whom, developing and maintaining the software/firmware
 is often just an overhead. The number of benefits that would arise as a consequence of 
 releasing the software under an open license are to be seriously taken into consideration.
@@ -803,7 +806,7 @@ releasing the software under an open license are to be seriously taken into cons
 Updates
 =======
    * It turns out the QLogic cLOM8214 is affected by the same issue, and can boot
-just fine if *PXENV\_UNDI\_ISR\_OUT\_OURS* is  always set. However, this NIC has been
-discontinued and no fixes will be provided. Speaking of *widget frosting*...
+just fine if `PXENV_UNDI_ISR_OUT_OURS` is  always set. However, this NIC has been
+discontinued and no fixes will be provided. Speaking of widget frosting...
    * Chelsio has provided a firmware fix which allows to boot correctly with lpxelinux 6.03
 

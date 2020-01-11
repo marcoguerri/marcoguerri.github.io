@@ -5,29 +5,32 @@ date:   2015-08-17 08:00:00
 published: yes
 categories: linux administration
 pygments: true
-summary: "This post presents a possible procedure to \"snapshot\" a Linux 
-installation based on a boot partition and three LVM logical volumes for root, 
+---
+
+Summary
+=======
+This post presents a possible procedure to "snapshot" a Linux
+installation based on a boot partition and three LVM logical volumes for root,
 var and swap, which proves
 useful when an identical environment must be reproduced on a different machine
-sharing the same hardware configuration. One 
-of the requirements is to obtain the smallest possible \"image\", so that it can
+sharing the same hardware configuration. One
+of the requirements is to obtain the smallest possible "image", so that it can
 be easily transferred and rewritten on the second machine. Such a procedure does entail
 a number of issues: all the machine specific parameters (e.g. /etc/hostname, MAC
 addresses in /etc/sysconfig/network-scripts) are deployed to the second machine
-and need to be adapted accordingly (not covered in this post). Bearing this in mind, 
-all the following commands have been executed from a live image based on RedHat Linux."
----
+and need to be adapted accordingly (not covered in this post). Bearing this in mind,
+all the following commands have been executed from a live image based on RedHat Linux.
 
 Initial setup
 =======
-First off, *lvm2* package needs to be installed. In this reference systems, the 
+First off, `lvm2` package needs to be installed. In this reference systems, the 
 situation is the following:
 
-* /dev/sda2 is the partition which is hosting a LVM physical volume
-* /dev/sda1 is the boot partition
+* `/dev/sda2` is the partition which is hosting a LVM physical volume
+* `/dev/sda1` is the boot partition
 
 vg1 is the only volume group on the system, consisting of the PV created on /dev/sda2.
-The volume group must be first activated with *vgchange*.
+The volume group must be first activated with `vgchange`.
 
 ```text
 # vgchange -a y vg1
@@ -48,7 +51,7 @@ contains four LVs. The notes that follow will take /dev/vg1/var as a reference.
   LV Path                /dev/vg1/swap
 ```
 
-*df* shows the available space on the LV as seen from userspace:
+`df` shows the available space on the LV as seen from userspace:
 
 ```text
 # mount /dev/vg1/var mnt
@@ -58,11 +61,11 @@ Filesystem           Size  Used Avail Use% Mounted on
 /dev/mapper/vg1-var  683G  1.8G  646G   1% /tmp/mnt
 ```
 
-There is clearly a significant margin of unused space on *vg1/var* and
-*resize2fs*, from *e2fsprogs*, can be used to find out the minimum allowed size of 
+There is clearly a significant margin of unused space on `vg1/var` and
+`resize2fs`, from `e2fsprogs`, can be used to find out the minimum allowed size of 
 the ext filesystem on top of it. It is important
 to notice that resize2fs uses the filesystem blocksize as default unit (normally 4K for ext),
-and that the space reported by *df* is the usable space as seen by the user. The actual
+and that the space reported by `df` is the usable space as seen by the user. The actual
 minimum size, metadata included, of an ext filesystem is not trivial to calculate:
 there is a detailed [article](http://www.tldp.org/HOWTO/Filesystems-HOWTO-6.html)
  on TLDP which covers the layout of ext2. The structure basically
@@ -77,10 +80,10 @@ consists of block groups, each one being divided as follows:
 
 Taking into consideration all contributions of the metadata requires an in-depth 
 understanding of the filesystem, but resize2fs comes to the rescue. In fact, 
-this calculation is done by function *calculate\_minimum\_resize\_size* 
-in [*resize/resize2fs.c*](http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/resize/resize2fs.c#n2769).
+this calculation is done by function `calculate_minimum_resize_size` 
+in [`resize/resize2fs.c`](http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/resize/resize2fs.c#n2769).
 If resize2fs is invoked with a command line argument which is smaller than the value returned
-by *calculate\_minimum\_resize\_size*, it raises an error followed by the minimum 
+by `calculate_minimum_resize_size`, it raises an error followed by the minimum 
 allowed size of the filesystem, as the number of 4K blocks. To this value, I usually
 add a small safety margin.
 
@@ -132,23 +135,23 @@ The situation after resizing the LVs is the following:
 # lsblk
 [...]
 sda                       8:0    0 745.2G  0 disk
-├─sda1                    8:1    0     1G  0 part
-└─sda2                    8:2    0 744.2G  0 part
-  ├─vg1-root (dm-2)     253:2    0   9.8G  0 lvm
-  ├─vg1-var (dm-3)      253:3    0     5G  0 lvm
-  ├─vg1-tmp (dm-4)      253:4    0   9.8G  0 lvm
-  └─vg1-swap (dm-5)     253:5    0     1G  0 lvm
+|-sda1                    8:1    0     1G  0 part
+`-sda2                    8:2    0 744.2G  0 part
+  |-vg1-root (dm-2)     253:2    0   9.8G  0 lvm
+  |-vg1-var (dm-3)      253:3    0     5G  0 lvm
+  |-vg1-tmp (dm-4)      253:4    0   9.8G  0 lvm
+  `-vg1-swap (dm-5)     253:5    0     1G  0 lvm
 ```
 
 The LVs occupy around 30GB altogether, hence the underlying physical volume could be 
 resized to match this value with the usual safety margin. Unfortunately, this operation 
 is not immediately straightforward because the physical extents (PE) which map 
 the logical extends (LE) are normally fragmented throughout the whole physical 
-volume. *pvresize* will refuse to shrink the physical volume if there are extends
+volume. `pvresize` will refuse to shrink the physical volume if there are extends
 allocated beyond the point where the new end would be. The documentation however
 states that future versions of lvm2 will support automatic relocation, so this workflow
 might change. For now, the physical extents must be collected at the beginning of the PV. 
-*pvdisplay* and *pvs* can be used to verify how many PEs are used and how these are 
+`pvdisplay` and `pvs` can be used to verify how many PEs are used and how these are 
 mapped on the volume.
 
 ```text
@@ -170,7 +173,7 @@ mapped on the volume.
 PEs belonging to the same LVs are normally clustered together as shown in the output above.
 PEs from 22494 to 22838 (345 PEs) are allocated for tmp and swap. These should be moved right 
 after var, starting from PE 473 until 817. This operation can be accomplished with 
-*pvmove* command.
+`pvmove` command.
 
 ```text
 # pvmove --alloc anywhere /dev/sda2:22494:22838 /dev/sda2:473-817
@@ -213,7 +216,7 @@ Resizing the partition
 The partition /dev/sda2 is now larger than the physical volume requires. 
 Resizing a partition basically means redefining its boundaries 
 in the partition table, i.e. start and end coordinates: this is a critical step, 
-which requires much attention. *fdisk* can be used to obtain the current 
+which requires much attention. `fdisk` can be used to obtain the current 
 layout of the disk.
 
  

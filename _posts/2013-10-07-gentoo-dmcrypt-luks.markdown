@@ -3,11 +3,6 @@ layout: post
 title:  "Gentoo full disk encryption with dm-crypt/LUKS"
 date:   2013-10-07 13:31:48
 categories: linux security
-summary: "This post covers the installation procedure of Gentoo Linux with
-encrypted root and swap partitions using LUKS and dm\_crypt. Each step is carried out
-manually (kernel compilation, creation of the initrd): the aim is to give an insight 
-into what happens under the hood when encryption is enabled in the disk partitioning 
-menu during the installation of a Linux distro."
 ---
 
 
@@ -18,6 +13,14 @@ menu during the installation of a Linux distro."
 </a>
 </div>
 {% endcomment %}
+
+Introduction
+=============
+This post covers the installation procedure of Gentoo Linux with
+encrypted root and swap partitions using LUKS and dm\_crypt. Each step is carried out
+manually (kernel compilation, creation of the initrd): the aim is to give an insight
+into what happens under the hood when encryption is enabled at disk partitioning time
+during the installation of a Linux distro.
 
 Initial setup
 =============
@@ -30,7 +33,7 @@ several different steps must be carried out.
 
 I went through the whole process inside a Virtual Machine, using VMWare Player 
 as hypervisor. The Gentoo live image I used is the weekly build 
-*install-x86-minimal-20130820* (sha512: d3135b53). Working "remotely" through ssh is much 
+`install-x86-minimal-20130820` (sha512: d3135b53). Working "remotely" through ssh is much 
 more convenient. RSA/DSA ssh keys must be generated with ssh-keygen, a root password 
 set and sshd daemon started.
 
@@ -116,20 +119,20 @@ Kernel compilation
 
 After the precompiled filesystem has been downloaded and the chrooted environment
 has been set, the kernel must be compiled. The kernel source code can be 
-retrieved through Portage, Gentoo package manager, by "emerging" *gentoo-sources*.
-The version installed with this live image is *linux-3.10.7-gentoo-r1*, but 
+retrieved through Portage, Gentoo package manager, by "emerging" `gentoo-sources`.
+The version installed with this live image is `linux-3.10.7-gentoo-r1`, but 
 the configuration procedure is highly hardware dependend. Make sure to activate 
 all the necessary modules to support the underlying hardware. For instance, 
 a while ago while I was working on a physical machine, I remember having problems 
 with the SATA controller which was supported by sata\_nv module, compiled through
-the *CONFIG\_SATA\_NV* configuration option. Now, considering that I am working 
-on a virtual machine, the i386\_defconfig lacked these options:
+the `CONFIG_SATA_NV` configuration option. Now, considering that I am working 
+on a virtual machine, the `i386_defconfig` lacked these options:
 
 
-* *CONFIG\_FUSION\_SPI* for LSI SCSI controller (which is the one emulated by VMPlayer)
-* *CONFIG\_CRYPTO\_SHA256* to support SHA256 algorithm in kernel space
-* *CONFIG\_DM\_CRYPT* to support dm\_cyrpt framework
-* *CONFIG\_PCNET32* for network support (this is not strictly necessary to
+* `CONFIG_FUSION_SPI` for LSI SCSI controller (which is the one emulated by VMPlayer)
+* `CONFIG_CRYPTO_SHA256` to support SHA256 algorithm in kernel space
+* `CONFIG_DM_CRYPT` to support dm_cyrpt framework
+* `CONFIG_PCNET32` for network support (this is not strictly necessary to
 set up the environment)
 
 Once the kernel is properly configured, it can be compiled together with the 
@@ -174,10 +177,9 @@ emerge --config =grub-0.97-r12
 * Copying files from /lib/grub and /usr/share/grub to /boot/grub
 Probing devices to guess BIOS drives. This may take a long time.
 * Grub has been installed to /boot successfully.
-
 ```
 
-DONT\_MOUNT\_BOOT variable prevents grub from trying to mount the boot partition,
+`DONT_MOUNT_BOOT` variable prevents grub from trying to mount the boot partition,
 already mounted, and consequently failing. When prompted for the 
 installation directory, just type /boot. grub stage1 and stage1.5 must then be installed
 respectively on the MBR and in the DOS compatibility region of /dev/sda.
@@ -199,8 +201,8 @@ succeeded
 Done.
 ```
 
-An alternative way to install grub is to simply use *grub-install* on /dev/sda. 
-*update-grub* can normally be used to update menu.lst (or grub.cfg) based on the kernels
+An alternative way to install grub is to simply use `grub-install` on /dev/sda. 
+`update-grub` can normally be used to update menu.lst (or grub.cfg) based on the kernels
  available under /boot, but in this case the configuration file is so simple that
  it can be populated manually. As a aside note, update-grub relies on the output 
  of df command, which must report correctly an entry for the boot partition. If /etc/mtab is empty, 
@@ -238,14 +240,15 @@ After leaving the chrooted environment, the following script can be used to
 setup the initrd.
 
 ```text
-ROOT="/mnt/gentoo"
+#!/bin/bash
+set -x
 mkdir -p $ROOT/boot/initram
 cd $ROOT/boot/initram
 mkdir bin lib dev dev/mapper dev/vc etc newroot proc sys
 
 cp /bin/busybox /sbin/cryptsetup /sbin/mdadm bin
-ln -s /bin/busybox bin/cat 
-ln -s /bin/busybox bin/mount 
+ln -s /bin/busybox bin/cat
+ln -s /bin/busybox bin/mount
 ln -s /bin/busybox bin/sh
 ln -s /bin/busybox bin/switch_root
 ln -s /bin/busybox bin/umount
@@ -255,7 +258,7 @@ cp -a /sbin/vgchange bin
 cp -a /sbin/vgscan bin
 cp -a /sbin/lvm bin
 
-cp -a /dev/console /dev/sda2 /dev/null /dev/urandom dev
+cp -a /dev/console /dev/nvme0n1p1 /dev/null /dev/urandom dev
 
 # Random device to avoid 
 # "Cannot initialize crypt RNG backend" error
@@ -263,44 +266,47 @@ mknod -m 644 dev/random c 1 8
 
 # Libraries for cryptsetup
 
-LIBS=$'/lib/ld-linux.so.2 \
-       /lib/ld-2.15.so \
-       /usr/lib/libcryptsetup.so.4 \
-       /usr/lib/libcryptsetup.so.4.2.0 \
-       /usr/lib/libpopt.so.0 \
-       /usr/lib/libpopt.so.0.0.0 \
-       /lib/libc.so.6 \
-       /lib/libc-2.15.so \
-       /lib/libuuid.so.1 \
-       /lib/libuuid.so.1.3.0 \
-       /lib/libdevmapper.so.1.02 \
-       /usr/lib/libgcrypt.so.11  \
-       /usr/lib/libgcrypt.so.11.8.2 \
-       /lib/libudev.so.1 \
-       /lib/libudev.so.1.3.5 \
-       /usr/lib/libgpg-error.so.0 \
-       /usr/lib/libgpg-error.so.0.8.0 \
-       /lib/librt.so.1 \
-       /lib/librt-2.15.so \
-       /lib/librt-2.15.so \
-       /lib/libpthread.so.0 \
-       /lib/libpthread-2.15.so'
+libs=(
+    /lib/ld-linux.so.2
+    /lib/ld-2.15.so
+    /usr/lib/libcryptsetup.so.4
+    /usr/lib/libcryptsetup.so.4.2.0
+    /usr/lib/libpopt.so.0
+    /usr/lib/libpopt.so.0.0.0
+    /lib/libc.so.6
+    /lib/libc-2.15.so
+    /lib/libuuid.so.1
+    /lib/libuuid.so.1.3.0
+    /lib/libdevmapper.so.1.02
+    /usr/lib/libgcrypt.so.11
+    /usr/lib/libgcrypt.so.11.8.2
+    /lib/libudev.so.1
+    /lib/libudev.so.1.3.5
+    /usr/lib/libgpg-error.so.0
+    /usr/lib/libgpg-error.so.0.8.0
+    /lib/librt.so.1
+    /lib/librt-2.15.so
+    /lib/librt-2.15.so
+    /lib/libpthread.so.0
+    /lib/libpthread-2.15.so
+)
 
-for l in $LIBS;
+for l in ${libs[@]};
 do
     cp -a $l lib
 done
 
 # Libraries for vgscan/vgchange
-LIBS=$'/lib/libdl.so.2 \
-       /lib/libdl-2.15.so \
-       /lib/libdevmapper-event.so.1.02 \
-       /lib/libreadline.so.6 \
-       /lib/libreadline.so.6.2 \
-       /lib/libncurses.so.5 \
-       /lib/libncurses.so.5.9'
-
-for l in $LIBS;
+libs=(
+    /lib/libdl.so.2
+    /lib/libdl-2.15.so
+    /lib/libdevmapper-event.so.1.02
+    /lib/libreadline.so.6
+    /lib/libreadline.so.6.2
+    /lib/libncurses.so.5
+    /lib/libncurses.so.5.9
+)
+for l in ${libs[@]};
 do
     cp -a $l lib
 done
@@ -309,14 +315,12 @@ cat > init << EOF_init
 #!/bin/sh
 echo "Initrd initialization"
 mount -t proc proc /proc
-CMDLINE="`cat /proc/cmdline`"
+CMDLINE="\$(cat /proc/cmdline)"
 mount -t sysfs sysfs /sys
-sleep 3
-/bin/cryptsetup luksOpen /dev/sda2 vault
+sleep 5 && /bin/cryptsetup luksOpen /dev/sda2 vault
 /bin/vgchange -ay vg
 mount -r /dev/mapper/vg-root /newroot
-umount /sys
-umount /proc
+umount /sys && umount /proc
 exec switch_root /newroot /sbin/init ${CMDLINE}
 EOF_init
 

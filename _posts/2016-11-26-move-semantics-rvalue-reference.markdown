@@ -5,12 +5,12 @@ date:   2016-11-26 08:00:00
 published: yes
 categories: programming cpp
 pygments: true
-summary: "A collection of some notes on move semantics, rvalue reference, type
-deduction and forwarding, just to consolidate some knowledge on C++11/14. The content
-of this post is mostly a re-elaboration of the information provided by
-Scott Meyer's \"Effective Modern C++\""
-
 ---
+
+Summary
+======
+A collection of some notes on move semantics, rvalue reference, type
+deduction and forwarding.
 
 Constructor, Copy Constructor and Move Constructor
 =======
@@ -76,10 +76,10 @@ of fact, with a proper rvalue, the caller will not even be able to tell if the o
 has been modified or not, due to the temporary nature of rvalues. 
 \\
 A simplified example of move semantics is implemented the move constructor
-of *MyClass*. The old object loses ownership of a certain resource while still
+of `MyClass`. The old object loses ownership of a certain resource while still
 being left in a consistent state. In this case there is solely an integer value 
 moved around: a more meaningful example would involve transferring ownership of a 
-dynamically allocated buffer while setting the old object's pointer to *nullptr*.
+dynamically allocated buffer while setting the old object's pointer to `nullptr`.
 In the examples below, lines 2 and 4 result in a call to the move assignment 
 operator and move constructor.
 
@@ -96,22 +96,22 @@ operator and move constructor.
 ```
 
 One remark must be made concerning the creation on line 4: here a temporary 
-object is created, which is again an rvalue and object *a* is move constructed from it.
-This is however not the default behaviour of gcc (version *4.9* in my case). The 
+object is created, which is again an rvalue and object `a` is move constructed from it.
+This is however not the default behaviour of gcc (version `4.9` in my case). The 
 compiler, if not asked otherwise, optimizes away the creation of the temporary.
-Something very similar happens with *RVO* (Return Value Optimization) and *NRVO*
-(Named return value optimization). *-fno-elide-constructors* will disable this behavior.
+Something very similar happens with `RVO` (Return Value Optimization) and `NRVO`
+(Named return value optimization). `-fno-elide-constructors` will disable this behavior.
 
 Moving from lvalues: std::move and std::forward
 =======
-Sometimes it becomes necessary to treat *lvalues* as *rvalues*, thus allowing the 
-function being invoked to move from a specific argument. *std::move* does exactly this,
-by returning an *rvalue reference* to its argument, which 
-will eventually bind to functions accepting *rvalues* like a move constructor (unless
-there is a *const* qualifier involved at some point). As *std::move*, *std::forward*
+Sometimes it becomes necessary to treat `lvalues` as `rvalues`, thus allowing the 
+function being invoked to move from a specific argument. `std::move` does exactly this,
+by returning an `rvalue reference` to its argument, which 
+will eventually bind to functions accepting `rvalues` like a move constructor (unless
+there is a `const` qualifier involved at some point). As `std::move`, `std::forward`
 is also responsible for casting the argument to an rvalue, but it does so
 only if certain conditions are met. The first and foremost scenario where
-*std::forward* comes to play is function templates which take universal references
+`std::forward` comes to play is function templates which take universal references
 as arguments.
 
 
@@ -128,11 +128,11 @@ template <typename T> void func(ParamType arg)
     [...]
 }
 ```
-*ParamType* is basically *T* enriched with qualifiers (e.g. *const*), references,
+`ParamType` is basically `T` enriched with qualifiers (e.g. `const`), references,
 or pointers. Considering the template function defined above, there are three 
 possible scenarios:
 
-  * ParamType is a pointer or a reference, but does not have the form of *T&&*
+  * ParamType is a pointer or a reference, but does not have the form of `T&&`
    (which instead would be a universal reference): in this case the reference part
     of the argument passed to the function can be ignored and *T* deduced 
     consequently.
@@ -148,11 +148,4 @@ possible scenarios:
     of any additional qualifier like *const* or *volatile* (unless, in case of
     a pointer, *const* refers to the data being pointed to).
 
-In the context of C++, type deduction is extended also to *auto* type and *decltype*. 
-
-[Work in progress...]
-
-
-
-
-
+In the context of C++, type deduction is extended also to `auto` type and `decltype`. 

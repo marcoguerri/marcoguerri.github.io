@@ -3,11 +3,15 @@ layout: post
 title:  "Network data corruption on a Gigabyte R120-P31 - Part 1"
 date:   2016-06-19 21:00:00
 categories: linux hardware kernel
-summary: "This post covers an interesting, yet subtle, data corruption issue 
-encountered on a Gigabyte ARM64 R120-MP31. This first part is a summary of some
-initial tests I did at the transport layer (i.e. TCP checksums) and at 
-the data link layer (i.e. Ethernet CRC32)."
 ---
+
+Summary
+=======
+This post covers an interesting, yet subtle, data corruption issue
+encountered on a Gigabyte ARM64 R120-MP31. This first part is a summary of some
+initial tests I did at the transport layer (i.e. TCP checksums) and at
+the data link layer (i.e. Ethernet CRC32).
+
 
 Background
 =======
@@ -106,7 +110,7 @@ sudo tc qdisc add dev lo root netem corrupt <CORRUPTION RATE>
 ```
 
 However, this method does not give much room for tuning: with the line above we
-are asking the network stack to "corrupt \<CORRUPTION RATE\>% of the *sk_buff*", 
+are asking the network stack to "corrupt <CORRUPTION RATE>% of the *sk_buff*", 
 where corruption means flipping one random bit in the whole *sk_buff*. The 
 relevant code from *net/sched/sched_netem.c* which implements the *corrupt* policy 
 is the following:
@@ -136,27 +140,27 @@ is the following:
     }
 ```
 
-The most relevant part is the call to *skb_checksum_help*, which computes
-in software the checksum of the packet and sets *skb->ip_summed* to *CHECKSUM_NONE*,
+The most relevant part is the call to `skb_checksum_help`, which computes
+in software the checksum of the packet and sets `skb->ip_summed` to `CHECKSUM_NONE`,
 basically disabling checksum offloading. The packet 
 singled out for corruption has a random bit flipped within the linear data of the 
-*sk_buff* (i.e. modulo *skb_headlen()*). The paged data of the sk_buff is not considered 
+`sk_buff` (i.e. modulo `skb_headlen()`). The paged data of the sk_buff is not considered 
 for corruption, I guess to keep things simple.
 \\
 This capability of the Linux kernel did not provide enough control for the test I wanted to perform, hence the decision
 to write a simple <a href="https://github.com/marcoguerri/packet-mangle" target="_blank">
-netfilter kernel module</a>, which registers a callback for the *NF_INET_POST_ROUTING* hook.
+netfilter kernel module</a>, which registers a callback for the `NF_INET_POST_ROUTING` hook.
 The code behaves in a very similar way as the netem discipline:
 
   * it looks for a magic word in the application level payload. 
     Again for simplicity non-linear sk_buffs are ignored
-  * it calculates the checksum of the outgoing *sk_buff* before the corruption. 
+  * it calculates the checksum of the outgoing `sk_buff` before the corruption. 
     The code operates at layer
     two just before the queue discipline, therefore the *sk_buff* is complete
   * it prints some debug information (e.g. the expected checksum)
   * it corrupts the checksum
-  * it sets *skb->ip_summed* to *CHECKSUM_NONE* so that hardware offloading is disabled
-  for this *sk_buff*
+  * it sets `skb->ip_summed` to `CHECKSUM_NONE` so that hardware offloading is disabled
+  for this `sk_buff`
 
 This kernel module has been tested on CentOS 7 with kernel 3.10, it is not guaranteed
 to work on any other kernel version. The outcome of the experiment was definitely 
@@ -171,10 +175,10 @@ I could see the following debug information:
 [ 4255.269345] Corrupting checksum to 0xBEEF
 ```
 
-The length of the linear portion of the *sk_buff* basically indicates how much non-paginated 
+The length of the linear portion of the `sk_buff` basically indicates how much non-paginated 
 data is present. Follows the length of the TCP payload and header.
 The module then prints the expected checksum followed by the corrupted checksum,
-i.e. 0xBEEF. The associated *tcpdump* trace on the server side is the following:
+i.e. 0xBEEF. The associated `tcpdump` trace on the server side is the following:
 
 ```
     10.41.208.7.44550 > 10.41.208.29.webcache: Flags [P.], cksum 0xbeef (incorrect -> 0x75f6
@@ -187,13 +191,13 @@ i.e. 0xBEEF. The associated *tcpdump* trace on the server side is the following:
         [...]
 ```
 
-The first 4 bytes of the payload correspond to the application level magic word, *0xDEADBEEF*.
+The first 4 bytes of the payload correspond to the application level magic word, `0xDEADBEEF`.
 The most interesting information shown by tcpdump is the incorrect TCP checksum notification,
-followed by the expected value *0x75F6*, which matches the output of the netfilter kernel module.
+followed by the expected value `0x75F6`, which matches the output of the netfilter kernel module.
 Considering that this segment <b>makes it all the way to userspace</b>, not just to layer 2
-where *tcpdump* intercepts it,
+where `tcpdump` intercepts it,
 the following question arises: who is supposed to stop the corrupted segment? 
-The NIC or the software stack at layer 4? According to *ethtool*, TCP checksum 
+The NIC or the software stack at layer 4? According to `ethtool`, TCP checksum 
 of incoming segments is software's responsibility:
 
 ```
@@ -207,7 +211,7 @@ tx-checksumming: on
         tx-checksum-sctp: off [fixed]
 ```
 
-Now, the relevant code in the *xgene-enet* driver that handles the checksum
+Now, the relevant code in the `xgene-enet` driver that handles the checksum
 of incoming frames is the following:
 
 ```c
@@ -217,7 +221,7 @@ if (likely((ndev->features & NETIF_F_IP_CSUM) &&
         xgene_enet_skip_csum(skb);
 }
 ```
-with *xgene_enet_skip_csum* begin:
+with `xgene_enet_skip_csum` begin:
 
 ```c
 static void xgene_enet_skip_csum(struct sk_buff *skb)                           
@@ -231,15 +235,15 @@ static void xgene_enet_skip_csum(struct sk_buff *skb)
 }                                                                               
 ```   
 
-If the protocol of the incoming frame is IP, i.e. *ETH_P_IP*, and the NIC reports 
-the *NETIF_F_IP_CSUM* flag, than *xgene_enet_skip_csum* is invoked. More conditions
+If the protocol of the incoming frame is IP, i.e. `ETH_P_IP`, and the NIC reports 
+the `NETIF_F_IP_CSUM` flag, than `xgene_enet_skip_csum` is invoked. More conditions
 must be met in order for the checksum to be skipped: the datagram must not be
 a fragment or the datagram must be carrying something that is neither TCP nor UDP.
 In this case, we have indeed a TCP segment, but the IP datagram is not fragmented,
-therefore *ip_summed* is definitely set to *CHECKSUM_UNNECESSARY* and the checksum
-never verified again. Now, that *ndev->features & NETIF_F_IP_CSUM* condition looks very
-suspicious. Why is *NETIF_F_IP_CSUM* set, if the NIC is not checksumming incoming
-segments? The flag is being set in function *xgene_enet_probe* in xgene-enet driver:
+therefore `ip_summed` is definitely set to `CHECKSUM_UNNECESSARY` and the checksum
+never verified again. Now, that `ndev->features & NETIF_F_IP_CSUM` condition looks very
+suspicious. Why is `NETIF_F_IP_CSUM` set, if the NIC is not checksumming incoming
+segments? The flag is being set in function `xgene_enet_probe` in xgene-enet driver:
 
 ```
          ndev->features |= NETIF_F_IP_CSUM |
@@ -250,7 +254,7 @@ segments? The flag is being set in function *xgene_enet_probe* in xgene-enet dri
 
 This "misunderstanding" between software and hardware causes corrupted
 data to go through to the application layer. It would be tempting to remove
-*NETIF_F_IP_CSUM* from the features of the device and, as a matter of fact,
+`NETIF_F_IP_CSUM` from the features of the device and, as a matter of fact,
 this would fix the data corruption issue until a TCP checksum collision, which is 
 not so unlikely considering the algorithm used is rather weak.
 However, the XGene-1 NIC is expected to checksum incoming frame. Offloading 
@@ -279,27 +283,27 @@ working properly, I wrote a <a href="https://github.com/marcoguerri/fcs-control"
 small tool</a> that allows to send Layer 2 frames with corrupted CRC. As mentioned
 before, normally CRC calculation is the hardware's responsibility and it is 
 completely out of the control of the software/driver. Crafting customs Ethernet frames
-is very easy with *PF_PACKET* sockets. If used
-with *socket_type* set to *SOCK_RAW*, then it is possible to pass to the driver
-the complete layer 2 frame, including the header. However, even *PF_PACKET* sockets
+is very easy with `PF_PACKET` sockets. If used
+with `socket_type` set to `SOCK_RAW`, then it is possible to pass to the driver
+the complete layer 2 frame, including the header. However, even `PF_PACKET` sockets
 do not prevent the NIC from appending the CRC. This is where
-socket option *SO_NOFCS* comes to the rescue. When supported by the driver, 
-*SO_NOFCS* tells the NIC not to add any frame check sequence (i.e. CRC). The flag 
-can be easily set with *setsockopt* at the *SOL_SOCKET* level. In case the driver 
-does not support it, *setsockopt* returns *ENOPROTOOPT*.
+socket option `SO_NOFCS` comes to the rescue. When supported by the driver, 
+`SO_NOFCS` tells the NIC not to add any frame check sequence (i.e. CRC). The flag 
+can be easily set with `setsockopt` at the `SOL_SOCKET` level. In case the driver 
+does not support it, `setsockopt` returns `ENOPROTOOPT`.
 
 
-Let's see an example of *SO_NOFCS* in action. The tool expects as command line 
+Let's see an example of `SO_NOFCS` in action. The tool expects as command line 
 arguments the interface to be associated with the RAW socket and the destination 
 MAC address. In the following examples, the destination MAC address passed as argument
 varies across the tests, even though the interface I am using is the same. The machine has two
 SFP+ interfaces and with the current UEFI firmware from AppliedMicro (version
 1.1.0) the second SFP+ port is not detected at all. The MAC address of the first
 interface varies depending on the version of the kernel. It is reported as
-*fc:aa:14:e4:97:59* when running kernel 4.2.0-29, but under kernel 4.6.0, the 
-interface with MAC address *fc:aa:14:e4:97:59* does not appear
+`fc:aa:14:e4:97:59` when running kernel 4.2.0-29, but under kernel 4.6.0, the 
+interface with MAC address `fc:aa:14:e4:97:59` does not appear
 to have any link anymore and the MAC of the interface under test
-becomes *22:f7:cb:32:eb:5c*. This behaviour is not present with the latest 
+becomes `22:f7:cb:32:eb:5c`. This behaviour is not present with the latest 
 UEFI firmware from Gigabyte, despite the data corruption issue still being reproducible. 
 It also true that, while running tcpdump on the server side, the NIC is in promiscuous 
 mode and it will accept anything, no matter the destination MAC, so the value 
@@ -332,7 +336,7 @@ Is there any way to have visibility over the CRC of incoming frames? Well,
 normally the answer is no, the hardware simply removes it. However, this is
 not always the case. In fact, on the XGene-1, the hardware actually passes the frame
 check sequence over to the software stack and it is instead the driver's 
-responsibility to strip it off. This is what happens in the *xgene_enet_rx_frame*
+responsibility to strip it off. This is what happens in the `xgene_enet_rx_frame`
 function, which is the NAPI polling function that handles the data which has been
 DMAed to memory by the NIC (the following source code comes from the xgene-enet
 driver shipped with kernel 4.6.0):
@@ -346,7 +350,7 @@ driver shipped with kernel 4.6.0):
 ```
 
 The CRC is being removed by subtracting the trailing 4 bytes from the total
-length of the frame. Removing the *-4* easily does the trick as shown by the 
+length of the frame. Removing the `-4` easily does the trick as shown by the 
 following trace (payload in now coming from /dev/zero):
 
 ```
@@ -369,14 +373,14 @@ Message sent correctly
 What happens if a corrupted CRC is appended to the frame? Normally any device
 that operates at layer 2 is expected to drop it, which means that a corrupted
 frame will never go past a switch or a NIC. However, at least for the latter,
-there are ways around it: ethtool compliant drivers/NICs expose the *rx-all* parameter, which when
+there are ways around it: ethtool compliant drivers/NICs expose the `rx-all` parameter, which when
 supported and enabled, allows to receive all incoming frames, including those
 whose CRC could not be validated. On the xgene-enet, rx-all is set to off,
 as expected, and cannot be modified in any way. For the test to be relevant,
 client and server must be connected back-to-back, or the switch will drop any
 corrupted data going through.
 Considering the previous frame, with a payload of all zeros, we have seen that
-the correct CRC is *0x0ffe979b*. If the tool appends a corrupted sequence, the result
+the correct CRC is `0x0ffe979b`. If the tool appends a corrupted sequence, the result
 on the server is the following:
 
 ```
@@ -386,7 +390,7 @@ on the server is the following:
         0x0020:  0000 0000 0000 0000 0000 0000 0000 efbe  ................
         0x0030:  adde 
 ```
-The frame is not discarded, even though the checksum is set to *0xdeadbeef*, which
+The frame is not discarded, even though the checksum is set to `0xdeadbeef`, which
 is clearly not valid. The CRC is written on the frame as a 
 little endian word and as a consequence bytes appear in reversed order.
 
@@ -400,7 +404,7 @@ layer have highlighted the following issues:
   * The corruption seems to follow a pattern, which most likely would rule out 
     data integrity issues on the medium (especially when the systems are connected
     back-to-back).
-  * The device features reported by the driver include the *NETIF_F_IP_CSUM* flag.
+  * The device features reported by the driver include the `NETIF_F_IP_CSUM` flag.
    However, corrupted TCP checksums are not discarded by the NIC.
   * Corrupted link layer frames are not discarded by the NIC
 

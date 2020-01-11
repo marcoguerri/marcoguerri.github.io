@@ -5,22 +5,25 @@ date:   2016-09-19 08:00:00
 published: yes
 categories: linux
 pygments: true
-summary: "A collection of some notes on Linux filesystem layer,
-focusing on the implementation independent interface provided by the OS also
-known as Virtual File System (VFS)."
 ---
+
+Summary
+=======
+A collection of some notes on Linux filesystem layer,
+focusing on the implementation independent interface provided by the OS also
+known as Virtual File System (VFS).
 
 Linux VFS
 =======
 The Linux VFS subsystem implements file-system realted operations by exporting the
 usual open/read/write interface to userspace processes regardless of the underlying
 filesystem or physical device. The main objects implemented by the VFS layer are
-*superblock*, *inode*, *dentry* and *file*. 
+`superblock`, `inode`, `dentry` and `file`. 
 
 
 superblock
 =======
-The *super_block* object is a collection of metadata describing a filesystem.
+The `super_block` object is a collection of metadata describing a filesystem.
 On ext filesystems, this object reflects the information stored in the 
 filesystem superblock at the beginning of each partition, just 
 after the initial boot block. The VFS superblock 
@@ -28,26 +31,26 @@ contains information such as:
 
   * The filesystem block size
   * The filesystem magic number
-  * An object representing the mount point within the system (see *dentry* discussion
+  * An object representing the mount point within the system (see `dentry` discussion
   further down)
   * A pointer to a pool of inodes
 
-The *superblock* is extremely important and it is usually backed up throughout
-the whole medium on ext filesystems. *dumpe2fs* lists all the backup copies available.
+The `superblock` is extremely important and it is usually backed up throughout
+the whole medium on ext filesystems. `dumpe2fs` lists all the backup copies available.
 
 inode and dentry
 =======
 The VFS treats directories as special files and represents each component
-of a filesystem path with a *dentry* object. Dentries 
+of a filesystem path with a `dentry` object. Dentries 
 are not physically stored on the medium, but they are rather created on-the-fly by
-the kernel when needed. The most relevant fields of a *dentry* are the following:
+the kernel when needed. The most relevant fields of a `dentry` are the following:
 
-  * *struct dentry \*d_parent*, a pointer to the parent *dentry*. When building
+  * `struct dentry *d_parent`, a pointer to the parent `dentry`. When building
   a path, the kernel chains the corresponding dentries together.
-  * *struct inode \*d_inode\**, a pointer to the *inode* implementing the current
+  * `struct inode *d_inode`, a pointer to the `inode` implementing the current
   element of the path, being it a directory or a regular file.
-  * *struct qstr d_name*, the name of the path element. Names are not part of
-  the *inode* but rather of the *dentry*.
+  * `struct qstr d_name`, the name of the path element. Names are not part of
+  the `inode` but rather of the `dentry`.
 
 
 Directories structure on the filesystem
@@ -55,7 +58,7 @@ Directories structure on the filesystem
 As mentioned before, directories are also represented on the filesystem with 
 inodes, which in turn contain pointers to blocks on the storage device. The layout of
 a directory on the storage device consists of a list of <inode, name> pairs that
-represent the entities contained in that directory. Linux uses the *dirent* 
+represent the entities contained in that directory. Linux uses the `dirent` 
 structure to model such information:
 
 
@@ -75,14 +78,14 @@ device. Considering for example the following hierarchy:
 
 ```
 directory1
-├── [13320526]  directory2
-├── [13328753]  directory3
-└── [13238920]  file1
+`|- [13320526]  directory2
+ |- [13328753]  directory3
+ `- [13238920]  file1
 ```
 
-*debugfs* allows to obtain the block numbers referenced by an inode representing a 
-file or a directory. In this case, directory *directory1* has inode number 13279608 
-(*ls* with *-i* flag displays such information).
+`debugfs` allows to obtain the block numbers referenced by an inode representing a 
+file or a directory. In this case, directory `directory1` has inode number 13279608 
+(`ls` with `-i` flag displays such information).
 
 ```
 $ sudo debugfs /dev/mapper/debian-debian--home
@@ -110,8 +113,8 @@ $ sudo dumpe2fs /dev/mapper/debian-debian--home  | grep "Block size"
 dumpe2fs 1.42.12 (29-Aug-2014)
 Block size:               4096
 ```
-Extent 52965455 corresponds to sector *52965455\*8* when using 4K blocks, i.e. 
-423723640, which can be dumped with *dd*. *stat* reports a size of 4K, which is
+Extent 52965455 corresponds to sector `52965455*8` when using 4K blocks, i.e. 
+423723640, which can be dumped with `dd`. `stat` reports a size of 4K, which is
 the allocation unit at the filesystem level, but the relevant data is most 
 likely less than 4096 bytes.
 
@@ -139,11 +142,11 @@ The first part of the hex dump is the following:
 Indeed this 4K block seems to contain the directory information but
 also additional irrelevant data from previous allocations in the same block. The first
 piece of information that immediately stands out is the name of the files and directories
-contained in *directory1*. What should follow each file name is an *ino_t* representing
-the inode number, encoded as a little endian *unsigned long* at the VFS layers,
+contained in `directory1`. What should follow each file name is an `ino_t` representing
+the inode number, encoded as a little endian `unsigned long` at the VFS layers,
 which translates to 64-bits on my system.
 However, it is up to the actual implementation to decide how to map Linux VFS fields
-to the internal structures. As an example, *ext4* uses *ext4_dir_entry* which consists
+to the internal structures. As an example, `ext4` uses `ext4_dir_entry` which consists
 of the following fields:
 
 ```c
@@ -154,7 +157,7 @@ struct ext4_dir_entry {
     char    name[EXT4_NAME_LEN];    /* File name */
 }; 
 ```
-The binary dump from 0x18 to 0x30 represents entry *file1* and maps directy to the 
+The binary dump from 0x18 to 0x30 represents entry `file1` and maps directy to the 
 fields above.
 
 ```
@@ -163,11 +166,11 @@ fields above.
 05 01               __le16 representing the file name length (261)
 66 69 6c 65 31      char*  representing the file name
 ```
-Does this look right? Not really. *inode* seems correct and *rec_len* as well (the total
-record len would be 13, but it's rounded to the byte boundary). *name_len* instead
+Does this look right? Not really. `inode` seems correct and `rec_len` as well (the total
+record len would be 13, but it's rounded to the byte boundary). `name_len` instead
 is definitely not correct: it should be simply 0x05 and the leftmost byte should
-be 0x00. This mismatch can be explained with the introduction of *ext4_dir_entry_2*
-structure, which is defined in *fs/ext4/ext4.h* as follows:
+be 0x00. This mismatch can be explained with the introduction of `ext4_dir_entry_2`
+structure, which is defined in `fs/ext4/ext4.h` as follows:
 
 ```c
 /*
@@ -184,10 +187,10 @@ struct ext4_dir_entry_2 {
     char name[EXT4_NAME_LEN]; /* File name */
 };
 ```
-So, *EXT4_NAME_LEN* is defined as 255, therefore having 2 bytes to represent 
+So, `EXT4_NAME_LEN` is defined as 255, therefore having 2 bytes to represent 
 the lenght does not make much sense. As a consequence, one byte that previously
-was part of the *__le16* representing the name is now used to designate the file
-type and indeed now name_len becomes a *__u8*, i.e. simply 0x05. The same analysis
+was part of the `__le16` representing the name is now used to designate the file
+type and indeed now `name_len` becomes a `__u8`, i.e. simply 0x05. The same analysis
 can be applied to the remaining entries. Now, the analysis started from the 
 first entry which could be easiy identified from the filename, but the block contains
 some more data from 0x00 to 0x17.
@@ -197,8 +200,8 @@ some more data from 0x00 to 0x17.
 00000010  0c 00 02 02 2e 2e 00 00                           |........|
 ```
 
-What is this data? Well *0x78a1ca00* looks like a little endian inode number
-and so does *0x0100ca00*. A quick check reveals what these entries are:
+What is this data? Well `0x78a1ca00` looks like a little endian inode number
+and so does `0x0100ca00`. A quick check reveals what these entries are:
 
 ```
 $ sudo debugfs /dev/mapper/debian-debian--home
@@ -211,8 +214,4 @@ Inode   Pathname
 13279608    /mguerri/directory1
 ```
 
-These are *dentries* representing *.* and *..*!
-
-[Work in progress...]
-
-
+These are `dentries` representing *.* and *..*!

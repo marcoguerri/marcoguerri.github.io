@@ -1,35 +1,38 @@
 ---
-layout: master
+layout: default
 ---
 
+
   <link rel="stylesheet" href="/css/jquery.fancybox.css" type="text/css" media="screen" />
-  <script type="text/javascript" src="/fancybox/jquery-1.4.3.min.js"></script>
-  <script type="text/javascript" src="/fancybox/jquery.fancybox-1.3.4.js"></script>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js"></script>
+  <script type="text/javascript" src="/fancybox/jquery.fancybox-1.3.4.pack.js"></script>
+
 <script>
  $(document).ready(function() {
     $("a#single_image").fancybox();
   });
 </script>
 
-<div class="summary">
-<h1 class='post_title'>{{page.title}}</h1>
+
+<div class="well">
 <div align="center">
+<h1>{{page.title}}</h1>
 <a href="{{page.flickr}}" target="_blank">Album on flickr</a>
 </div>
+
 <br>
 {{ page.introduction }}
-</div>
 <div style="display:table;padding-top:2em">
   {% for image in page.images %}
     <div style="display:table-row;">
-        <div style="display:table-cell;padding-right:1em">
+        <div style="display:table-cell;padding-right:1em;padding-top:0.5em">
             <a id="single_image" href="{{ image.image_path }}">
             <img src="{{ image.thumb }}" alt=""/></a>
         </div>
-        <div style="display:table-cell;vertical-align:top">
+        <div style="display:table-cell;vertical-align:top;padding-top:0.5em">
             {{image.description}}
         </div>
     </div>
   {% endfor %}
-
+</div>
 </div>

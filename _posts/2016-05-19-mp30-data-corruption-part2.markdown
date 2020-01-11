@@ -3,11 +3,14 @@ layout: post
 title:  "Network data corruption on Gigabyte R120-P31 - Part 2"
 date:   2016-08-19 21:00:00
 categories: jekyll update
-summary: "After investigating a data corruption issue encountered on a Gigabyte 
+---
+Summary
+=======
+After investigating a data corruption issue encountered on a Gigabyte
 ARM64 R120-MP31 at the application, transport and date link layer, I performed some
 tests aimed at validating an alternative hypothesis, i.e. data corruption happening
-in system RAM."
----
+in system RAM.
+
 
 The hardware-software interface
 =======
@@ -16,10 +19,10 @@ the controller is capable of mastering the bus and copying directly the data
 into system memory. The controller maintains a hardware ring buffer of available 
 DMAable memory regions where to copy incoming frames. When the NIC runs out of 
 regions, the hardware ring buffer is refilled by the driver. The DMAable addresses 
-are basically *sk_buff* allocated with *netdev_alloc_skb_ip_align*. This function 
+are basically `sk_buff` allocated with `netdev_alloc_skb_ip_align`. This function 
 allocates a virtual addresses that is immediately mapped to a physical region. 
-When user space processes allocate memory via *malloc*, the underlying *brk* or 
-*mmap* syscalls add a particular mapping to the virtual address space of the 
+When user space processes allocate memory via `malloc`, the underlying `brk` or 
+`mmap` syscalls add a particular mapping to the virtual address space of the 
 process but a physical frame is normally not reserved until the first page fault. 
 In this case, however, the newly allocated address must be passed over to the hardware 
 which accesses system memory without going through the CPU MMU, making it necessary
@@ -27,31 +30,31 @@ to have a mapping immediately available. Hardware devices are not always
 capable of DMAing directly to physical addresses. There is usually IOMMU hardware 
 that translates addresses as seen by the device to physical ones: the kernel allows 
 to obtain a valid DMAble address for the device via the DMA API. 
-In this case *dma_map_single* is used.
+In this case `dma_map_single` is used.
 
 Retrieving frames from system RAM
 =======
 In the xgene-enet driver, the function responsible for retrieving frames that 
-have been DMAed to memory is *xgene_enet_rx_frame*. This function is called
-by the NAPI polling callback, *xgene_enet_napi*  registered by the driver upon 
+have been DMAed to memory is `xgene_enet_rx_frame`. This function is called
+by the NAPI polling callback, `xgene_enet_napi`  registered by the driver upon 
 initialization and it is basically responsible for the following operations:
 
-  * it validates the incoming *sk_buff* checking for hardware I/O errors
+  * it validates the incoming `sk_buff` checking for hardware I/O errors
   * it strips off the CRC 
   * it disables TCP checksum validation if already performed by the hardware
   * it updates RX counters
-  * it passes the *sk_buff* to the upper layers of the stack via *napi_gro_receive*
+  * it passes the `sk_buff` to the upper layers of the stack via `napi_gro_receive`
 
 By invoking the GRO receive function, the driver makes use of the 
 Generic Receive Offload capabilities provided by the kernel that allow to merge 
-TCP segments into single *sk_buff*. GRO is the receive counterpart of 
-*tcp-segmentation-offload*, a feature of ethtool-enabled hardware that performs
+TCP segments into single `sk_buff`. GRO is the receive counterpart of 
+`tcp-segmentation-offload`, a feature of ethtool-enabled hardware that performs
 hardware segmentation of outgoing TCP segments. Both on the receive and transmit side, 
-segmentation allows to send fewer *sk_buff*  through the network stack, 
+segmentation allows to send fewer `sk_buff`  through the network stack, 
 with a significant increase in performance while still transmitting on the wire
 chunks of data sized in a way that can be easily handled by routers, switches, etc.
 The following is an brief example of the initial control path for incoming frames 
-obtained with *ftrace*.
+obtained with `ftrace`.
 
 ```   
  2)               |  xgene_enet_napi() {
@@ -74,7 +77,7 @@ obtained with *ftrace*.
 ```
 
 As already mentioned, the DMAable addresses that are passed to the hardware 
-ring buffers point directly to the *data* field of the *sk_buff*s. A further hypothesis 
+ring buffers point directly to the `data` field of the `sk_buff`s. A further hypothesis 
 I wanted to validate was whether corruption was happening when data was 
 DMAed and subsequently read from memory due to faulty RAM (e.g. flipped bits that
 ECC checks could not correct).
@@ -82,23 +85,23 @@ ECC checks could not correct).
 
 Validating frames after DMA transfers
 =======
-In order to check whether *xgene_enet_rx_frame* was receiving data already corrupted
+In order to check whether `xgene_enet_rx_frame` was receiving data already corrupted
 from system memory, I wrote some code that would perform the following steps:
     
-  * Trap *xgene_enet_rx_frame*
+  * Trap `xgene_enet_rx_frame`
   * Calculate the CRC and compare it with the one in the FCS field of the frame
   * Print the physical address of the frame upon detection of a mismatch in order
     to spot possible patterns or recurrent memory areas.
 
-The implementation is based on a kernel *jprobe*, a Linux feature
+The implementation is based on a kernel `jprobe`, a Linux feature
 that allows to assign a callback to a kernel function with the capability 
 of inspecting the function's arguments. At the time of testing, the latest kernel 
 version available (4.7.0) was not supporting officially jprobes for ARM64. Several 
 implementations had already been circulated in the kernel mailing list, the latest 
-one being from Sandeepa Prabhu on the 8th of July 2016 (*arm64: Kprobes with single 
-stepping support*). This series of 10 patches cleanly applied against kernel 4.6.0 
+one being from Sandeepa Prabhu on the 8th of July 2016 (`arm64: Kprobes with single 
+stepping support`). This series of 10 patches cleanly applied against kernel 4.6.0 
 (aka 2dcd0af5), which is the one I used for this experiment. As a side note, I had to disable
-*CONFIG_ARM64_ERRATUM_843419* in the kernel configuration to work around a 
+`CONFIG_ARM64_ERRATUM_843419` in the kernel configuration to work around a 
 relocation error ("unsupported RELA") that was being raised when loading the module.
 
 
@@ -106,10 +109,10 @@ Results from the probe
 =======
 What immediately stands out when running the jprobe is that the code is definitely not
 optimized for speed. When loading the kernel module and transferring data
-over the SFP+ interface, the *softirq* which is running the NAPI handler
+over the SFP+ interface, the `softirq` which is running the NAPI handler
 goes 100\% CPU utilization and the throughput drops to a bare ~8MB/s. Nonetheless,
 the jprobe does its job: after having transferred around 30 GB of data coming from 
-/dev/zero, there were 69 *sk_buff* for which the CRC could not be validated:
+/dev/zero, there were 69 `sk_buff` for which the CRC could not be validated:
 
 ```
 [1513584.424677] Calculated CRC is 50b477c,  CRC in frame is 5ccfcebe, phys: 0000008051da2c02, 0000008051da2c02
@@ -209,13 +212,13 @@ can be drafted:
 ```
 
 Now, the only way to rule out any possible memory corruption issue would be an
-in-depth memory test pointed directly on those memory regions. *memtester* is 
+in-depth memory test pointed directly on those memory regions. `memtester` is 
 actually capable of working directly on a range of physical addresses, by 
 making use of /dev/mem, but this is really a bad idea as the underlying memory
 pages are very likely to be in use by the kernel. In the best case, the tool would mistakenly 
 report data corruption due to the concurrent activity of other threads, in the
 worst case, the system would completely freeze. The proper course of action would
-be to use bare-metal memory testing utilities like uboot *mtest*. 
+be to use bare-metal memory testing utilities like uboot `mtest`. 
 At this point however, I decided to halt all the debugging activities as the 
 memory corruption hypothesis seemed rather weak to me and the deadline I had set for
 coming up with a solution had been reached. Time came to ask for support to the 
