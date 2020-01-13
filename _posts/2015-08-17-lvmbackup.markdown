@@ -67,7 +67,7 @@ the ext filesystem on top of it. It is important
 to notice that resize2fs uses the filesystem blocksize as default unit (normally 4K for ext),
 and that the space reported by `df` is the usable space as seen by the user. The actual
 minimum size, metadata included, of an ext filesystem is not trivial to calculate:
-there is a detailed [article](http://www.tldp.org/HOWTO/Filesystems-HOWTO-6.html)
+there is a detailed [article](https://www.tldp.org/HOWTO/Filesystems-HOWTO-6.html)
  on TLDP which covers the layout of ext2. The structure basically
 consists of block groups, each one being divided as follows:
 
@@ -81,7 +81,7 @@ consists of block groups, each one being divided as follows:
 Taking into consideration all contributions of the metadata requires an in-depth 
 understanding of the filesystem, but resize2fs comes to the rescue. In fact, 
 this calculation is done by function `calculate_minimum_resize_size` 
-in [`resize/resize2fs.c`](http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/resize/resize2fs.c#n2769).
+in [`resize/resize2fs.c`](https://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/tree/resize/resize2fs.c#n2769).
 If resize2fs is invoked with a command line argument which is smaller than the value returned
 by `calculate_minimum_resize_size`, it raises an error followed by the minimum 
 allowed size of the filesystem, as the number of 4K blocks. To this value, I usually
