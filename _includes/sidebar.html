@@ -13,7 +13,7 @@
 
 <div class="sidebar well">
     <h1>Recent Posts</h1>
-    <ul>
+    <ul style="padding-inline-start:1em">
         {% for post in site.posts limit:8 %}
           <li><a href="{{ site.baseurl}}{{ post.url }}">{{ post.title }}</a></li>
         {% endfor %}
