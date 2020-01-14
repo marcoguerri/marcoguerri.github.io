@@ -1,0 +1,21 @@
+<link rel="stylesheet" href="/css/font-awesome.min.css" type="text/css" media="screen" charset="utf-8"/>
+<div class="sidebar well">
+{{ site.description }}
+<br>
+<br>
+<div align="center">
+<i style="padding-right:0.2em" class="fa fa-github"></i><a style="padding-right:0.5em" href='https://github.com/marcoguerri'>Github</a></li>
+<i style="padding-right:0.2em"class="fa fa-twitter"></i><a style="padding-right:0.5em" href='https://twitter.com/guerrimarco'>Twitter</a></li>
+<i style="padding-right:0.2em" class="fa fa-linkedin"></i><a style="padding-right:0.5em" href='https://www.linkedin.com/in/marco-guerri-a08b61116/'>Linkedin</a></li>
+</div>
+
+</div>
+
+<div class="sidebar well">
+    <h1>Recent Posts</h1>
+    <ul>
+        {% for post in site.history limit:8 %}
+          <li><a href="{{ site.baseurl}}{{ post.url }}">{{ post.title }}</a></li>
+        {% endfor %}
+    </ul>
+</div>
