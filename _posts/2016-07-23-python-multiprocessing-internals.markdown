@@ -43,7 +43,7 @@ In order to trace both the parent and the child, `-f` flag is required. The work
 process is initially created via `clone` syscall:
 
 
-{% endhighlight %}plaintext
+{% highlight text %}
 clone(child_stack=0, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fca99ea09d0) = 17498
 Process 17498 attached
 [...]
