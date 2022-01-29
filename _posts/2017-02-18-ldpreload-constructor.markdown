@@ -9,6 +9,8 @@ pygments: true
 
 Summary
 =======
+LD_PRELOAD is a great tool to "override" the behavior of a binary. This post explains how `attribute constructor` and LD_PRELOAD might affect the behavior of the process after execve syscall.
+
 A collection of notes on LD_PRELOAD, attribute constructor and execve syscall
 
 constructor, destructor and execve
@@ -27,8 +29,8 @@ everything becomes even more interesting. If `LD_PRELOAD` is set, the dynamic lo
 loads the libraries referenced by that variable before any other shared object and,
 as a consequence, constructor functions of those objects are also invoked.
 
-When playing around with `LD_PRELOAD`, I found myself in a situation 
-where I could not explain why a constructor function was being called multiple 
+When playing around with `LD_PRELOAD`,  I could not explain why a constructor function 
+was being called multiple 
 times by children processes further down the fork chain.
 After a closer look, it turned out those processes were calling `execve` multiple
 times, with `LD_PRELOAD` set in `envp` parameter, as it would be expected if the parent

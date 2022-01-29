@@ -6,10 +6,11 @@ categories: jekyll update
 ---
 Summary
 =======
-After investigating a data corruption issue encountered on a Gigabyte
-ARM64 R120-MP31 at the application, transport and date link layer, I performed some
-tests aimed at validating an alternative hypothesis, i.e. data corruption happening
-in system RAM.
+This is the second part of an [investigation](/2016/06/mp30-data-corruption-part1)
+to solve a data corruption issue encountered on a Gigabyte ARM64 R120-MP31 board. 
+In the first part I had a look at application, transport and data link layer.
+In this second part I perform some tests to validate possible data corruption happening
+in system RAM
 
 
 The hardware-software interface
@@ -56,7 +57,7 @@ chunks of data sized in a way that can be easily handled by routers, switches, e
 The following is an brief example of the initial control path for incoming frames 
 obtained with `ftrace`.
 
-```   
+{% highlight text  %}
  2)               |  xgene_enet_napi() {
  2)               |    xgene_enet_process_ring() {
  2)               |      xgene_enet_rx_frame() {
@@ -74,7 +75,7 @@ obtained with `ftrace`.
  2)   4.180 us    |          }
  2)               |          netif_receive_skb_internal() {
 [...]
-```
+{% endhighlight %}
 
 As already mentioned, the DMAable addresses that are passed to the hardware 
 ring buffers point directly to the `data` field of the `sk_buff`s. A further hypothesis 
@@ -114,14 +115,14 @@ goes 100\% CPU utilization and the throughput drops to a bare ~8MB/s. Nonetheles
 the jprobe does its job: after having transferred around 30 GB of data coming from 
 /dev/zero, there were 69 `sk_buff` for which the CRC could not be validated:
 
-```
+{% highlight text  %}
 [1513584.424677] Calculated CRC is 50b477c,  CRC in frame is 5ccfcebe, phys: 0000008051da2c02, 0000008051da2c02
 [1513628.119962] Calculated CRC is fd4e97fc,  CRC in frame is e34ba66c, phys: 000000805e182382, 000000805e182382
 [1513656.995813] Calculated CRC is 8c725bf1,  CRC in frame is 12953b1d, phys: 000000804c145682, 000000804c145682
 [1513677.473247] Calculated CRC is 22665372,  CRC in frame is 12bfc315, phys: 000000804c7a7002, 000000804c7a7002
 [...]
 [1513685.219367] Calculated CRC is 4ad9905d,  CRC in frame is 424e3943, phys: 000000804c145f02, 000000804c145f02
-```
+{% endhighlight %}
 <!--
 [1513704.518584] Calculated CRC is f7d94c71,  CRC in frame is 988a84c8, phys: 00000080565dab82, 00000080565dab82
 [1513734.334714] Calculated CRC is beeeefff,  CRC in frame is ae1af712, phys: 000000805e0d6782, 000000805e0d6782
@@ -198,7 +199,7 @@ can be drafted:
   * Among the 29 pages, three of them are located in a lower memory area 
     (0xe006, 0xe808, 0xec27).
 
-```
+{% highlight text  %}
       1 00000000e006          2 00000080563c          2 000000805da1
       1 00000000e808          3 000000805655          2 000000805e09
       1 00000000ec27          3 000000805657          3 000000805e0a
@@ -209,7 +210,7 @@ can be drafted:
       2 000000805204          4 000000805691          1 000000805e1f
       1 000000805626          2 000000805695          2 000000805f18
       2 000000805636          5 000000805887
-```
+{% endhighlight %}
 
 Now, the only way to rule out any possible memory corruption issue would be an
 in-depth memory test pointed directly on those memory regions. `memtester` is 

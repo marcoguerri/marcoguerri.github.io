@@ -49,3 +49,21 @@ body {
 .author a {
     color: #ee4444;
 }
+
+pre {
+    border: 0px;
+}
+
+pre.lineno {
+    color: #d0d0d0d0;
+    border: 0px;
+}
+
+code.language-text {
+    color: #d0d0d0d0;
+    white-space: pre;
+}
+
+td {
+    padding: 0px 10px 0px 10px;
+}

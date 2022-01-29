@@ -9,8 +9,8 @@ pygments: true
 
 Summary
 ======
-A collection of some notes on move semantics, rvalue reference, type
-deduction and forwarding.
+This post walks through new concepts introduced by C++11 such as move semantics, rvalue reference, forwarding, 
+and shows how they affect compile time and runtime behavior.
 
 Constructor, Copy Constructor and Move Constructor
 =======
@@ -18,7 +18,7 @@ Constructor, Copy Constructor and Move Constructor
 Let's consider a class with constructor, copy constructor, move constructor,
 copy assignment operator and move assignment operator.
 
-```c++
+{% highlight c++ linenos %}
 class MyClass {
 public:
   int _value;
@@ -51,20 +51,21 @@ public:
       cout << "Destructor" << endl;
    }
 };
-```
+{% endhighlight %}
 
 Some first basic construction scenarios are shown below, with the code on the 
 left and the output on the right.
 
-```
- 1  MyClass a(10);    Constructor 10
- 2  MyClass b(a);     Copy constructor
- 3  b = a;            Copy assignment operator
- 4  MyClass c = b;    Copy constructor
- 5                    Destructor
- 6                    Destructor
- 7                    Destructor
-```
+{% highlight c++ linenos %}
+MyClass a(10);    Constructor 10
+MyClass b(a);     Copy constructor
+b = a;            Copy assignment operator
+MyClass c = b;    Copy constructor
+                  Destructor
+                  Destructor
+                  Destructor
+{% endhighlight %}
+
 These examples are all well known under C++98, probably the only remark worth pointing
 out is the invocation of the copy constructor on line 2 and 4.
 In the context of C++11, the introduction of rvalue references allows to implement
@@ -83,17 +84,17 @@ dynamically allocated buffer while setting the old object's pointer to `nullptr`
 In the examples below, lines 2 and 4 result in a call to the move assignment 
 operator and move constructor.
 
-```
- 1  MyClass c(10);           Constructor 10
- 2  c = MyClass(20);         Constructor 20
- 3                           Move assignment operator
- 4  MyClass a(MyClass(10));  Constructor 10
- 5                           Move constructor
- 6                           Destructor
- 7                           Destructor
- 8                           Destructor
- 9                           Destructor
-```
+{% highlight c++ linenos  %}
+MyClass c(10);           Constructor 10
+c = MyClass(20);         Constructor 20
+                         Move assignment operator
+MyClass a(MyClass(10));  Constructor 10
+                         Move constructor
+                         Destructor
+                         Destructor
+                         Destructor
+                         Destructor
+{% endhighlight %}
 
 One remark must be made concerning the creation on line 4: here a temporary 
 object is created, which is again an rvalue and object `a` is move constructed from it.
@@ -105,13 +106,15 @@ Something very similar happens with `RVO` (Return Value Optimization) and `NRVO`
 Moving from lvalues: std::move and std::forward
 =======
 Sometimes it becomes necessary to treat `lvalues` as `rvalues`, thus allowing the 
-function being invoked to move from a specific argument. `std::move` does exactly this,
-by returning an `rvalue reference` to its argument, which 
+function being invoked to move from a specific argument. `rvalues` can be bound to `rvalue`
+references or to `lvalue` references to const. `std::move` carries out the operation of turning an `lvalue`
+into an `rvalue`, by returning an `rvalue reference` to its argument, which 
 will eventually bind to functions accepting `rvalues` like a move constructor (unless
-there is a `const` qualifier involved at some point). As `std::move`, `std::forward`
-is also responsible for casting the argument to an rvalue, but it does so
-only if certain conditions are met. The first and foremost scenario where
-`std::forward` comes to play is function templates which take universal references
+there is a `const` qualifier involved at some point: in this case, a const rvalue cannot
+be passed to a move constructor, which takes a rvalue reverence to a non-const object).
+ As `std::move`, `std::forward` is also responsible for casting the argument to an rvalue,
+but it does so only if its argument was initialized with an rvalue. The first and foremost scenario 
+where `std::forward` comes to play is function templates which take universal references
 as arguments.
 
 
@@ -122,12 +125,13 @@ time based on the types involved in the invocation. The first and foremost scena
 where the compiler implements type deduction is function templates, which are 
 normally declared as follows.
 
-```c++
+{% highlight c++ linenos  %}
 template <typename T> void func(ParamType arg) 
 {
     [...]
 }
-```
+{% endhighlight %}
+
 `ParamType` is basically `T` enriched with qualifiers (e.g. `const`), references,
 or pointers. Considering the template function defined above, there are three 
 possible scenarios:
@@ -144,8 +148,12 @@ possible scenarios:
 
   * ParamType is neither a pointer nor a reference. In this case, the argument
     is passed by value. If the argument is a reference, the reference part can
-    be ignored to deduce *T*. *arg* is copy constructed an therefore independent
+    be ignored to deduce *T*. *arg* is copy constructed and therefore independent
     of any additional qualifier like *const* or *volatile* (unless, in case of
     a pointer, *const* refers to the data being pointed to).
 
-In the context of C++, type deduction is extended also to `auto` type and `decltype`. 
+
+If *T* is deduced to be of type lvalue reference, the compiler will perform reference
+collapsing to derive the final type of *ParamType*: if any of the right hand side or
+left hand side are lvalue references, the result is an `lvalue` reference. Otherwise,
+the result is an `rvalue` reference.

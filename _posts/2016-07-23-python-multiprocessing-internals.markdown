@@ -16,7 +16,7 @@ Background
 In the following code snippet, the main thread spawns a worker process that 
 requires a certain amount of time to terminate.
 
-```python
+{% highlight python  %}
 from multiprocessing import Process
 import time
 
@@ -27,7 +27,7 @@ def worker():
 p = Process(target=worker)
 p.start()
 print "All done"
-```
+{% endhighlight %}
 When this code is executed, "All done" is immediately printed, then a 10 seconds
 delay follows and the message "Worker Process" is printed on the tty. What happens 
 exactly when the process is created and why the interpreter does not return until
@@ -43,7 +43,7 @@ In order to trace both the parent and the child, `-f` flag is required. The work
 process is initially created via `clone` syscall:
 
 
-```plaintext
+{% endhighlight %}plaintext
 clone(child_stack=0, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fca99ea09d0) = 17498
 Process 17498 attached
 [...]
@@ -51,7 +51,7 @@ Process 17498 attached
 [pid 17498] fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 6), ...}) = 0[pid 17498] mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fca99ec8000
 [pid 17498] mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fca99ec8000
 [pid 17498] write(1, "Worker process\n", 15Worker process
-```
+{% endhighlight %}
 
 The absence of `CLONE_VM`, to enable sharing page tables, and `CLONE_FS`, to enable
 sharing the `fs_struct`  in `task_struct` (i.e. the open files table), when invoking clone 
@@ -60,7 +60,7 @@ thread. `SIGCHLD` is also set, which causes the parent to be signaled upon the
 termination of the child. The process then waits 10 seconds via `select` syscall and 
 finally prints its message. What is the parent doing meanwhile?
 
-```text
+{% highlight text  %}
 [pid 17497] write(1, "All done\n", 9All done
 )   = 9
 [pid 17497] wait4(17498, 0x7ffc65a9aab4, WNOHANG, NULL) = 0
@@ -71,7 +71,7 @@ finally prints its message. What is the parent doing meanwhile?
 rt_sigaction(SIGINT, {SIG_DFL, [], SA_RESTORER, 0x7fca99a9d8d0}, {0x559f50, [], SA_RESTORER, 0x7fca99a9d8d0}, 8) = 0
 [...]
 exit_group(0)                           = ?
-```
+{% endhighlight %}
 
 After printing its message on standard output, it starts a series of non-blocking
 wait on the child setting `WNOHANG` flag, which causes the syscall to return immediately
@@ -92,9 +92,9 @@ First, python debug symbols must be installed. On Debian,
 `python-dbg` contains the interpreter compiled with `-g` option. On Fedora,
 debug symbols can be downloaded separately with the following yum command:
 
-```text
+{% highlight text  %}
 yum --enablerepo=fedora-debuginfo install python-debuginfo
-```
+{% endhighlight %}
 
 Note however that the package with debug symbols must match the version of
 the "plain" package: a mismatch will prevent gdb from loading the symbols.
@@ -112,7 +112,7 @@ what control path led to its invocation. It is very easy to break on a specific
 syscall with gdb and to check which control path led there with `bt` command,
 which by default shows only the trace of the current process.
 
-```text
+{% highlight text  %}
 (gdb) catch syscall wait4
 Catchpoint 1 (syscall 'wait4' [61])
 (gdb) run test.py
@@ -122,7 +122,7 @@ Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
 All done
 
 Catchpoint 1 (call to syscall wait4), 0x00007ffff7bce47c in __libc_waitpid (pid=18368, stat_loc=0x7fffffffd16c, options=1) at ../sysdeps/unix/sysv/linux/waitpid.c:31
-```
+{% endhighlight %}
 
 
 Backtracing
@@ -133,19 +133,19 @@ what is happening in the Python interpreter with the high level source code.
 Having trapped `wait4` invocations, the first item I expect to see is a libc
 control path that leads to that syscall:
 
-```text
+{% highlight text  %}
 #0  0x00007ffff7bce47c in __libc_waitpid (pid=19042, stat_loc=0x7fffffffd16c, options=1) at ../sysdeps/unix/sysv/linux/waitpid.c:31
 #1  0x00000000005f69d4 in posix_waitpid (self=0x0, args=(19042, 1)) at ../Modules/posixmodule.c:6207
-```
+{% endhighlight %}
 
 Indeed this is the case. Now, what led to that invocation?
 
-```text
+{% highlight text  %}
 #3  0x000000000052b7f6 in call_function (pp_stack=0x7fffffffd2e0, oparg=2) at ../Python/ceval.c:4033
 #4  0x00000000005266ca in PyEval_EvalFrameEx (
     f=Frame 0xa3f610, for file /usr/lib/python2.7/multiprocessing/forking.py, line 135, in poll (self=<Popen(returncode=None, pid=19042) at remote 0x7ffff6a263e0>, flag=1), throwflag=0)
     at ../Python/ceval.c:2679
-```
+{% endhighlight %}
 
 `PyEval_EvalFrameEx` is the huge infinite for loop that constitutes the core of
 the Python interpreter. Basically it goes through the byte code an interprets/executes
@@ -156,9 +156,9 @@ executed in that context. A `PyFrameObject` contains all the information needed 
 link Python machine level instructions to the high level source code. gdb extracts
 this information automatically pointing us to the source file and the line number:
 
-```text
+{% highlight text  %}
 f=Frame 0xa3f610, for file /usr/lib/python2.7/multiprocessing/forking.py, line 135,
-```
+{% endhighlight %}
 
 Just for the sake of curiosity, let's try to extract this information manually.
 The `PyFrameObject` contains the following interesting items:
@@ -175,76 +175,76 @@ being executed.
 The inspection of these values leads to the following results, that definitely match
 the actual Python source code from forking.py.
 
-```text
+{% highlight text  %}
 (gdb) x/s ((PyStringObject*)f->f_code->co_filename)->ob_sval
 0x7ffff6a2075c: "/usr/lib/python2.7/multiprocessing/forking.py"
 (gdb) x/s ((PyStringObject*)f->f_code->co_name)->ob_sval
 0x7ffff6ce8d94: "poll"
 (gdb) p f->f_lineno
 $3 = 131
-```
+{% endhighlight %}
 
-```python
+{% highlight python  %}
 def poll(self, flag=os.WNOHANG):
     if self.returncode is None:
         while True:
             try:
                 pid, sts = os.waitpid(self.pid, flag)
-```
+{% endhighlight %}
 
 The actual source code line that corresponds to the bytecode instruction being
 executed is a bit more tricky to obtain, but the interpreter abstracts all the
 complexity by providing `PyFrame_GetLineNumber`.
 
-```text
+{% highlight text  %}
 (gdb) p PyFrame_GetLineNumber(f)
 $4 = 135
-```
+{% endhighlight %}
 
 Exactly what gdb already told us. After this little digression, let's go back to 
 the stack trace. The `poll` function is a method of `Popen` class in multiprocessing 
 lib. The next invocation of `PyEval_EvalFrameEx` on the stack points to process.py.
 
-```text
+{% highlight text  %}
 #8  0x00000000005266ca in PyEval_EvalFrameEx (
     f=Frame 0x7ffff6cd9a10, for file /usr/lib/python2.7/multiprocessing/process.py, line 79, in _cleanup (p=<Process(_daemonic=False, _target=<function at remote 0x7ffff6ee2648>, _args=(), _tempdir=None, _name='Process-1', _authkey=<AuthenticationString at remote 0x7ffff7e57880>, _parent_pid=19038, _kwargs={}, _identity=(1,), _popen=<Popen(returncode=None, pid=19042) at remote 0x7ffff6a263e0>) at remote 0x7ffff6ca4610>), throwflag=0) at ../Python/ceval.c:2679
-```
+{% endhighlight %}
 `poll` is invoked in function `_cleanup` to identify child processes that have terminated.
 
-```python
+{% highlight python  %}
 def _cleanup():
     # check for processes which have finished
     for p in list(_current_process._children):
         if p._popen.poll() is not None:
             _current_process._children.discard(p)
-```
+{% endhighlight %}
 
 Further down the stack there is another pointer to process.py.
 
-```text
+{% highlight text  %}
 #11 0x00000000005266ca in PyEval_EvalFrameEx (f=Frame 0x7ffff6cfcba0, for file /usr/lib/python2.7/multiprocessing/process.py, line 69, in active_children (), throwflag=0)
     at ../Python/ceval.c:2679
-```
+{% endhighlight %}
 `_cleanup` function is now called in `active_children`, which returns a list
 of child processes which are alive.
 
-```python
+{% highlight python  %}
 def active_children():
     [...]
     _cleanup()
     return list(_current_process._children)
-```
+{% endhighlight %}
 
 Next frame points to util.py.
 
-```text
+{% highlight text  %}
 #14 0x00000000005266ca in PyEval_EvalFrameEx (
     f=Frame 0xacf490, for file /usr/lib/python2.7/multiprocessing/util.py, line 318, in _exit_function (info=<function at remote 0x7ffff6ce3648>, debug=<function at remote 0x7ffff6ce35a0>, _run_finalizers=<function at remote 0x7ffff6c9f840>, active_children=<function at remote 0x7ffff6ee2990>, current_process=<function at remote 0x7ffff6ee28e8>), throwflag=0)
     at ../Python/ceval.c:2679
-```
+{% endhighlight %}
 Here `active_children` is called in `_exit_function`.
 
-```python
+{% highlight python  %}
 def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
                    active_children=active_children,
                    current_process=current_process):
@@ -256,15 +256,15 @@ def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
         for p in active_children():
             info('calling join() for process %s', p.name)
             p.join()
-```
+{% endhighlight %}
 
 Next and last frame of interest points to atexit.py. 
 
-```text
+{% highlight text  %}
 #19 0x0000000000526982 in PyEval_EvalFrameEx (
     f=Frame 0xaa5cb0, for file /usr/lib/python2.7/atexit.py, line 24, in _run_exitfuncs (exc_info=None, func=<function at remote 0x7ffff6c9fcd8>, targs=(), kargs={}), throwflag=0)
     at ../Python/ceval.c:2718
-```
+{% endhighlight %}
 
 atexit.py is a mechanism that allows to register cleanup functions that are
 executed upon normal interpreter termination (the Python counterpart of the libc
@@ -272,9 +272,9 @@ executed upon normal interpreter termination (the Python counterpart of the libc
 an atexit callback:
 
 
-```python
+{% highlight python  %}
 atexit.register(_exit_function)
-```
+{% endhighlight %}
 
 With this mechanism, the multiprocessing library ensures that the interpreter does
 not terminate before having waited all the children, therefore not leaving orphaned

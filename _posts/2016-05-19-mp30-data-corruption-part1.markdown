@@ -7,10 +7,9 @@ categories: linux hardware kernel
 
 Summary
 =======
-This post covers an interesting, yet subtle, data corruption issue
-encountered on a Gigabyte ARM64 R120-MP31. This first part is a summary of some
-initial tests I did at the transport layer (i.e. TCP checksums) and at
-the data link layer (i.e. Ethernet CRC32).
+This post covers a network data corruption issue encountered on a Gigabyte ARM64 R120-MP31. 
+This first part is a summary of some initial tests I did at the transport layer (i.e. TCP checksums) 
+and at the data link layer (i.e. Ethernet CRC32).
 
 
 Background
@@ -21,7 +20,7 @@ started appearing during daily operations. The system was cabled with a passive
 Direct Attached Copper cable: everything seemed to point to a data corruption issue, 
 and a quick network test confirmed something was wrong.
 
-```
+{% highlight text  %}
 [root@client]~# loop=1; while [ $loop -eq 1 ]; do 
     dd if=/dev/zero bs=8K count=20480 2>&/dev/null | tee >(md5sum) | nc 10.41.208.28 8080; 
     if [ $? -ne 0 ]; then loop=0; fi; 
@@ -32,7 +31,7 @@ f5ffba20ce077a9f789a61ff8aedb471  -
 f5ffba20ce077a9f789a61ff8aedb471  -
 60e1904fda6b86ebdf703ed2b41c39f8  -
 f5ffba20ce077a9f789a61ff8aedb471  -
-```
+{% endhighlight %}
 
 After ruling out the most obvious factors, I wrote a slightly more elaborated
 <a href="https://github.com/marcoguerri/checksum-test" target="_blank">
@@ -41,7 +40,7 @@ that would transfer a specific payload together with the corresponding checksum.
 Upon encountering a non-matching checksum, the server would write on disk the 
 incoming data. The dump of a payload coming from /dev/zero would look as follows:
 
-```
+{% highlight text  %}
 [root@r120p31 ~]# hexdump data 
 0000000 0000 0000 0000 0000 0000 0000 0000 0000
 *
@@ -50,7 +49,7 @@ incoming data. The dump of a payload coming from /dev/zero would look as follows
 5f20810 0000 0000 0000 0000 0000 0000 0000 0000
 *
 a000000
-```
+{% endhighlight %}
 
 At first glance, there seemed to be bits flipped at random positions. The time necessary for 
 data corruption to appear varied. I had two boards available, and the MTBF ranged
@@ -58,7 +57,7 @@ from few seconds to up to 2 minutes. After a bit of troubleshooting I came to th
 conclusion that there seemed to be a pattern. A further instance of corrupted payload
 was the following:
 
-```
+{% highlight text  %}
 [root@r120p31 ~]# hexdump data 
 0000000 0000 0000 0000 0000 0000 0000 0000 0000
 *
@@ -66,7 +65,7 @@ was the following:
 54a78c0 0000 0000 0000 0000 0000 0000 0000 0000
 *
 a000000
-```
+{% endhighlight %}
 
 The 3 bits flipped in the second dump are placed at the same
 distances as in the first example. The existence of a pattern seemed to rule
@@ -105,9 +104,9 @@ that corrupts outgoing packets. In particular,
 the *netem* (Network Emulator) scheduler allows to perform randomized packet
 corruption via *tc* command as follows:
 
-```
+{% highlight text  %}
 sudo tc qdisc add dev lo root netem corrupt <CORRUPTION RATE>
-```
+{% endhighlight %}
 
 However, this method does not give much room for tuning: with the line above we
 are asking the network stack to "corrupt <CORRUPTION RATE>% of the *sk_buff*", 
@@ -115,7 +114,7 @@ where corruption means flipping one random bit in the whole *sk_buff*. The
 relevant code from *net/sched/sched_netem.c* which implements the *corrupt* policy 
 is the following:
 
-```c
+{% highlight c  %}
     if (q->corrupt && q->corrupt >= get_crandom(&q->corrupt_cor)) {
         if (skb_is_gso(skb)) {
             segs = netem_segment(skb, sch);
@@ -138,7 +137,7 @@ is the following:
         skb->data[prandom_u32() % skb_headlen(skb)] ^=
             1<<(prandom_u32() % 8);
     }
-```
+{% endhighlight %}
 
 The most relevant part is the call to `skb_checksum_help`, which computes
 in software the checksum of the packet and sets `skb->ip_summed` to `CHECKSUM_NONE`,
@@ -167,20 +166,20 @@ to work on any other kernel version. The outcome of the experiment was definitel
 interesting. On the client side, where the netfilter kernel module was running, 
 I could see the following debug information:
 
-```
+{% highlight text  %}
 [ 4255.255119] Linear data: 564
 [ 4255.257251] TCP payload len is 512
 [ 4255.257944] TCP header len is 20
 [ 4255.265462] TCP checksum should be 0x75f6
 [ 4255.269345] Corrupting checksum to 0xBEEF
-```
+{% endhighlight %}
 
 The length of the linear portion of the `sk_buff` basically indicates how much non-paginated 
 data is present. Follows the length of the TCP payload and header.
 The module then prints the expected checksum followed by the corrupted checksum,
 i.e. 0xBEEF. The associated `tcpdump` trace on the server side is the following:
 
-```
+{% highlight text  %}
     10.41.208.7.44550 > 10.41.208.29.webcache: Flags [P.], cksum 0xbeef (incorrect -> 0x75f6
 ), seq 1:513, ack 1, win 229, options [nop,nop,TS val 3954650 ecr 151369], length 512
         0x0000:  4500 0234 17d4 4000 4006 6c79 0a29 d007  E..4..@.@.ly.)..
@@ -189,7 +188,7 @@ i.e. 0xBEEF. The associated `tcpdump` trace on the server side is the following:
         0x0030:  0002 4f49 dead beef 0000 0000 0000 0000  ..OI............
         0x0040:  0000 0000 0000 0000 0000 0000 0000 0000  ................
         [...]
-```
+{% endhighlight %}
 
 The first 4 bytes of the payload correspond to the application level magic word, `0xDEADBEEF`.
 The most interesting information shown by tcpdump is the incorrect TCP checksum notification,
@@ -200,7 +199,7 @@ the following question arises: who is supposed to stop the corrupted segment?
 The NIC or the software stack at layer 4? According to `ethtool`, TCP checksum 
 of incoming segments is software's responsibility:
 
-```
+{% highlight text  %}
 [root@r120p31 ~]# ethtool -k eth2 | grep -i checksum
 rx-checksumming: off [fixed]
 tx-checksumming: on
@@ -209,21 +208,21 @@ tx-checksumming: on
         tx-checksum-ipv6: off [fixed]
         tx-checksum-fcoe-crc: off [fixed]
         tx-checksum-sctp: off [fixed]
-```
+{% endhighlight %}
 
 Now, the relevant code in the `xgene-enet` driver that handles the checksum
 of incoming frames is the following:
 
-```c
+{% highlight c  %}
 skb->protocol = eth_type_trans(skb, ndev);
 if (likely((ndev->features & NETIF_F_IP_CSUM) &&
            skb->protocol == htons(ETH_P_IP))) {
         xgene_enet_skip_csum(skb);
 }
-```
+{% endhighlight %}
 with `xgene_enet_skip_csum` begin:
 
-```c
+{% highlight c  %}
 static void xgene_enet_skip_csum(struct sk_buff *skb)                           
 {                                                                               
         struct iphdr *iph = ip_hdr(skb);                                        
@@ -233,7 +232,7 @@ static void xgene_enet_skip_csum(struct sk_buff *skb)
                 skb->ip_summed = CHECKSUM_UNNECESSARY;                          
         }                                                                          
 }                                                                               
-```   
+{% endhighlight %}   
 
 If the protocol of the incoming frame is IP, i.e. `ETH_P_IP`, and the NIC reports 
 the `NETIF_F_IP_CSUM` flag, than `xgene_enet_skip_csum` is invoked. More conditions
@@ -245,12 +244,12 @@ never verified again. Now, that `ndev->features & NETIF_F_IP_CSUM` condition loo
 suspicious. Why is `NETIF_F_IP_CSUM` set, if the NIC is not checksumming incoming
 segments? The flag is being set in function `xgene_enet_probe` in xgene-enet driver:
 
-```
+{% highlight text  %}
          ndev->features |= NETIF_F_IP_CSUM |
                            NETIF_F_GSO |
                            NETIF_F_GRO |
                            NETIF_F_SG;
-```
+{% endhighlight %}
 
 This "misunderstanding" between software and hardware causes corrupted
 data to go through to the application layer. It would be tempting to remove
@@ -315,23 +314,23 @@ The minimum frame size allowed by the 803.2 standard is 64 bytes. Considering
 CRC, the minimum payload size is 46 bytes, which in this case is randomly generated.
 
 
-```
+{% highlight text  %}
 [root@client]~# ./corrupt -i ens9f1 -m fc:aa:14:e4:97:59
 Interface is ens9f1
 Destination MAC address is fc:aa:14:e4:97:59
 crc: d66bfef8
 Message sent correctly
-```
+{% endhighlight %}
 
 On the server the frame is received correctly, but clearly the CRC is not visible,
 as it is stripped off by the NIC.
 
-```
+{% highlight text  %}
 22:17:28.363202 aa:bb:cc:dd:ee:ff (oui Unknown) > fc:aa:14:e4:97:59 (oui Unknown), ethertype Unknown (0x1213), length 60: 
         0x0000:  568c 0682 43c7 02a0 fc06 b47f 359f 53fd  V...C.......5.S.
         0x0010:  aed0 9e1a c9ef 6169 19f2 5106 ab7d 6981  ......ai..Q..}i.
         0x0020:  8aee 044d b607 ee34 8c23 b341 43f8       ...M...4.#.AC.
-```
+{% endhighlight %}
 Is there any way to have visibility over the CRC of incoming frames? Well,
 normally the answer is no, the hardware simply removes it. However, this is
 not always the case. In fact, on the XGene-1, the hardware actually passes the frame
@@ -341,34 +340,34 @@ function, which is the NAPI polling function that handles the data which has bee
 DMAed to memory by the NIC (the following source code comes from the xgene-enet
 driver shipped with kernel 4.6.0):
 
-```c
+{% highlight c  %}
         /* strip off CRC as HW isn't doing this */
         datalen = GET_VAL(BUFDATALEN, le64_to_cpu(raw_desc->m1));
         datalen = (datalen & DATALEN_MASK) - 4;
         prefetch(skb->data - NET_IP_ALIGN);
         skb_put(skb, datalen);
-```
+{% endhighlight %}
 
 The CRC is being removed by subtracting the trailing 4 bytes from the total
 length of the frame. Removing the `-4` easily does the trick as shown by the 
 following trace (payload in now coming from /dev/zero):
 
-```
+{% highlight c  %}
 10:13:53.697511 aa:bb:cc:dd:ee:ff (oui Unknown) > 22:f7:cb:32:eb:5c (oui Unknown), ethertype Unknown (0x1213), length 64: 
         0x0000:  0000 0000 0000 0000 0000 0000 0000 0000  ................
         0x0010:  0000 0000 0000 0000 0000 0000 0000 0000  ................
         0x0020:  0000 0000 0000 0000 0000 0000 0000 0ffe  ................
         0x0030:  979b
-```
+{% endhighlight %}
 The debug output on the client side confirms the value of the CRC.
 
-```
+{% highlight c  %}
 [root@client]~# ./corrupt -m 22:f7:cb:32:eb:5c -i ens9f1 
 Destination MAC address is 22:f7:cb:32:eb:5c
 Interface is ens9f1
 crc: ffe979b
 Message sent correctly
-```
+{% endhighlight %}
 
 What happens if a corrupted CRC is appended to the frame? Normally any device
 that operates at layer 2 is expected to drop it, which means that a corrupted
@@ -383,13 +382,13 @@ Considering the previous frame, with a payload of all zeros, we have seen that
 the correct CRC is `0x0ffe979b`. If the tool appends a corrupted sequence, the result
 on the server is the following:
 
-```
+{% highlight c  %}
 11:02:57.186851 aa:bb:cc:dd:ee:ff (oui Unknown) > 22:f7:cb:32:eb:5c (oui Unknown), ethertype Unknown (0x1213), length 64: 
         0x0000:  0000 0000 0000 0000 0000 0000 0000 0000  ................
         0x0010:  0000 0000 0000 0000 0000 0000 0000 0000  ................
         0x0020:  0000 0000 0000 0000 0000 0000 0000 efbe  ................
         0x0030:  adde 
-```
+{% endhighlight %}
 The frame is not discarded, even though the checksum is set to `0xdeadbeef`, which
 is clearly not valid. The CRC is written on the frame as a 
 little endian word and as a consequence bytes appear in reversed order.

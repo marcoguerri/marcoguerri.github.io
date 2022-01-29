@@ -2,11 +2,11 @@
 layout: post
 title:  "How branch prediction affects performance"
 date:   2017-02-11 08:00:00
-published: no
+published: yes
 categories: performance python
 pygments: true
-summary: "Recent CPU  microarchitectures have drastically improved the accuracy
-of hardware branch predictors. Some heavily non-linear workloads significantly
+summary: "Recent CPU microarchitectures have drastically improved the accuracy
+of hardware branch predictors. Some heavily non-linear workloads
 benefit from a lower rate of mispredicted branches: here I provide an example based
 on CPython."
 ---
@@ -32,18 +32,18 @@ I was comparing the performance on the following two systems:
 || Ivy Bridge | Haswell |
 |----------|--------------------------------|-------------------|
 | CPU      | Dual socket E5-2650v2 @ 2.60 GHz | Dual socket E5-2640v3 @ 2.60 GHz |
-| CPU details      | 8 physical cores, 16 threads, 2.8GHz Turbo CLK  | 8 physical cores, 10 threads, 3.4 GHz Turbo CLK |
+|       | 8 physical cores, 16 threads, 2.8GHz Turbo  | 8 physical cores, 10 threads, 3.4 GHz Turbo |
 | RAM      | 64 GiB DDR3, fully balanced NUMA domains  | 128 GiB DDR4, fully balanced NUMA domains|
 | OS     | CentOS 7.3 running kernel 3.10.0-514  | CentOS 7.3 running kernel 3.10.0-514 |
 | gcc    | 4.8.5 | 4.8.5 |
 | CPU clk    | 2.00GHz, acpi_cpufreq userspace | 2.00GHz, acpi_cpufreq userspace |
 
-
+\\
 The clock frequency was set to 2.00GHz via userspace governor with *acpi_cpufreq*
 driver. Disregarding for a moment the output of the benchmark, which is not
 relevant, the runtime on the two platforms was the following:
 
-```
+{% highlight text  %}
 [root@ivybridge ~]# time numactl --physcpubind=0 --membind=0 python lhcb.py
 8.62366333218
 real    0m58.239s
@@ -55,7 +55,7 @@ sys 0m0.225s
 real    0m39.315s
 user    0m38.977s
 sys 0m0.319s
-```
+{% endhighlight %}
 
 The runtime highlights a speedup close to 50%.
 
@@ -78,7 +78,7 @@ The first result obtained with SDE was a profile of the functions executed
 by the benchmarks. Ivy Bridge functions-breakdown, limited to the first 10
 contributors, was the following:
 
-```
+{% highlight text  %}
 #rank total-icount    % cumulative%   #times-called    address  function-name    image-name
 0:  78447041164  40.065  40.065      25000610      7fafdb921d00 PyEval_EvalFrameEx  IMG: /lib64/libpython2.7.so.1.0
 1:  20255778100  10.345  50.410             0      7fafdb88b700 _Py_add_one_to_index_C  IMG: /lib64/libpython2.7.so.1.0
@@ -90,12 +90,12 @@ contributors, was the following:
 7:   5218234381   2.665  73.510      34216947      7fafdaea0450 __ieee754_log_avx  IMG: /lib64/libm.so.6
 8:   5001235968   2.554  76.065     125029399      7fafdb8c6280 PyDict_GetItem   IMG: /lib64/libpython2.7.so.1.0
 9:   4450066224   2.273  78.337            76      7fafdb8b2bb0 _PyFloat_Unpack8  IMG: /lib64/libpython2.7.so.1.0
-```
+{% endhighlight %}
 
 Haswell functions-breakdown, also limited to the first 10 contributors, was
 the following:
 
-```
+{% highlight text  %}
 #rank total-icount    % cumulative%   #times-called    address  function-name    image-name
 0:  78443984168  40.061  40.061      25000613      7f547808ed00 PyEval_EvalFrameEx  IMG: /lib64/libpython2.7.so.1.0
 1:  20255041770  10.344  50.406             0      7f5477ff8700 _Py_add_one_to_index_C  IMG: /lib64/libpython2.7.so.1.0
@@ -107,7 +107,7 @@ the following:
 7:   5217908380   2.665  73.504      34214316      7f5477611450 __ieee754_log_avx  IMG: /lib64/libm.so.6
 8:   5001228296   2.554  76.059     125029216      7f5478033280 PyDict_GetItem   IMG: /lib64/libpython2.7.so.1.0
 9:   4450065996   2.273  78.331            76      7f547801fbb0 _PyFloat_Unpack8  IMG: /lib64/libpython2.7.so.1.0
-```
+{% endhighlight %}
 
 What immediately stood out from the traces above was the following:
 
@@ -136,7 +136,7 @@ For each function listed above, I created an histogram of the instructions execu
 {% for item in list %}
 <p align="center">
 <a id="single_image" href="/img/branch-prediction/{{item}}.png">
-<img  src="/img/branch-prediction/{{item}}.png" alt=""/></a>
+<img  src="../../img/branch-prediction/{{item}}.png" alt="" width=800/></a>
 </p>
 {% endfor %}
 
@@ -156,7 +156,7 @@ that dispatches the current opcode to the corresponding case branch
 for execution. In CPython 2.7.5, it looks like the following:
 
 
-```c
+{% highlight c  %}
 switch (opcode) {
     case NOP:
         <NOP Instruction>
@@ -182,7 +182,7 @@ switch (opcode) {
         break;
     [...]
 }
-```
+{% endhighlight %}
 
 Switch constructs are normally implemented in assembly with jump
 tables, assigning a label to each branch which constitutes the
@@ -202,7 +202,8 @@ The results are as follows (the number of case branches is 512):
 
 Ivy Bridge, sequential opcode, lenght of the sequence is 512
 ---
-```
+
+{% highlight text  %}
 # perf stat numactl --physcpubind=0 --membind=0 ./branch -l 512
 
  Performance counter stats for 'numactl --physcpubind=0 --membind=0 ./branch -l 512':
@@ -219,12 +220,12 @@ Ivy Bridge, sequential opcode, lenght of the sequence is 512
        260,595,846      branch-misses             #   19.34% of all branches
 
       10.082002557 seconds time elapsed
-```
+{% endhighlight %}
 
 Ivy Bridge, random opcode, lenght of the sequence is 512
 ---
 
-```
+{% highlight text  %}
 # perf stat numactl --physcpubind=0 --membind=0 ./branch -r -l 512
 
  Performance counter stats for 'numactl --physcpubind=0 --membind=0 ./branch -r -l 512':
@@ -241,12 +242,12 @@ Ivy Bridge, random opcode, lenght of the sequence is 512
        257,970,218      branch-misses             #   19.15% of all branches
 
        9.677276472 seconds time elapsed
-```
+{% endhighlight %}
 
 Haswell, sequential opcode, lenght of the sequence is 512
 ---
 
-```
+{% highlight text  %}
 # perf stat numactl --physcpubind=0 --membind=0 ./branch  -l 512
 
  Performance counter stats for 'numactl --physcpubind=0 --membind=0 ./branch -l 512':
@@ -261,12 +262,12 @@ Haswell, sequential opcode, lenght of the sequence is 512
         91,048,715      branch-misses             #    6.77% of all branches
 
        4.995183920 seconds time elapsed
-```
+{% endhighlight %}
 
 Haswell, random opcode, lenght of the sequence is 512
 ---
 
-```
+{% highlight text  %}
 # perf stat numactl --physcpubind=0 --membind=0 ./branch  -r -l 512
 
  Performance counter stats for 'numactl --physcpubind=0 --membind=0 ./branch -r -l 512':
@@ -281,9 +282,9 @@ Haswell, random opcode, lenght of the sequence is 512
         23,396,176      branch-misses             #    1.74% of all branches
 
        2.890916053 seconds time elapsed
-```
+{% endhighlight %}
 
-The comparison highlights a very interesting difference: with a negligible delta
+The comparison highlights that with a negligible delta
 in the number of branches executed by the CPU, the number of branch
 mispredictions is instead much higher on Ivy Bridge. A mispredicted branch is a 
 wrong guess taken by the front-end of the pipeline when deciding where to fetch the 
@@ -300,5 +301,3 @@ is 10 times higher on Ivy Bridge, with a difference in number of branches of
 only 0.2%. There is another interesting result that stands out: on Haswell,
 a sequential opcode sequence generates a higher number of mispredictions compared
 to a random one.
-
-

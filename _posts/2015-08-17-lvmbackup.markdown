@@ -9,7 +9,7 @@ pygments: true
 
 Summary
 =======
-This post presents a possible procedure to "snapshot" a Linux
+This post covers a possible procedure to "snapshot" a Linux
 installation based on a boot partition and three LVM logical volumes for root,
 var and swap, which proves
 useful when an identical environment must be reproduced on a different machine
@@ -32,9 +32,9 @@ situation is the following:
 vg1 is the only volume group on the system, consisting of the PV created on /dev/sda2.
 The volume group must be first activated with `vgchange`.
 
-```text
+{% highlight text  %}
 # vgchange -a y vg1
-```
+{% endhighlight %}
 
 
 Resizing filesystems
@@ -43,23 +43,23 @@ All logical volumes created on top of vg1 must be shrunk to the minimum size
 possible, but before doing so, the filesystems need to be resized. The test system 
 contains four LVs. The notes that follow will take /dev/vg1/var as a reference.
 
-```text
+{% highlight text  %}
 # lvdisplay  | grep Path
   LV Path                /dev/vg1/root
   LV Path                /dev/vg1/var
   LV Path                /dev/vg1/tmp
   LV Path                /dev/vg1/swap
-```
+{% endhighlight %}
 
 `df` shows the available space on the LV as seen from userspace:
 
-```text
+{% highlight text  %}
 # mount /dev/vg1/var mnt
 # df -h
 Filesystem           Size  Used Avail Use% Mounted on
 [...]
 /dev/mapper/vg1-var  683G  1.8G  646G   1% /tmp/mnt
-```
+{% endhighlight %}
 
 There is clearly a significant margin of unused space on `vg1/var` and
 `resize2fs`, from `e2fsprogs`, can be used to find out the minimum allowed size of 
@@ -87,7 +87,7 @@ by `calculate_minimum_resize_size`, it raises an error followed by the minimum
 allowed size of the filesystem, as the number of 4K blocks. To this value, I usually
 add a small safety margin.
 
-```text
+{% highlight text  %}
 # resize2fs /dev/mapper/vg1-var 10K
 resize2fs 1.41.12 (17-May-2010)
 resize2fs: New size smaller than minimum (871426)
@@ -96,7 +96,7 @@ resize2fs: New size smaller than minimum (871426)
 resize2fs 1.41.12 (17-May-2010)
 Resizing the filesystem on /dev/vg1/var to 871450 (4k) blocks.
 The filesystem on /dev/vg1/var is now 871450 blocks long.
-```
+{% endhighlight %}
 This roughly corresponds to 3.3GB. 
 
 
@@ -105,19 +105,19 @@ Resizing the LVs
 The LV can be resized accordingly. The procedure outlined so far applies to all
 the LVs, with the exception of the swap volume.
 
-```text
+{% highlight text  %}
 # lvreduce --size 5G /dev/vg1/var
   WARNING: Reducing active logical volume to 5.00 GiB
   THIS MAY DESTROY YOUR DATA (filesystem etc.)
 Do you really want to reduce var? [y/n]: y
   Size of logical volume vg1/var changed from 693.16 GiB (22181 extents) to 5.00 GiB (160 extents).
   Logical volume var successfully resized
-```
+{% endhighlight %}
 
 The swap filesystem is a special case, as the underlying LV can be shrunk straight 
 away and a new swap filesystem created on top.
 
-```text
+{% highlight text  %}
 # lvreduce --size 1G /dev/vg1/swap
   WARNING: Reducing active logical volume to 1.00 GiB
   THIS MAY DESTROY YOUR DATA (filesystem etc.)
@@ -125,13 +125,13 @@ Do you really want to reduce swap? [y/n]: y
   Size of logical volume vg1/swap changed from 31.47 GiB (1007 extents) to 1.00 GiB (32 extents).
   Logical volume swap successfully resized
 [root@localhost tmp]# mkswap /dev/vg1/swap
-```
+{% endhighlight %}
 
 Modifying the mapping of the Extents
 =======
 The situation after resizing the LVs is the following: 
 
-```text
+{% highlight text  %}
 # lsblk
 [...]
 sda                       8:0    0 745.2G  0 disk
@@ -141,7 +141,7 @@ sda                       8:0    0 745.2G  0 disk
   |-vg1-var (dm-3)      253:3    0     5G  0 lvm
   |-vg1-tmp (dm-4)      253:4    0   9.8G  0 lvm
   `-vg1-swap (dm-5)     253:5    0     1G  0 lvm
-```
+{% endhighlight %}
 
 The LVs occupy around 30GB altogether, hence the underlying physical volume could be 
 resized to match this value with the usual safety margin. Unfortunately, this operation 
@@ -154,7 +154,7 @@ might change. For now, the physical extents must be collected at the beginning o
 `pvdisplay` and `pvs` can be used to verify how many PEs are used and how these are 
 mapped on the volume.
 
-```text
+{% highlight text  %}
 # pvdisplay | grep Allocated
     Allocated PE          818
 # pvs -v --segments /dev/sda2
@@ -168,14 +168,14 @@ mapped on the volume.
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g 22494   313 tmp      0 linear /dev/sda2:22494-22806
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g 22807    32 swap     0 linear /dev/sda2:22807-22838
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g 22839   975          0 free
-```
+{% endhighlight %}
 
 PEs belonging to the same LVs are normally clustered together as shown in the output above.
 PEs from 22494 to 22838 (345 PEs) are allocated for tmp and swap. These should be moved right 
 after var, starting from PE 473 until 817. This operation can be accomplished with 
 `pvmove` command.
 
-```text
+{% highlight text  %}
 # pvmove --alloc anywhere /dev/sda2:22494:22838 /dev/sda2:473-817
 [...]
 # pvs -v --segments /dev/sda2
@@ -188,26 +188,26 @@ after var, starting from PE 473 until 817. This operation can be accomplished wi
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g   473   313 tmp      0 linear /dev/sda2:473-785
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g   786    32 swap     0 linear /dev/sda2:786-817
   /dev/sda2  vg1  lvm2 a--  744.19g 718.62g   818 22996          0 free
-```
+{% endhighlight %}
 
 There are now 818x32 MiB Physical Extents allocated, which roughly corresponds to 25GB.
 
 
-```text
+{% highlight text  %}
 # pvdisplay  | grep Size
   PV Size               744.21 GiB / not usable 24.00 MiB
   PE Size               32.00 MiB
 # echo "scale=2;818\*32/1024" | bc -l
 25.56
-```
+{% endhighlight %}
 
 The PV can be resized taking into consideration a safety margin.
 
-```text
+{% highlight text  %}
 # pvresize --setphysicalvolumesize 30G /dev/sda2
   Physical volume "/dev/sda2" changed
   1 physical volume(s) resized / 0 physical volume(s) not resized
-```
+{% endhighlight %}
 
 
 Resizing the partition
@@ -220,12 +220,12 @@ which requires much attention. `fdisk` can be used to obtain the current
 layout of the disk.
 
  
-```text
+{% highlight text  %}
    Device Boot      Start         End      Blocks   Id  System
 /dev/sda1   *           1         131     1048576   83  Linux
 Partition 1 does not end on cylinder boundary.
 /dev/sda2             131       97282   780361728   8e  Linux LVM
-```
+{% endhighlight %}
 
 Pre-GPT partition tables identify partitions boundaries both in CHS and 
 LBA coordinates. fdisk default displaying unit is cylinders. This comes from the 
@@ -251,7 +251,7 @@ deleted and recreated with the same Start cylinder. The End cylinder is obviousl
 defined based on the desired size, 35GB in this case or ~4571 cylinders. LVM type 
 must also be set with fdisk. The layout is now the following:
 
-```text
+{% highlight text  %}
 [root@localhost tmp]# parted -l
 Model: ATA INTEL SSDSC2BB80 (scsi)
 Disk /dev/sda: 800GB
@@ -261,17 +261,17 @@ Partition Table: msdos
 Number  Start   End     Size    Type     File system  Flags
  1      1049kB  1075MB  1074MB  primary  ext4         boot
  2      1075MB  39.1GB  38.0GB  primary
-```
+{% endhighlight %}
 
 To obtain a compressed image of the disk, the LVs must be first disabled and /dev/sda
 dumped for around ~40GB from the beginning of the disk: everything else beyond this
 area is unallocated space and therefore not interesting.
 
 
-```text
+{% highlight text  %}
 # vgchange -a n vg1
 # dd if=/dev/sda conv=sync bs=128K count=328000| gzip -c  > /tmp/sda.img.gzip
-```
+{% endhighlight %}
 
 The live environment must provide enough in-memory space for dumping the whole
 compressed file. My configuration led to a 14GB image, and RAM was large enough
@@ -280,7 +280,7 @@ the compression ratio can be improved significantly. To test the restore procedu
 the image can be simply decompressed and written back to the disk.
 
 
-```text
+{% highlight text  %}
 # dd if=/dev/zero of=/dev/sda
 29973169+0 records in
 29973169+0 records out
@@ -288,7 +288,7 @@ the image can be simply decompressed and written back to the disk.
 
 # dd if=<(gunzip -c -d sda.img.gzip) of=/dev/sda conv=sync bs=4M  
 # reboot
-```
+{% endhighlight %}
 
 If everything went well, the system should boot into the exact same environment 
 as before.
