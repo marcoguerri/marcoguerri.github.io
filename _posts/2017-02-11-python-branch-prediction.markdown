@@ -195,7 +195,7 @@ further attempt to reproduce a workload that yields a 50% speedup on
 Haswell architecture, I tried to write some basic code that would
 replicate this indirect jmp intensive workload.
 
-The code can be found at [nstr-miss-benchmark](https://github.com/marcoguerri/instr-miss-benchmark) repository. 
+The code can be found at [instr-miss-benchmark](https://github.com/marcoguerri/instr-miss-benchmark) repository. 
 The script implements a large switch
 statement dispatching in loop either a sequential opcode sequence or a random one.
 The results are as follows (the number of case branches is 512):
