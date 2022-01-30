@@ -11,8 +11,6 @@ Summary
 =======
 LD_PRELOAD is a great tool to "override" the behavior of a binary. This post explains how `attribute constructor` and LD_PRELOAD might affect the behavior of the process after execve syscall.
 
-A collection of notes on LD_PRELOAD, attribute constructor and execve syscall
-
 constructor, destructor and execve
 =======
 

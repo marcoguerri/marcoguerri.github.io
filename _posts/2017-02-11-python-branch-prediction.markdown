@@ -1,12 +1,12 @@
 ---
 layout: post
-title:  "How branch prediction affects performance"
+title:  "Branch target prediction and performance"
 date:   2017-02-11 08:00:00
 published: yes
 categories: performance python
 pygments: true
 summary: "Recent CPU microarchitectures have drastically improved the accuracy
-of hardware branch predictors. Some heavily non-linear workloads
+of hardware branch predictors and branch target predictors. Some heavily non-linear workloads
 benefit from a lower rate of mispredicted branches: here I provide an example based
 on CPython."
 ---
@@ -193,10 +193,10 @@ is somehow coherent with the profile of *PyEval_EvalFrameEx*, where
 jmp is the seventh most recurrent instruction. Now, in a
 further attempt to reproduce a workload that yields a 50% speedup on
 Haswell architecture, I tried to write some basic code that would
-replicate this indirect jmp intensive workload. The results are
-indeed interesting.
+replicate this indirect jmp intensive workload.
 
-The code can be found at <LINK>. The script implements a large switch
+The code can be found at [nstr-miss-benchmark](https://github.com/marcoguerri/instr-miss-benchmark) repository. 
+The script implements a large switch
 statement dispatching in loop either a sequential opcode sequence or a random one.
 The results are as follows (the number of case branches is 512):
 
@@ -289,8 +289,15 @@ in the number of branches executed by the CPU, the number of branch
 mispredictions is instead much higher on Ivy Bridge. A mispredicted branch is a 
 wrong guess taken by the front-end of the pipeline when deciding where to fetch the 
 next instruction. This prediction is made when fetching an instruction block: the 
-front-end tries to guess if the block will branch and, if so, where it will land.
-This is done very early to avoid having to wait for the decode and execution
+front-end tries to guess if the block will branch and, in this case, where it will land.
+In fact, guessing the destination address is referred to as Branch Target Prediction,
+as we have branching instruction (e.g. `jump`) which uses an indirect operand of the type:
+
+{% highlight nasm %}
+jmp *rax
+{% endhighlight %}
+
+The prediction is done very early to avoid having to wait for the decode and execution
 stages of the pipeline. The obvious consequence is that the guess might be wrong.
 In that case, the instructions that have been fetched following a wrong prediction
 are flushed from the pipeline and the execution resumes from the correct control
