@@ -2,22 +2,154 @@
 layout: post
 title:  "RFM69 and 433 MHz communication"
 date:   2022-01-16 08:00:00
-published: false
+published: true
 categories: rf electronics
 pygments: true
 ---
 
 Summary
 =======
-I setup a RFM69 tranceiver on 433 MHz band, and interfaced it with a Nooelec SDR.
-This posts explains how the transceiver modulates
-and encodes data, and how the SDR receives and decodes the signal.
+I recently setup a RFM69 tranceiver on 433 MHz band, and interfaced it with a Nooelec SDR.
+This posts explains how the transceiver modulates and encodes data, and how the SDR receives 
+and decodes the signal.
+
+
+Transmission
 =======
 
 
-For the SPI communication analysis, I used a cheap logic analyzer.
+Demodulation and decoding
+=======
+We know our signal is modulated as `OOK`, and data is transmitted by RFM69 at 1kbit, with a 1ms bit period which is independent
+of the bit value. This signal can be demodulated with the `OOK_PCM`, provided we give `short`, `long`, `reset` parameters, which
+we'll explain later:
+
+{% highlight text %}
+$ rtl_433 g002_434M_250k.cu8  -R 0 -X 'n=rfm69,m=OOK_PCM,s=1000,l=1000,r=100000'
+time      : @0.180560s
+model     : rfm69        count     : 1             num_rows  : 1             rows      : 
+len       : 278          data      : aaaaaaaa2dd4ef5915e7580a01cbfc93f142b03747eec52a3c00000000000000000000
+codes     : {278}aaaaaaaa2dd4ef5915e7580a01cbfc93f142b03747eec52a3c00000000000000000000
+{% endhighlight %}
 
 
-Be careful to not establish ground loops. In this case everything was
-connected through the USB bus, so the risk was basically 0.
+With OOK modulation, binary data is represented as the 433 MHz carrier being present or absent. RTL2832U, which my
+SDR receiver is based on, outputs 8-bit I/Q-samples. The default sampling frequency used by `rtl_433` is 250kHZ,
+which audacity visualizes as follows:
 
+
+`rtl_433` first translates the I/Q samples into a pulse train, e.g. a sequence of `pulse[n]` and `gap[b]` numbers, each
+representing the width, in number of samples, of either the pulse (presence of the carrier) or the gap (absence of
+the carrier) at position `n` in the sequence. The RFM69 transmits at 1kbit, with a 1ms bit period which is independent
+of the bit value being transmitted. The `PCM` demodulator needs to know how to extract bits in the pulse train, in particular
+through the following parameters:
+
+* `short` is the nominal width of the pulse, i.e. the duration of the presence of the carrier which signals a value of 1 or 0
+* `long` is the nominal width of the bit period, which might not necessarily correspond to `short` bit.
+* `reset` the maximum gap length before it's considered end of message
+
+
+The data produced by `OOK_PCM` demodulator seems to be matching what we would expect: we have a pre-amble (`aaaaaaaa`) and a sync world (`2dd4`)
+as expected. What follows definitely does not correspond to what we transmitted, because the transceiver transforms data post demodulation with a 
+whitening process. What initially did not add up was the output of the pulse analyzer (`-A` flag), whose output was the following:
+
+{% highlight text %}
+$ rtl_433 g002_434M_250k.cu8 -A                                                     
+rtl_433 version 21.12-19-g4084ea62 branch master at 202201071942 inputs file rtl_tcp RTL-SDR with TLS
+Registered 179 out of 210 device decoding protocols [ 1-4 8 11-12 15-17 19-23 25-26 29-36 38-60 63 67-71 73-100 102-105 108-116 119 121 124-128 130-149 151-161 163-168 170-175 177-197 199 201-210 ]
+Test mode active. Reading samples from file: g002_434M_250k.cu8
+baseband_demod_FM: low pass filter for 250000 Hz at cutoff 25000 Hz, 40.0 us
+Detected OOK package	@0.180560s
+Analyzing pulses...
+Total count:   57,  width: 198.03 ms		(49507 S)
+Pulse width distribution:
+ [ 0] count:   39,  width: 1016 us [1016;1036]	( 254 S)
+ [ 1] count:    6,  width: 2016 us [2016;2024]	( 504 S)
+ [ 2] count:    6,  width: 3016 us [3016;3024]	( 754 S)
+ [ 3] count:    3,  width: 4016 us [4016;4016]	(1004 S)
+ [ 4] count:    1,  width: 8016 us [8016;8016]	(2004 S)
+ [ 5] count:    2,  width: 6016 us [6012;6024]	(1504 S)
+Gap width distribution:
+ [ 0] count:   38,  width:  980 us [972;992]	( 245 S)
+ [ 1] count:    6,  width: 2980 us [2980;2984]	( 745 S)
+ [ 2] count:    8,  width: 1976 us [1976;1984]	( 494 S)
+ [ 3] count:    2,  width: 7480 us [6980;7980]	(1870 S)
+ [ 4] count:    1,  width: 3984 us [3984;3984]	( 996 S)
+ [ 5] count:    1,  width: 5984 us [5984;5984]	(1496 S)
+Pulse period distribution:
+ [ 0] count:   29,  width: 2000 us [1988;2012]	( 500 S)
+ [ 1] count:   13,  width: 4228 us [3996;5000]	(1057 S)
+ [ 2] count:    6,  width: 2996 us [2996;3008]	( 749 S)
+ [ 3] count:    2,  width: 5504 us [5008;6000]	(1376 S)
+ [ 4] count:    5,  width: 8996 us [8004;9992]	(2249 S)
+ [ 5] count:    1,  width: 6996 us [6996;6996]	(1749 S)
+Pulse timing distribution:
+ [ 0] count:   77,  width: 1000 us [972;1036]	( 250 S)
+ [ 1] count:   14,  width: 1992 us [1976;2024]	( 498 S)
+ [ 2] count:   12,  width: 3000 us [2980;3024]	( 750 S)
+ [ 3] count:    4,  width: 4008 us [3984;4016]	(1002 S)
+ [ 4] count:    3,  width: 7656 us [6980;8016]	(1914 S)
+ [ 5] count:    3,  width: 6004 us [5984;6024]	(1501 S)
+ [ 6] count:    1,  width: 80164 us [80164;80164]	(20041 S)
+Level estimates [high, low]:  15982,     16
+RSSI: -0.1 dB SNR: 30.0 dB Noise: -30.1 dB
+Frequency offsets [F1, F2]:    -345,      0	(-1.3 kHz, +0.0 kHz)
+Guessing modulation: Pulse Code Modulation (Not Return to Zero)
+view at https://triq.org/pdv/#AAB030070103E807C80BB80FA81DE81774FFFF808080808080808080808080808080828090A08081A0B08091828080B1A0809455+AAB012070103E807C80BB80FA81DE81774FFFF808455+AAB018070103E807C80BB80FA81DE81774FFFFA180C18181D2808355+AAB013070103E807C80BB80FA81DE81774FFFF80809555+AAB01C070103E807C80BB80FA81DE81774FFFF90A082D0A0928081808082B655
+Attempting demodulation... short_width: 1016, long_width: 1016, reset_limit: 1040384, sync_width: 0
+Unsupported
+
+{% endhighlight %}
+
+The decoded sequence was `Bits: {259} AA AA AA AA 2D D4 EF 59 15 E7 58 05 00 E5 FE 49 F8 A1 5E E8 FD D8 A5 47 80 00 00 00 00 00 00 00 0`,
+which was initially identical to the correct one, but was diverging from bit 12th onwards. The sequence encoded in the URL query string
+is in RfRaw format, which is defined as part of a command supported by the [Portisch](https://github.com/Portisch/RF-Bridge-EFM8BB1) open source firmware
+for the Sonoff RF bridge. The Portisch firmware itself runs on the RF chip, while the the [Tasmota](https://tasmota.github.io/docs/) project includes
+also the firmware for the ESP on the Sonoff device. The wiki [explains](https://tasmota.github.io/docs/devices/Sonoff-RF-Bridge-433/#learning-commands-with-portisch-firmware) how commands are built,
+but it's more interesting to look at `rtl_433` code.
+
+
+
+The `RfRaw` command is built based on the pulse/gap sequence calculated initially by `rtl_433`,
+which is then merged into a histogram of bins containing the duration in `us` of a pulse/gap
+event. These bins are then referred by the data in the command, creating a dictionary-based
+compressed sequence. The bins collected from pulse and gaps might look for example like the 
+following:
+
+{% highlight text %}
+Bin 1000.000000
+Bin 1992.000000
+Bin 3000.000000
+Bin 4008.000000
+Bin 7656.000000
+Bin 6004.000000
+Bin 80164.000000
+{% endhighlight %}
+
+and a sequence of (pulse, gap) pairs:
+
+{% highlight text %}
+504, 245
+754, 247
+254, 746
+1503, 246
+754, 247
+504, 745
+254, 246
+255, 494
+255, 246
+255, 245
+255, 745
+1004, 20041
+{% endhighlight %}
+
+As seen before, those numbers represent the amount of samples for a specific pulse or gap.
+Given the 250kHZ sampling frequency, 250 samples would represent 1ms, which is also our bit
+time. What gets transmitted as `RfRaw` command are the references to the bins, which are
+themselves encoded at the beginning of the sequence:
+
+|----------|--------------------------------|-------------------|
+| **Pulse/gap** | **Bin reference** | **Bin encoding** |
+|----------|--------------------------------|-------------------|
+| 504,245      | Bin indexes 1 and 0    | 0x90 
+{:.tablestyle}

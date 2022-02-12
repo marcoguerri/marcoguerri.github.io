@@ -15,7 +15,7 @@ Introduction
 =======
 
 I was recently analyzing the performance of [DIRACBenchmark](https://github.com/DIRACGrid/DB12/blob/master/DIRACbenchmark.py)
-after having seen a peculiar speed-up in the transition from Sandry Bridge/Ivy Bridge
+after having seen a peculiar speed-up in the transition from Sandy Bridge/Ivy Bridge
 architecture to Haswell/Broadwell. This benchmark basically generates a long
 sequence of random numbers via Python random module and performs some
 multiply and accumulate operations. What stood out after some initial
@@ -29,17 +29,20 @@ Systems under test
 =======
 I was comparing the performance on the following two systems:
 
-|| Ivy Bridge | Haswell |
 |----------|--------------------------------|-------------------|
+|| **Ivy Bridge** | **Haswell** |
 | CPU      | Dual socket E5-2650v2 @ 2.60 GHz | Dual socket E5-2640v3 @ 2.60 GHz |
 |       | 8 physical cores, 16 threads, 2.8GHz Turbo  | 8 physical cores, 10 threads, 3.4 GHz Turbo |
 | RAM      | 64 GiB DDR3, fully balanced NUMA domains  | 128 GiB DDR4, fully balanced NUMA domains|
 | OS     | CentOS 7.3 running kernel 3.10.0-514  | CentOS 7.3 running kernel 3.10.0-514 |
 | gcc    | 4.8.5 | 4.8.5 |
 | CPU clk    | 2.00GHz, acpi_cpufreq userspace | 2.00GHz, acpi_cpufreq userspace |
+{:.tablestyle .center}
+
+
 
 \\
-The clock frequency was set to 2.00GHz via userspace governor with *acpi_cpufreq*
+The clock frequency was set to 2.00GHz via userspace governor with `acpi_cpufreq`
 driver. Disregarding for a moment the output of the benchmark, which is not
 relevant, the runtime on the two platforms was the following:
 
@@ -47,7 +50,7 @@ relevant, the runtime on the two platforms was the following:
 [root@ivybridge ~]# time numactl --physcpubind=0 --membind=0 python lhcb.py
 8.62366333218
 real    0m58.239s
-user    0m58.007s
+        user    0 m58.007s
 sys 0m0.225s
 
 [root@haswell ~]# time numactl --physcpubind=0 --membind=0 python lhcb.py
@@ -69,7 +72,7 @@ binary instrumentation tool capable of tracing the execution down to the assembl
 instruction level, providing emulation support on Intel platforms for instructions
 sets that are not natively supported by the hardware (e.g. it is possible to test
 AVX512 code on a machine which provides only AVX2). Intel SDE is based on Pin
-library, which uses *ptrace* system call on Linux to inject instrumentation
+library, which uses `ptrace` system call on Linux to inject instrumentation
 code into the application. Each instruction of the application is replaced with
 a jmp to the instrumentation, allowing to gain control over every single
 instruction executed. Clearly, this has a bearing on the runtime.
@@ -113,13 +116,13 @@ What immediately stood out from the traces above was the following:
 
    * The two executions were pretty much identical
    * The major contributor in terms of instructions executed was the Python interpreter, CPython, with
-    *PyEval_EvalFrameEx*, the core function that executes Python bytecode
-   *  *_randommodule.so* contributed only for 3.5% of the total instructions, while
+    `PyEval_EvalFrameEx`, the core function that executes Python bytecode
+   *  `_randommodule.so` contributed only for 3.5% of the total instructions, while
      all other contributions were mostly coming from CPython.
      
 The percentage of instructions executed does not necessarily translate into the
 same execution time weight, although it is reasonable to expect 
-that *PyEval_EvalFrameEx* be also the major contributor in terms of time.
+that `PyEval_EvalFrameEx` be also the major contributor in terms of time.
 For each function listed above, I created an histogram of the instructions executed.
 
 {% assign list = "PyEval_EvalFrameEx, 
@@ -144,14 +147,14 @@ Interpreting the histograms
 =======
 The plots suggested that the instruction set used on Ivy Bridge and
 Haswell be exactly the same. I considered worthwhile having a closer look at
-the main contributor, *PyEval_EvalFrameEx*.
+the main contributor, `PyEval_EvalFrameEx`.
 
 
 Analyzing PyEval_EvalFrameEx
 =======
-*PyEval_EvalFrameEx* is the heart of the CPython interpreter, where
+`PyEval_EvalFrameEx` is the heart of the CPython interpreter, where
 bytecode is ``decoded'' and executed. Its implementation resides in
-*Python/ceval.c* and makes use of a huge switch statement (1500 LOC)
+`Python/ceval.c` and makes use of a huge switch statement (1500 LOC)
 that dispatches the current opcode to the corresponding case branch
 for execution. In CPython 2.7.5, it looks like the following:
 
@@ -189,7 +192,7 @@ tables, assigning a label to each branch which constitutes the
 target of a jumps instruction when a matching argument in the switch
 statement is encountered. The jump is indirect: the destination
 address is loaded in a register or taken directly from memory. This
-is somehow coherent with the profile of *PyEval_EvalFrameEx*, where
+is somehow coherent with the profile of `PyEval_EvalFrameEx`, where
 jmp is the seventh most recurrent instruction. Now, in a
 further attempt to reproduce a workload that yields a 50% speedup on
 Haswell architecture, I tried to write some basic code that would
