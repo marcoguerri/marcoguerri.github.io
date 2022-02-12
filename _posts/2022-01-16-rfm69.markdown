@@ -2,7 +2,7 @@
 layout: post
 title:  "RFM69 and 433 MHz communication"
 date:   2022-01-16 08:00:00
-published: true
+published: false
 categories: rf electronics
 pygments: true
 ---
