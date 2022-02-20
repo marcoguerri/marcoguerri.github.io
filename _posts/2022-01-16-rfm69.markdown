@@ -10,8 +10,8 @@ pygments: true
 Summary
 =======
 I recently setup a RFM69 tranceiver on 433 MHz band, and interfaced it with a Nooelec SDR.
-This posts explains how the transceiver modulates and encodes data, and how the SDR receives 
-and decodes the signal.
+This posts explains how the transceiver modulates and encodes data, and how the SDR and `rtl_433`
+receive and decode the signal.
 
 
 Transmission
@@ -37,7 +37,10 @@ With OOK modulation, binary data is represented as the 433 MHz carrier being pre
 SDR receiver is based on, outputs 8-bit I/Q-samples. The default sampling frequency used by `rtl_433` is 250kHZ,
 which audacity visualizes as follows:
 
+![](/img/rfm69/Audacity.png)
 
+
+The two channels shown above represents the I and Q samples, which are identical because [TODO: reason].
 `rtl_433` first translates the I/Q samples into a pulse train, e.g. a sequence of `pulse[n]` and `gap[b]` numbers, each
 representing the width, in number of samples, of either the pulse (presence of the carrier) or the gap (absence of
 the carrier) at position `n` in the sequence. The RFM69 transmits at 1kbit, with a 1ms bit period which is independent
@@ -63,34 +66,7 @@ Detected OOK package	@0.180560s
 Analyzing pulses...
 Total count:   57,  width: 198.03 ms		(49507 S)
 Pulse width distribution:
- [ 0] count:   39,  width: 1016 us [1016;1036]	( 254 S)
- [ 1] count:    6,  width: 2016 us [2016;2024]	( 504 S)
- [ 2] count:    6,  width: 3016 us [3016;3024]	( 754 S)
- [ 3] count:    3,  width: 4016 us [4016;4016]	(1004 S)
- [ 4] count:    1,  width: 8016 us [8016;8016]	(2004 S)
- [ 5] count:    2,  width: 6016 us [6012;6024]	(1504 S)
-Gap width distribution:
- [ 0] count:   38,  width:  980 us [972;992]	( 245 S)
- [ 1] count:    6,  width: 2980 us [2980;2984]	( 745 S)
- [ 2] count:    8,  width: 1976 us [1976;1984]	( 494 S)
- [ 3] count:    2,  width: 7480 us [6980;7980]	(1870 S)
- [ 4] count:    1,  width: 3984 us [3984;3984]	( 996 S)
- [ 5] count:    1,  width: 5984 us [5984;5984]	(1496 S)
-Pulse period distribution:
- [ 0] count:   29,  width: 2000 us [1988;2012]	( 500 S)
- [ 1] count:   13,  width: 4228 us [3996;5000]	(1057 S)
- [ 2] count:    6,  width: 2996 us [2996;3008]	( 749 S)
- [ 3] count:    2,  width: 5504 us [5008;6000]	(1376 S)
- [ 4] count:    5,  width: 8996 us [8004;9992]	(2249 S)
- [ 5] count:    1,  width: 6996 us [6996;6996]	(1749 S)
-Pulse timing distribution:
- [ 0] count:   77,  width: 1000 us [972;1036]	( 250 S)
- [ 1] count:   14,  width: 1992 us [1976;2024]	( 498 S)
- [ 2] count:   12,  width: 3000 us [2980;3024]	( 750 S)
- [ 3] count:    4,  width: 4008 us [3984;4016]	(1002 S)
- [ 4] count:    3,  width: 7656 us [6980;8016]	(1914 S)
- [ 5] count:    3,  width: 6004 us [5984;6024]	(1501 S)
- [ 6] count:    1,  width: 80164 us [80164;80164]	(20041 S)
+[...]
 Level estimates [high, low]:  15982,     16
 RSSI: -0.1 dB SNR: 30.0 dB Noise: -30.1 dB
 Frequency offsets [F1, F2]:    -345,      0	(-1.3 kHz, +0.0 kHz)
@@ -101,8 +77,13 @@ Unsupported
 
 {% endhighlight %}
 
-The decoded sequence was `Bits: {259} AA AA AA AA 2D D4 EF 59 15 E7 58 05 00 E5 FE 49 F8 A1 5E E8 FD D8 A5 47 80 00 00 00 00 00 00 00 0`,
-which was initially identical to the correct one, but was diverging from bit 12th onwards. The sequence encoded in the URL query string
+The decoded sequence was 
+\\
+\\
+**Bits: {259} AA AA AA AA 2D D4 EF 59 15 E7 58 05 00 E5 FE 49 F8 A1 5E E8 FD D8 A5 47 80 00 00 00 00 00 00 00 0**
+
+
+which was initially identical to the correct one, but was diverging from byte 12th onwards. The sequence encoded in the URL query string
 is in RfRaw format, which is defined as part of a command supported by the [Portisch](https://github.com/Portisch/RF-Bridge-EFM8BB1) open source firmware
 for the Sonoff RF bridge. The Portisch firmware itself runs on the RF chip, while the the [Tasmota](https://tasmota.github.io/docs/) project includes
 also the firmware for the ESP on the Sonoff device. The wiki [explains](https://tasmota.github.io/docs/devices/Sonoff-RF-Bridge-433/#learning-commands-with-portisch-firmware) how commands are built,
@@ -151,5 +132,30 @@ themselves encoded at the beginning of the sequence:
 |----------|--------------------------------|-------------------|
 | **Pulse/gap** | **Bin reference** | **Bin encoding** |
 |----------|--------------------------------|-------------------|
-| 504,245      | Bin indexes 1 and 0    | 0x90 
-{:.tablestyle}
+| 504,245      | Bin indexes 1, 0    | 0x90 |
+| 754, 247  | Bin indexes 2, 0 | 0xA0 |
+| 254, 746 | Bin indexes 0, 2 | 0x82 |
+| 1503, 246 | Bin indexes 5,0 | 0xD0 |
+| 754, 247 | Bin indexes 2,0 | 0xA0 |
+| 504, 745 | Bin indexes 1,2 | 0x92|
+| 254, 246 | Bin indexes 0,0 | 0x80 |
+| 255, 494 | Bin indexes 0,1 | 0x81 |
+| 255, 246 | Bin indexes 0,0 | 0x80 |
+| 255, 245 | Bin indexes 0,0 | 0x80 |
+| 255, 745 | Bin indexes 0,2 | 0x82 |
+| 1004, 20041 | Bin indexes 3,6 | 0xB6 |
+{:.tablestyle .center}
+
+\\
+The bins and references combined together yield the last portion of the query string, i.e:
+AAB01C070103E807C80BB80FA81DE81774FFFF**90A082D0A0928081808082B655**
+
+Knowing how the `RfRaw` encoding happens, we can try to find where the analyzed sequences
+starts diverging from the expected one. 
+
+
+
+| Analyzed | AA AA AA AA 2D D4 EF 59 15 E7 58 **05** 00 E5 FE 49 F8 A1 5E E8 FD D8 A5 47 80 00 00 [...]
+| Expected | AA AA AA AA 2D D4 EF 59 15 E7 58 **0A** 01 CB FC 93 F1 42 B0 37 47 EE C5 2A 3C 00 00 [...]
+
+

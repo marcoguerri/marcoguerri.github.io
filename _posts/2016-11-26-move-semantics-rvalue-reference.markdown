@@ -36,11 +36,13 @@ public:
   MyClass& operator=(MyClass &rhs) {
       cout << "Copy assignment operator" << endl;
       this->_value = rhs._value;
+      return this;
   }
   MyClass& operator=(MyClass &&rhs) {
       cout << "Move assignment operator" << endl;
       this->_value = rhs._value;
       rhs._value = -1;
+      return *this;
   }
   MyClass(MyClass &&rhs) {
       cout << "Move constructor" << endl;
@@ -66,8 +68,10 @@ MyClass c = b;    Copy constructor
                   Destructor
 {% endhighlight %}
 
-These examples are all well known under C++98, probably the only remark worth pointing
+These examples are all well known under C++98. It's worth pointing
 out is the invocation of the copy constructor on line 2 and 4.
+\\
+\\
 In the context of C++11, the introduction of rvalue references allows to implement
 move semantics: when constructing an object from a reference to an rvalue, the code
 can transfer ownership of resources from that argument to the object being constructed, 
@@ -75,6 +79,7 @@ with the awareness that the original one needs to be left in a consistent state 
 the caller will not expect it to hold an initialized value anymore. As a matter
 of fact, with a proper rvalue, the caller will not even be able to tell if the object
 has been modified or not, due to the temporary nature of rvalues. 
+\\
 \\
 A simplified example of move semantics is implemented the move constructor
 of `MyClass`. The old object loses ownership of a certain resource while still
@@ -96,7 +101,7 @@ MyClass a(MyClass(10));  Constructor 10
                          Destructor
 {% endhighlight %}
 
-One remark must be made concerning the creation on line 4: here a temporary 
+On line 4, a temporary 
 object is created, which is again an rvalue and object `a` is move constructed from it.
 This is however not the default behaviour of gcc (version `4.9` in my case). The 
 compiler, if not asked otherwise, optimizes away the creation of the temporary.
@@ -106,18 +111,194 @@ Something very similar happens with `RVO` (Return Value Optimization) and `NRVO`
 Moving from lvalues: std::move and std::forward
 =======
 Sometimes it becomes necessary to treat `lvalues` as `rvalues`, thus allowing the 
-function being invoked to move from a specific argument. `rvalues` can be bound to `rvalue`
-references or to `lvalue` references to const. `std::move` carries out the operation of turning an `lvalue`
-into an `rvalue`, by returning an `rvalue reference` to its argument, which 
-will eventually bind to functions accepting `rvalues` like a move constructor (unless
-there is a `const` qualifier involved at some point: in this case, a const rvalue cannot
-be passed to a move constructor, which takes a rvalue reverence to a non-const object).
- As `std::move`, `std::forward` is also responsible for casting the argument to an rvalue,
-but it does so only if its argument was initialized with an rvalue. The first and foremost scenario 
-where `std::forward` comes to play is function templates which take universal references
-as arguments.
+function being invoked to move from a specific argument. 
+\\
+\\
+`rvalues` can be bound to `rvalue` references or to `lvalue` references to const
+as in the following code.
 
 
+{% highlight c++ linenos  %}
+// func takes rvalue reference
+void func(MyClass&& a) {
+    cout << a._value << endl;
+}
+
+// func1 takes lvalue reference to const
+void func1(MyClass const &a) {
+    cout << a._value << endl;
+}
+
+int main() {
+    func(MyClass(10));
+    func1(MyClass(10));
+}
+{% endhighlight %}
+
+It is not possible to bind a non-const `lvalue` reference to an `rvalue`. Calling mutable methods 
+on a temporary object is considered illegal as it's probably a logic bug. The following 
+code:
+{% highlight c++ linenos  %}
+void func(MyClass &a) {
+    cout << a._value << endl;
+}
+
+int main() {
+    func(MyClass(10));
+}
+{% endhighlight %}
+
+will not compile:
+
+{% highlight text  %}
+$ g++ main.cpp -o main -fno-elide-constructors
+main.cpp: In function ‘int main()’:
+main.cpp:43:10: error: cannot bind non-const lvalue reference of type ‘MyClass&’ to an rvalue of type ‘MyClass’
+   43 |     func(MyClass(10));
+      |
+
+{% endhighlight %}
+
+It is however possible to bind a const `lvalue` reference to an `rvalue`, as it is 
+guaranteed that no change will be applied to the temporary object:
+
+{% highlight c++ linenos  %}
+// func takes a const lvalue reference
+void func(const MyClass& a) {
+    cout << a._value << endl;
+}
+
+int main() {
+    MyClass a(10);
+    func(std::move(a));
+    cout << a._value << endl;
+}
+{% endhighlight %}
+
+
+
+`std::move` carries out the operation of turning an `lvalue` into an `rvalue`, 
+by returning an `rvalue reference` to its argument, which will eventually bind 
+according to the rules above. An `rvalue reference` cannot  bind to an `lvalue`. 
+The following code:
+
+{% highlight c++ linenos %}
+void func(MyClass&& a) {    
+    cout << a._value << endl;
+}
+
+int main() {
+    MyClass a(10);
+    func(a);
+}  
+{% endhighlight %}
+
+will not compile:
+
+{% highlight text  %}
+$ g++ main.cpp -o main -fno-elide-constructors
+main.cpp: In function ‘int main()’:
+main.cpp:47:10: error: cannot bind rvalue reference of type ‘MyClass&&’ to lvalue of type ‘MyClass’
+   47 |     func(a);
+      |
+{% endhighlight %}
+
+`std::move` can be used to turn the `lvalue` into and `rvalue`. The reference argument of
+`func` will then bind to it:
+
+{% highlight c++ linenos  %}
+void func(MyClass&& a) {    
+    cout << a._value << endl;
+}
+
+int main() {
+    MyClass a(10);
+    func(std::move(a));
+}
+{% endhighlight %}
+
+`std::move` tells the compiler that the object is eligible to be moved from  and 
+that we don't care anymore about it holding an
+initialized value. If that object can be used to construct more efficiently a copy, by
+moving from the object itself, the compiler will do so. In the following code, instead of
+copy constructing the argument to `func`, it is move constructed, and the original object
+will later hold a non-initialized value:
+
+{% highlight c++ linenos  %}
+void func(MyClass a) {  
+    cout << a._value << endl;
+}
+
+int main() {
+    MyClass a(10);
+    func(std::move(a));
+    cout << a._value << endl;
+}
+{% endhighlight %}
+
+The result is the following:
+
+{% highlight text  %}
+Constructor 10
+Move constructor
+10
+Destructor
+-1
+Destructor
+{% endhighlight %}
+
+
+As `std::move`, `std::forward` is also responsible for casting the argument to an rvalue,
+but it does so only if its argument was initialized with an rvalue. `std::forward`` is normally
+used with function templates taking universal referececes. For example, consider the following
+template function:
+
+{% highlight c++ linenos  %}
+void func1(MyClass a) {
+    cout << a._value << endl;
+}
+
+template<typename T> void func(T&& param) {
+    func1(param);
+}
+
+int main() {
+    MyClass a(10);
+    func(a);
+    cout << a._value << endl;
+}
+{% endhighlight %}
+
+On invocation of `func`, the argument will be copy constructed. We could explicitly ask for it 
+to be move constructured by invoking `func1(std::move(param))`. This would work, but `param`
+is an `lvalue` reference (`T&&` is a universal reference, which follow specific rules for
+type deducation), therefore the initial `a` object would be moved from, and would be invalid
+at the end of `main`. This is accepted, as `func` doesn't give any guarantee on the const-ness
+for `param`.
+
+`func` could decide to move from `param` only if it was initially an `rvalue` with `std::forward`.
+The following call would therefore result in calling the copy constructor:
+
+{% highlight c++ linenos  %}
+void func1(MyClass a) {
+    cout << a._value << endl;
+}
+
+template<typename T> void func(T&& param) {
+    func1(std::forward<T>(param));
+}
+
+int main() {
+    MyClass a(10);
+    func(a);
+    cout << a._value << endl;
+}
+{% endhighlight %}
+
+It's sufficient to cast `a` to an `rvalue` when invoking `func`, that `std::forward` will
+cast `param` to an `rvalue` as well, invoking the move constructor.
+
+{% comment %}
 Universal references and type deduction
 =======
 Type deduction refers to the operation of statically dispatching a call at compile
@@ -157,3 +338,4 @@ If *T* is deduced to be of type lvalue reference, the compiler will perform refe
 collapsing to derive the final type of *ParamType*: if any of the right hand side or
 left hand side are lvalue references, the result is an `lvalue` reference. Otherwise,
 the result is an `rvalue` reference.
+{% endcomment %}
