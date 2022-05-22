@@ -14,7 +14,7 @@ on CPython."
 Introduction
 =======
 
-I was recently analyzing the performance of [DIRACBenchmark](https://github.com/DIRACGrid/DB12/blob/master/DIRACbenchmark.py)
+I was recently analyzing the performance of [DIRACBenchmark](https://github.com/DIRACGrid/DB12/blob/387860b582978bef863bf9db286e5241ccc2b301/DIRACbenchmark.py)
 after having seen a peculiar speed-up in the transition from Sandy Bridge/Ivy Bridge
 architecture to Haswell/Broadwell. This benchmark basically generates a long
 sequence of random numbers via Python random module and performs some
@@ -122,7 +122,7 @@ What immediately stood out from the traces above was the following:
      
 The percentage of instructions executed does not necessarily translate into the
 same execution time weight, although it is reasonable to expect 
-that `PyEval_EvalFrameEx` be also the major contributor in terms of time.
+that `PyEval_EvalFrameEx` is also the major contributor in terms of time.
 For each function listed above, I created an histogram of the instructions executed.
 
 {% assign list = "PyEval_EvalFrameEx, 
@@ -146,14 +146,14 @@ For each function listed above, I created an histogram of the instructions execu
 Interpreting the histograms
 =======
 The plots suggested that the instruction set used on Ivy Bridge and
-Haswell be exactly the same. I considered worthwhile having a closer look at
+Haswell was exactly the same. I considered worthwhile having a closer look at
 the main contributor, `PyEval_EvalFrameEx`.
 
 
 Analyzing PyEval_EvalFrameEx
 =======
 `PyEval_EvalFrameEx` is the heart of the CPython interpreter, where
-bytecode is ``decoded'' and executed. Its implementation resides in
+bytecode is decoded and executed. Its implementation resides in
 `Python/ceval.c` and makes use of a huge switch statement (1500 LOC)
 that dispatches the current opcode to the corresponding case branch
 for execution. In CPython 2.7.5, it looks like the following:
