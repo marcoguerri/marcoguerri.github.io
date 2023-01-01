@@ -7,8 +7,6 @@ categories: openembedded
 pygments: true
 ---
 
-Summary
-======
 devshell is a great feature implemented in Openembedded that allows to spawn
 a cross-compilation terminal session that replicates the build time environment used
 by bitbake. It allows to save a lot of time and headaches when packages fail to

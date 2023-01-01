@@ -2,20 +2,10 @@
 layout: post
 title:  "Gentoo full disk encryption with dm-crypt/LUKS"
 date:   2013-10-07 13:31:48
-categories: linux security
+tag: linux security
 ---
 
 
-{% comment %}
-<div align="center">
-<a id="single_image" href="/img/gentoo-encryption/encrypt.png">
-<img src="/img/gentoo-encryption/encrypt.thumb.png" alt=""/>
-</a>
-</div>
-{% endcomment %}
-
-Introduction
-=============
 This post covers the manual installation procedure of Gentoo Linux with
 encrypted root and swap partitions using LUKS and dm\_crypt on a legacy BIOS system.
 

@@ -7,8 +7,6 @@ published: yes
 pygments: true
 ---
 
-Summary
-======
 This post shows a proof of concept of the Heartbleed bug. I tried
 to exploit the bug to steal the private keys from a local instance 
 using a vulnerable version of OpenSSL. I was unsuccessful, but it has proven 

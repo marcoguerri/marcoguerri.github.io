@@ -7,8 +7,6 @@ categories: programming cpp
 pygments: true
 ---
 
-Summary
-======
 This post walks through new concepts introduced by C++11 such as move semantics, rvalue reference, forwarding, 
 and shows how they affect compile time and runtime behavior.
 

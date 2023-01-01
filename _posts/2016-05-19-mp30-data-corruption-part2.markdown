@@ -4,8 +4,6 @@ title:  "Network data corruption on Gigabyte R120-P31 - Part 2"
 date:   2016-08-19 21:00:00
 categories: jekyll update
 ---
-Summary
-=======
 This is the second part of an [investigation](/2016/06/mp30-data-corruption-part1)
 to solve a data corruption issue encountered on a Gigabyte ARM64 R120-MP31 board. 
 In the first part I had a look at application, transport and data link layer.

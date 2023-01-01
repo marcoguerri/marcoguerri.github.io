@@ -5,8 +5,6 @@ date:   2016-06-19 21:00:00
 categories: linux hardware kernel
 ---
 
-Summary
-=======
 This post covers a network data corruption issue encountered on a Gigabyte ARM64 R120-MP31. 
 This first part is a summary of some initial tests I did at the transport layer (i.e. TCP checksums) 
 and at the data link layer (i.e. Ethernet CRC32).

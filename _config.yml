@@ -1,10 +1,10 @@
 # Jekyll configuration
 
 name: Marco Guerri
-description: I am a Production Engineer working at Facebook, with an interest in infrastructure security and machine learning. Previously CERN.
+description: I am a Production Engineer working at Meta, with an interest in infrastructure security and machine learning.
 
 # url is currently only used only for the RSS feed in feed.xml
-url: https://scotte.github.io/jekyll-clean
+url: https://marcoguerri.github.io
 
 # baseurl will often be '', but for a project page on gh-pages, it needs to
 # be the project name.
@@ -31,7 +31,7 @@ isso: ''
 disqus: ''
 
 permalink: /:year/:month/:title
-paginate: 3
+paginate: 10
 
 pygments: true
 markdown: kramdown
@@ -40,6 +40,9 @@ plugins: ['jekyll-paginate']
 exclude: ['README.md', 'LICENSE']
 
 collections:
-        history:
-                output: true
-                permalink: /history/:name
+	history:
+    	output: true
+        permalink: /history/:name
+	tags:
+    	output: true
+    	permalink: tags/:path/

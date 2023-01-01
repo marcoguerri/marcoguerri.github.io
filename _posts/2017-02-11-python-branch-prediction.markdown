@@ -11,9 +11,6 @@ benefit from a lower rate of mispredicted branches: here I provide an example ba
 on CPython."
 ---
 
-Introduction
-=======
-
 I was recently analyzing the performance of [DIRACBenchmark](https://github.com/DIRACGrid/DB12/blob/387860b582978bef863bf9db286e5241ccc2b301/DIRACbenchmark.py)
 after having seen a peculiar speed-up in the transition from Sandy Bridge/Ivy Bridge
 architecture to Haswell/Broadwell. This benchmark basically generates a long

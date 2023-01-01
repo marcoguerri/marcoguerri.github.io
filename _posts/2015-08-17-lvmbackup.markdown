@@ -7,8 +7,6 @@ categories: linux administration
 pygments: true
 ---
 
-Summary
-=======
 This post covers a possible procedure to "snapshot" a Linux
 installation based on a boot partition and three LVM logical volumes for root,
 var and swap, which proves

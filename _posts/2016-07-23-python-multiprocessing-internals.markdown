@@ -5,8 +5,6 @@ date:   2016-07-24 20:00:00
 categories: jekyll python multiprocessing
 ---
 
-Summary
-=======
 This post is a collection of notes on the mechanisms that regulate
 the creation and termination of a Python multiprocessing Process, investigating in
 particular what happens when the interpreter terminates.

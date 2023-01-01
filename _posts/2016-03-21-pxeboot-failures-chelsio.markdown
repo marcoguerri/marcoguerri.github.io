@@ -6,8 +6,6 @@ categories: linux pxe datacenter
 published: yes
 ---
 
-Summary
-=======
 This a collection of notes I have taken while debugging a regression of CERN PXE booting
 infrastructure, which followed the update to PXELINUX 6.03. I traversed the stack down 
 to the network interface firmware, which reminded me of Eric Raymond's "The Cathedral and the Bazaar",

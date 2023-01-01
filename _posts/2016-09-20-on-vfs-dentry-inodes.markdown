@@ -7,8 +7,6 @@ categories: linux
 pygments: true
 ---
 
-Summary
-=======
 There is often a lot of counfusion around how directories are represented on the filesystem. This
 post tries to clarify how ext4 uses `dirent` structure to store directory information.
 
