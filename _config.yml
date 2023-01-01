@@ -42,7 +42,7 @@ exclude: ['README.md', 'LICENSE']
 collections:
     history:
         output: true
-            permalink: /history/:name
+        permalink: /history/:name
     tags:
         output: true
         permalink: tags/:path/
