@@ -40,9 +40,9 @@ plugins: ['jekyll-paginate']
 exclude: ['README.md', 'LICENSE']
 
 collections:
-	history:
-    	output: true
-        permalink: /history/:name
-	tags:
-    	output: true
-    	permalink: tags/:path/
+    history:
+        output: true
+            permalink: /history/:name
+    tags:
+        output: true
+        permalink: tags/:path/
