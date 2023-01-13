@@ -3,6 +3,7 @@ layout: post
 title:  "LD_PRELOAD and attribute constructor"
 date:   2017-02-18 08:00:00
 published: yes
+comments: true
 categories: c linker
 pygments: true
 ---

@@ -28,7 +28,7 @@ comments: true
 isso: ''
 
 # Set this to your disqus shortname to enable comments via disqus. Set to '' to disable disqus.
-disqus: ''
+disqus: 'marcoguerri'
 
 permalink: /:year/:month/:title
 paginate: 10
@@ -39,6 +39,7 @@ plugins: ['jekyll-paginate']
 
 exclude: ['README.md', 'LICENSE']
 
+
 collections:
     history:
         output: true
@@ -46,3 +47,13 @@ collections:
     tags:
         output: true
         permalink: tags/:path/
+
+
+defaults:
+    -
+      scope:
+        path: ""
+        type: "posts"
+      values:
+        layout: "post"
+        comments: true 

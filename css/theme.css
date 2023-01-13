@@ -100,3 +100,6 @@ td, th {
 ::-webkit-scrollbar-thumb {
     background: #ccc
 }
+summary {
+  display: list-item;
+}

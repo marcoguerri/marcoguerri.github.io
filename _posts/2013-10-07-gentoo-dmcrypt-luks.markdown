@@ -9,6 +9,7 @@ tag: linux security
 This post covers the manual installation procedure of Gentoo Linux with
 encrypted root and swap partitions using LUKS and dm\_crypt on a legacy BIOS system.
 
+
 Initial setup
 =============
 
@@ -227,6 +228,7 @@ livecd boot # ldd /sbin/cryptsetup
 After leaving the chrooted environment, the following script can be used to 
 setup the initrd.
 
+<details> <summary>Expand</summary> 
 {% highlight text  %}
 #!/bin/bash
 set -x
@@ -314,6 +316,8 @@ EOF_init
 
 chmod a+x init
 {% endhighlight %}
+</details>
+\
 The actual initrd image is then built with the following commands (cpio might
 need to be invoked with the full path of the stage3 binary).
 
