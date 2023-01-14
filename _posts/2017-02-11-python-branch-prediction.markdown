@@ -137,7 +137,7 @@ For each function listed above, I created an histogram of the instructions execu
 {% for item in list %}
 <p align="center">
 <a id="single_image" href="/img/branch-prediction/{{item}}.png">
-<img  src="../../img/branch-prediction/{{item}}.png" alt="" width=800/></a>
+<img  src="/img/branch-prediction/{{item}}.png" alt="" width=800/></a>
 </p>
 {% endfor %}
 

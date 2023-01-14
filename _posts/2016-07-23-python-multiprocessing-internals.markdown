@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Creation and termination of a Python multiprocessing.Process"
+title: "Lifecycle of a Python multiprocessing.Process"
 date:   2016-07-24 20:00:00
 categories: jekyll python multiprocessing
 ---

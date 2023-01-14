@@ -1,59 +1,43 @@
-# Jekyll configuration
+title: marcoguerri
 
-name: Marco Guerri
-description: I am a Production Engineer working at Meta, with an interest in infrastructure security and machine learning.
+# The `>` after `description:` means to ignore line-breaks until next key.
+# If you want to omit the line-break after the end of text, use `>-` instead.
+description: 
+  ©2013-2023 Marco Guerri
 
-# url is currently only used only for the RSS feed in feed.xml
-url: https://marcoguerri.github.io
+# Build settings
 
-# baseurl will often be '', but for a project page on gh-pages, it needs to
-# be the project name.
-# *** IMPORTANT: If your local "jekyll serve" throws errors change this to '' or
-#     run it like so: jekyll serve --baseurl=''
-baseurl: /
+theme: minima
 
-# These can be '' to hide the Github or Gitlab nav buttons
-github: 'marcoguerri'
-gitlab: ''
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
 
-# Set this to your UA-# value, or '' to disable the block completely
-gaaccount: ''
+# Theme-specific settings
 
-# The 'comments' setting enables comments. You'll need to select either
-# disqus or isso below to choose a comment system. Individual posts can
-# override 'comments' to disable on a post-by-post basis.
-comments: true
+minima:
+  # Minima date format.
+  # Refer to https://shopify.github.io/liquid/filters/date/ if you want to customize this.
+  #
+  # date_format: "%b %-d, %Y"
 
-# Set this to your public isso URL to enable comments via isso. Set to '' to disable isso.
-isso: ''
+  skin: dark
 
-# Set this to your disqus shortname to enable comments via disqus. Set to '' to disable disqus.
-disqus: 'marcoguerri'
+  # Generate social links in footer.
+  #
+  social_links:
+    - { platform: github,         user_url: "https://github.com/marcoguerri" }
+    - { platform: linkedin,       user_url: "https://www.linkedin.com/in/marco-guerri-a08b61116/" }
 
-permalink: /:year/:month/:title
-paginate: 10
+# If you want to link only specific pages in your header, uncomment this and add the path to the pages in
+# order as they should show up.
+#
+header_pages:
+  - about.md
 
-pygments: true
-markdown: kramdown
-plugins: ['jekyll-paginate']
+# Set to `true` to show excerpts on the homepage.
+#
+show_excerpts: true
 
-exclude: ['README.md', 'LICENSE']
-
-
-collections:
-    history:
-        output: true
-        permalink: /history/:name
-    tags:
-        output: true
-        permalink: tags/:path/
-
-
-defaults:
-    -
-      scope:
-        path: ""
-        type: "posts"
-      values:
-        layout: "post"
-        comments: true 
+disqus:
+  shortname: 'marcoguerri'
