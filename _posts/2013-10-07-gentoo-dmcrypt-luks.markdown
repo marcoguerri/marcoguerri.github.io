@@ -228,7 +228,7 @@ livecd boot # ldd /sbin/cryptsetup
 After leaving the chrooted environment, the following script can be used to 
 setup the initrd.
 
-<details> <summary>Expand</summary> 
+<details> <summary>Code</summary> 
 {% highlight text  %}
 #!/bin/bash
 set -x
