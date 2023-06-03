@@ -256,6 +256,313 @@ And further down:
 001ACE4D                 mov     es:[eax], dx
 ```
 
-[There are however debug messages]
+TODO: why logs are revelant
 
-TODO: check if indeed the default file handler is being used: https://stanislavs.org/helppc/file_handles.html 
+NVRAM I/O
+=======
+
+
+Directory
+=======
+The low address range of the NVRAM stores a table of metadata which is referred to as
+"directory". The function at `0x2BB4D` goes through this table to find an entry suitable
+for storing PXE blob metadata. Every entry is identified with an id and the base directory holds
+8 entries at most. There exists also the concept of extended  directory, but we will not cover 
+it in this exercise. The code iterates through entries `[0,8[` and under certain conditions, it 
+copies their content to memory. `ecx` is used store the current index and address NVRAM as follows:
+```
+0002BBA9 loc_2BBA9:                              ; CODE XREF: dir_find_entry+50j
+0002BBA9                 mov     eax, ecx
+0002BBAB                 shl     eax, 2
+0002BBAE                 sub     eax, ecx
+0002BBB0                 shl     eax, 2
+0002BBB3                 add     eax, edi
+```
+This code already reveals important information on how the directory is structured. In fact, starting
+from an index, NVRAM is addressed as `(((4*index-index)*4)+<BASE>)+<OFFSET>`, i.e. 
+`12*index+<BASE>+<OFFSET>`, suggesting that every item in the table is 12 bytes long.
+
+We first fetch 4 bytes content at +4 offset and reverse its endianess,  using `esp+1Ch+var_14` as temporary storage:
+```
+0002BBB5                 mov     edx, [eax+4]
+0002BBB8                 and     edx, 0FF000000h
+0002BBBE                 shr     edx, 18h
+0002BBC1                 mov     [esp+1Ch+var_14], edx
+0002BBC5                 mov     edx, [eax+4]
+0002BBC8                 and     edx, 0FF0000h
+0002BBCE                 shr     edx, 8
+0002BBD1                 mov     ebx, [esp+1Ch+var_14]
+0002BBD5                 or      ebx, edx
+0002BBD7                 mov     edx, [eax+4]
+0002BBDA                 and     edx, 0FF00h
+0002BBE0                 shl     edx, 8
+0002BBE3                 or      ebx, edx
+0002BBE5                 mov     edx, [eax+4]
+0002BBE8                 and     edx, 0FFh
+0002BBEE                 shl     edx, 18h
+0002BBF1                 or      edx, ebx
+```
+
+We then skip skip the entry in the following cases:
+* Its value is `0x3FFFFF`
+* Value of bits `[24,31]` is != 0x10
+
+```
+0002BBF3                 test    edx, offset unk_3FFFFF
+0002BBF9                 jz      short loc_2BB9F
+0002BBFB                 shr     edx, 18h
+0002BBFE                 and     edx, 0FFh
+0002BC04                 cmp     edx, 10h
+0002BC07                 jnz     short loc_2BB9F
+```
+
+Bits `[24,31]` have a have a special meaning, which we'll see later. If the entry passes all checks above, 
+we copy the content at `+8` into `ebp` and call `0x000B19EA`:
+```
+0002BC3E                 lea     edx, [edi+60h]
+0002BC41                 mov     ebx, 30h
+0002BC46                 mov     eax, ebp
+0002BC48                 call    sub_B19EA
+```
+Through `sub_B19EA`, we ask to fetch NVRAM data from offset `ebp`, which we just read at `<DIRECTORY_ENTRY>+8` 
+for a lenght of 0x30\*4 into destination address in `edx`. We derive the meaning of these parameters by 
+following `sub_B19EA` and seeing that it increments the source and destination addresses by 4 until we 
+reach the desired lenght:
+```
+000B19F7                 mov     esi, eax
+000B19F9                 mov     ecx, edx
+000B19FB                 mov     edi, ebx
+[...]
+000B19FD                 xor     ebx, ebx
+000B19FF
+000B19FF loc_B19FF:                              ; CODE XREF: copy_nvram_data?+6Aj
+000B19FF                 cmp     ebx, edi
+[...]
+000B1A03                 mov     edx, ecx
+000B1A05                 add     ecx, 4
+[...]
+000B1A50                 inc     ebx
+000B1A51                 add     esi, 4
+```
+
+Further down the stack, we have a write to `[ebx]`, which is originally `edi+0x60` in the listing above.
+```
+000B0E16                 mov     eax, 6838h
+000B0E1B                 call    sub_21263
+000B0E20                 mov     [ebx], eax
+```
+
+Register `0x6838` seems to be undocumented, and I can only speculate it controls read access of
+NVRAM. We saw earlier that there are 8 entries in the directory each one 12 bytes long, overall 0x60 bytes:
+we can assume `edi+0x60` points into memory just after the directory table.
+If we succeed in finding an entry that triggers the copy, we set a flag:
+```
+0002BC55                 mov     [esp+1Ch+var_18], 1
+```
+and then decide where to dispatch execution:
+```
+0002BC62 loc_2BC62:                              ; CODE XREF: dir_find_entry+56j
+0002BC62                 cmp     [esp+1Ch+var_10], 80h
+0002BC67                 jb      loc_2BDA4
+0002BC6D                 cmp     [esp+1Ch+var_18], 0
+0002BC72                 jz      loc_2BD96
+0002BC78                 xor     ecx, ecx
+0002BC7A                 jmp     short loc_2BC86
+```
+
+`esp+1Ch+var_10` is `0x0` and represent the id of the entry we are trying to add to the table.
+As this is `< 0x80`, we jump further ahead. If instaed the id was `> 0x80` and `esp+1Ch+var_18` 
+was 0x0 we would jump to a control path where what stands out is:
+
+```
+0002A277                 push    edx
+0002A278                 push    offset aDircreate_extd ; "\ndirCreate_Extdir.
+```
+
+This seems to be creating the extended directory table, so we can speculate that the leftmost
+byte of the field in the directory entry which we checked against `0x10` might indicate its type,
+and 0x10 might represent the extended directory. When attempting to add an entry with
+id `> 0x80`, which at this point is unclear what it represents, if the extended directory is not
+found, it gets created.
+
+`esi` contains the callers' `esp+140h+var_1C`, where it expects to find an entry id to use. Once
+past the look-up of the extended directory, we start scanning through the base entries in the 
+directory table, starting from 0:
+```
+0002BDA4 loc_2BDA4:                              ; CODE XREF: dir_find_entry+11Aj
+0002BDA4                 mov     dword ptr [esi], 0
+0002BDAA                 jmp     short loc_2BDBA
+```
+
+We then follow a similar pattern seen before, and check content at `+4` offset against 
+`0x3FFFFF`:
+```
+0002BDBA loc_2BDBA:                              ; CODE XREF: dir_find_entry+25Dj
+0002BDBA                 mov     edx, [esi]
+0002BDBC                 mov     eax, edx
+0002BDBE                 shl     eax, 2
+0002BDC1                 sub     eax, edx
+0002BDC3                 shl     eax, 2
+0002BDC6                 add     eax, edi
+0002BDC8                 mov     ecx, [eax+4]
+0002BDCB                 and     ecx, 0FF000000h
+0002BDD1                 shr     ecx, 18h
+0002BDD4                 mov     edx, [eax+4]
+0002BDD7                 and     edx, 0FF0000h
+0002BDDD                 shr     edx, 8
+0002BDE0                 or      ecx, edx
+0002BDE2                 mov     edx, [eax+4]
+0002BDE5                 and     edx, 0FF00h
+0002BDEB                 shl     edx, 8
+0002BDEE                 or      edx, ecx
+0002BDF0                 mov     ecx, [eax+4]
+0002BDF3                 and     ecx, 0FFh
+0002BDF9                 shl     ecx, 18h
+0002BDFC                 or      edx, ecx
+0002BDFE                 test    edx, offset unk_3FFFFF
+```
+
+Also similarly to the first scan, we check bits `[24,31]` against 
+`esp+1Ch+var_10`, which we now know for sure contains the id of the entry 
+(`0x0` for PXE).
+
+```
+0002BE06                 mov     ecx, edx
+0002BE08                 shr     ecx, 18h
+0002BE0B                 and     ecx, 0FFh
+0002BE11                 xor     edx, edx
+0002BE13                 mov     dl, [esp+1Ch+var_10]
+0002BE17                 cmp     ecx, edx
+```
+
+If we find an entry with a matching id, we perform an additional check:
+```
+0002BE1B                 cmp     [esp+1Ch+var_1C], 0
+0002BE1F                 jz      loc_2BD21
+0002BE25                 mov     dword ptr [eax+4], 0
+```
+
+`esp+1Ch+var_1C` is a flag passed by the caller, with value `0x1`. We then
+zero out the value at offset `+4` and exit, with the entry id in `[esi]` for
+the caller to find. After having identified an entry in the table,
+we look for NVRAM space to host the data:
+
+```
+0002AFF1                 mov     ebx, [esp+140h+var_14]
+0002AFF8                 lea     edx, [esp+140h+var_20]
+0002AFFF                 mov     eax, esp
+0002B001                 call    sub_29682
+```
+
+Here I have taken a shortcut and I haven't dive into the details of NVRAM space management
+(I might do that in the future). The strategy I am planning to use is to reserve initially
+a large enough portion of flash by writing a larger PXE Option Rom through the tool in 
+DOS environment, and then iterate on top of the same entry with smaller ROMs without having
+to worry about space allocation.
+
+The code proceeds in setting new values in the directory entry. We see a similar pattern as 
+before: if the ID is `> 0x80`, we jump to the extended directory update section, otherwise we follow
+the base directory path.
+
+```
+0002B0F3 loc_2B0F3:                              ; CODE XREF: program_NVRAM_maybe_update_directory+1CDj
+0002B0F3                                         ; program_NVRAM_maybe_update_directory+1E1j
+0002B0F3                 mov     eax, [esp+140h+var_1C]
+0002B0FA                 push    eax
+0002B0FB                 push    offset aDirwriteIndexI ; "\ndirWrite, index is %x."
+0002B100                 call    verbosity_8
+0002B105                 add     esp, 8
+0002B108                 mov     edx, [esp+140h+var_1C]
+0002B10F                 cmp     edx, 80h
+0002B115                 jl      loc_2B3E6
+```
+
+Before moving forward, we must note that the lenght of the OptionROM, stored in `esp+140h+var_14`
+is aligned to 4 bytes boundaries:
+```
+0002AFB0                 test    byte ptr [esp+140h+var_14], 3
+0002AFB8                 jz      short loc_2AFCD
+0002AFBA                 mov     eax, [esp+140h+var_14]
+0002AFC1                 and     al, 0FCh
+0002AFC3                 add     eax, 4
+0002AFC6                 mov     [esp+140h+var_14], eax
+```
+
+The lenght is written to at `+4` of the selected index:
+```
+0002B3E6 loc_2B3E6:                              ; CODE XREF: program_NVRAM_maybe_update_directory+20Dj
+0002B3E6                 mov     ecx, [esp+140h+var_14]
+0002B3ED                 and     ecx, 0FF000000h
+0002B3F3                 shr     ecx, 18h
+0002B3F6                 mov     eax, [esp+140h+var_14]
+0002B3FD                 and     eax, 0FF0000h
+0002B402                 shr     eax, 8
+0002B405                 or      ecx, eax
+0002B407                 mov     eax, [esp+140h+var_14]
+0002B40E                 and     eax, 0FF00h
+0002B413                 shl     eax, 8
+0002B416                 or      ecx, eax
+0002B418                 mov     eax, [esp+140h+var_14]
+0002B41F                 and     eax, 0FFh
+0002B424                 shl     eax, 18h
+0002B427                 or      ecx, eax
+0002B429                 mov     eax, edx
+0002B42B                 shl     eax, 2
+0002B42E                 sub     eax, edx
+0002B430                 mov     [esp+eax*4+4], ecx
+```
+
+At offset `+0`, a value set by the caller gets written. On the PXE update path, it seems to be
+always 0x100000, which is coherent with the dumps on the NVRAM seen earlier:
+
+```
+0002B434                 mov     ecx, esi
+0002B436                 and     ecx, 0FF000000h
+0002B43C                 shr     ecx, 18h
+0002B43F                 mov     edx, esi
+0002B441                 and     edx, 0FF0000h
+0002B447                 shr     edx, 8
+0002B44A                 or      ecx, edx
+0002B44C                 mov     edx, esi
+0002B44E                 and     edx, 0FF00h
+0002B454                 shl     edx, 8
+0002B457                 or      edx, ecx
+0002B459                 mov     ecx, esi
+0002B45B                 and     ecx, 0FFh
+0002B461                 shl     ecx, 18h
+0002B464                 or      edx, ecx
+0002B466                 mov     [esp+eax*4], edx
+```
+At offset `+8` we write the NVRAM address returned by `sub_29682` (the function which looks up space in NVRAM):
+```
+0002B469                 mov     ecx, [esp+140h+var_20]
+0002B470                 and     ecx, 0FF000000h
+0002B476                 shr     ecx, 18h
+0002B479                 mov     edx, [esp+140h+var_20]
+0002B480                 and     edx, 0FF0000h
+0002B486                 shr     edx, 8
+0002B489                 or      ecx, edx
+0002B48B                 mov     edx, [esp+140h+var_20]
+0002B492                 and     edx, 0FF00h
+0002B498                 shl     edx, 8
+0002B49B                 or      edx, ecx
+0002B49D                 mov     ecx, [esp+140h+var_20]
+0002B4A4                 and     ecx, 0FFh
+0002B4AA                 shl     ecx, 18h
+0002B4AD                 or      edx, ecx
+0002B4AF                 mov     [esp+eax*4+8], edx
+```
+
+NVRAM is then programmed with the modified directory.
+
+Integrity checks
+=======
+There are multiple integrity values stored in NVRAM. The following are in particular relevant
+for PXE OptionROM:
+
+
+An algorithm for PXE ROM update
+=======
+From the exploration presented in this post, we can derive the following "fast" update algorithm for
+OptionROM:
+

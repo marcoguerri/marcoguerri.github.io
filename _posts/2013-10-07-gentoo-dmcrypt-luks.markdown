@@ -207,7 +207,7 @@ Creation of the initrd
 ======================
 
 The initial ramdisk responsible for mounting the encrypted device must contain 
-cryptsetup tools and all the dependencies listed by ldd.
+cryptsetup tools and all the dependencies listed by ldd. For example:
 
 {% highlight text  %}
 livecd boot # ldd /sbin/cryptsetup 
@@ -226,105 +226,89 @@ livecd boot # ldd /sbin/cryptsetup
 {% endhighlight %}
 
 After leaving the chrooted environment, the following script can be used to 
-setup the initrd.
+setup the initrd, which will be packaged under `$(pwd)/initramfs`.
 
 <details> <summary>Code</summary> 
 {% highlight text  %}
 #!/bin/bash
-set -x
-mkdir -p $ROOT/boot/initram
-cd $ROOT/boot/initram
-mkdir bin lib dev dev/mapper dev/vc etc newroot proc sys
+set -euo pipefail
 
-cp /bin/busybox /sbin/cryptsetup /sbin/mdadm bin
-ln -s /bin/busybox bin/cat
-ln -s /bin/busybox bin/mount
-ln -s /bin/busybox bin/sh
-ln -s /bin/busybox bin/switch_root
-ln -s /bin/busybox bin/umount
-ln -s /bin/busybox bin/sleep
+INITRD_ROOT="$(mktemp -d)"
+
+exit() {
+    echo "Cleaning up ${INITRD_ROOT}"
+    rm -rf "${INITRD_ROOT}"
+}
+trap exit EXIT
+
+echo "Building INITRD in ${INITRD_ROOT}"
+
+pushd "$(pwd)"
+cd "${INITRD_ROOT}"
+mkdir bin lib dev dev/mapper dev/vc etc newroot proc sys
+cp "$(which busybox)" "$(which cryptsetup)" "$(which mdadm)" bin
+
+tools=(
+    bin/cat
+    bin/mount
+    bin/sh
+    bin/switch_root
+    bin/umount
+    bin/sleep
+)
+
+for t in "${tools[@]}";
+do 
+    ln -s /bin/busybox "${t}"
+done
 
 cp -a /sbin/vgchange bin
 cp -a /sbin/vgscan bin
 cp -a /sbin/lvm bin
 
-cp -a /dev/console /dev/nvme0n1p1 /dev/null /dev/urandom dev
+mknod -m 444 dev/random c 1 8
+mknod -m 600 dev/console c 5 1
+mknod -m 444 dev/urandom c 1 9
 
-# Random device to avoid 
-# "Cannot initialize crypt RNG backend" error
-mknod -m 644 dev/random c 1 8
 
-# Libraries for cryptsetup
-
-libs=(
-    /lib/ld-linux.so.2
-    /lib/ld-2.15.so
-    /usr/lib/libcryptsetup.so.4
-    /usr/lib/libcryptsetup.so.4.2.0
-    /usr/lib/libpopt.so.0
-    /usr/lib/libpopt.so.0.0.0
-    /lib/libc.so.6
-    /lib/libc-2.15.so
-    /lib/libuuid.so.1
-    /lib/libuuid.so.1.3.0
-    /lib/libdevmapper.so.1.02
-    /usr/lib/libgcrypt.so.11
-    /usr/lib/libgcrypt.so.11.8.2
-    /lib/libudev.so.1
-    /lib/libudev.so.1.3.5
-    /usr/lib/libgpg-error.so.0
-    /usr/lib/libgpg-error.so.0.8.0
-    /lib/librt.so.1
-    /lib/librt-2.15.so
-    /lib/librt-2.15.so
-    /lib/libpthread.so.0
-    /lib/libpthread-2.15.so
+deps=(
+    vgscan
+    vgchange
+    cryptsetup
 )
 
-for l in ${libs[@]};
+for d in "${deps[@]}";
 do
-    cp -a $l lib
-done
-
-# Libraries for vgscan/vgchange
-libs=(
-    /lib/libdl.so.2
-    /lib/libdl-2.15.so
-    /lib/libdevmapper-event.so.1.02
-    /lib/libreadline.so.6
-    /lib/libreadline.so.6.2
-    /lib/libncurses.so.5
-    /lib/libncurses.so.5.9
-)
-for l in ${libs[@]};
-do
-    cp -a $l lib
+    echo "Copying deps for ${d}"
+    LIBS=$(ldd "$(which "${d}")" 2>&1 | awk -F"=>" '{print $2}'  | grep -o "/[^ ]*")
+    for l in ${LIBS};
+    do
+        echo "    Copying ${l}"
+        cp -a "${l}" lib
+    done
 done
 
 cat > init << EOF_init
 #!/bin/sh
-echo "Initrd initialization"
+echo "Unlocking LUKS encrypted volume..."
 mount -t proc proc /proc
-CMDLINE="\$(cat /proc/cmdline)"
 mount -t sysfs sysfs /sys
-sleep 5 && /bin/cryptsetup luksOpen /dev/sda2 vault
+/bin/cryptsetup luksOpen /dev/sda2 vault
 /bin/vgchange -ay vg
 mount -r /dev/mapper/vg-root /newroot
 umount /sys && umount /proc
-exec switch_root /newroot /sbin/init ${CMDLINE}
+exec switch_root /newroot /sbin/init \$(cat /proc/cmdline)
 EOF_init
 
 chmod a+x init
+
+popd
+
+echo "Packing initrd in $(pwd)/initramfs"
+find "${INITRD_ROOT}" | cpio --quiet -o -H newc | gzip -9 > initramfs
+echo "Done"
 {% endhighlight %}
 </details>
-\
-The actual initrd image is then built with the following commands (cpio might
-need to be invoked with the full path of the stage3 binary).
-
-{% highlight text  %}
-cd /mnt/gentoo/boot/initram
-find . | cpio --quiet -o -H newc | gzip -9 > /mnt/gentoo/boot/initramfs
-{% endhighlight %}
 
 
 Final steps
