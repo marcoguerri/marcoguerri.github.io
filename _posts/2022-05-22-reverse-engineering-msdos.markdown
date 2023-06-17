@@ -7,25 +7,38 @@ categories: reversing programming
 pygments: true
 ---
 
-I have been working on OptionROM malwares and used a Broacdom NIC as test
-vector. `B57UDIAG.EXE` is the vendor tool which allows to configure and test
-the hardware, including manipulating OptionROM.
+I have been working on OptionROM malware development using a Broacdom BCM5751 1G Network Card on 
+a PCEngines APU2D board. `B57UDIAG.EXE` is the vendor tool whichconfigures and tests Broadcom NICs, 
+including all PXE related information (OptionROM binary, PXE enablement/disablement, etc.) The tool however runs only on MS-DOS. In order to iterate
+faster during OptionROM development,  I was looking for a way to manipulate correctly the NVRAM of the NIC,
+which is accessible from `ethtool`, from Linux. I derived layout specification, algorithms for integrity checks
+and other information by reverse engineering specific control paths of the `B57UDIAG.EXE` tool. 
+
+It must be noted that several results obtained here could have probably been sourced from the existing 
+end to end reverse engineering effort that produced the [ortega specification](https://github.com/hlandau/ortega).
+Nevertheless, I did want to go through a reverse engineering exercise of a MS-DOS tool and this was
+a perfect opportunity, so I essentially ignored any resource that did not include:
+* Datasheet
+* `B57UDIAG.EXE` code
 
 
-Disassembling Linear Executables
+The architecture of the tool
+=======
+
+Disassembling LE binaries
 =======
 IDA 4.1 supports disassembling Linear Executable binaries under DOS. 
 The idb produced can then be imported into IDA 5.0 under Windows.
-There is still an IDA 5.0 binary available.
+Both versions of the tool are still available at the time of writing:
+
 
 Alternatively, Ghidra also has a Linear Executable loader, but I have had a much harder time
-using Ghidra as it is unable to "discover" all executable code. The decompiled code is also
-inaccurate, as the assembly doesn't always make use of clear function prologue and epilogue.
-Take for example the following code:
+using Ghidra to discover all executable code. The disassembled code is also sometimes
+inaccurate, as the tool doesn't always make use of clear function prologue and epilogue.
+[elaborate]
 
 Stripping PMODE header
 =======
-
 
 Command line flags
 =======
@@ -37,7 +50,7 @@ The former enables support for OptionROMs, while the latter overwrites
 the OptionROM region in NVRAM.
 
 
-setpxe command
+Dispatching commands
 =======
 
 We can first look for the occurrences of `setpxe` string in the binary.
@@ -85,14 +98,24 @@ The first reference is the following:
 
 The other references to `0x25B266` show a similar execution flow however with `0x65` and `0x64` in `edx`. 
 These hex codes, `0x74`, `0x65` and `0x64` are the command line flags supported  by `setpxe`, so we should expect for this 
-code to be dispatching `setpxe` execution based on the parameters provided. If we follow all `call` instructions, we'll see
+code to be dispatching `setpxe` execution based on the parameters provided. 
+
+Stack protection
+======
+If we follow all `call` instructions, we'll see
 functions starting with a common prologue, similar to the following:
 ```
 000158A3                 push    <HEX_CODE>
 000158A8                 call    sub_19576C
 ```
 
-This is a stack overflow protection mechanism which is prepended to every function call. We can focus on the PXE enable 
+This is a stack overflow protection mechanism which is prepended to every function call. 
+
+
+
+setpxe command
+======
+We can focus on the PXE enable 
 control path, following therefore `0x65`:
 
 {% highlight assembly linenos %}
@@ -166,7 +189,12 @@ This is important because in the `0x65` control path, we see that depending on t
 ```
 
 We can see the similar `mov ecx, 2` and call to `sub_A1CA8` which at this point we can assume to be a "programming" function
-and we label it accordingly. Before moving ahead, it is worth having a look at `sub_16309`. This is supposedly a function
+and we label it accordingly. 
+
+
+Debug messages
+=====
+Before moving ahead, it is worth having a look at `sub_16309`. This is supposedly a function
 which prints a message on screen and waits for user input, e.g. `Y/N`. In fact, the full message in the listing above is
 `PXE firmware cannot be found in NVRAM. Program anyway? Y/N`. The code makes use of two different types of output:
 
@@ -258,11 +286,14 @@ And further down:
 
 TODO: why logs are revelant
 
+pxe command
+======
+
 NVRAM I/O
 =======
 
 
-Directory
+Updating directory
 =======
 The low address range of the NVRAM stores a table of metadata which is referred to as
 "directory". The function at `0x2BB4D` goes through this table to find an entry suitable
@@ -533,7 +564,7 @@ always 0x100000, which is coherent with the dumps on the NVRAM seen earlier:
 0002B464                 or      edx, ecx
 0002B466                 mov     [esp+eax*4], edx
 ```
-At offset `+8` we write the NVRAM address returned by `sub_29682` (the function which looks up space in NVRAM):
+At offset `+8` we write the NVRAM address returned by `sub_29682`, the function which looks up space in NVRAM:
 ```
 0002B469                 mov     ecx, [esp+140h+var_20]
 0002B470                 and     ecx, 0FF000000h
@@ -553,16 +584,110 @@ At offset `+8` we write the NVRAM address returned by `sub_29682` (the function 
 0002B4AF                 mov     [esp+eax*4+8], edx
 ```
 
-NVRAM is then programmed with the modified directory.
+NVRAM is then overwritten with the modified directory.
 
-Integrity checks
+Integrity checksums
 =======
-There are multiple integrity values stored in NVRAM. The following are in particular relevant
-for PXE OptionROM:
+There are multiple integrity values stored in NVRAM. Two are immediately obvious from the binary diff
+shown at the beginning of the post, i.e. a 1 byte checksum at offset `0x75` and a 4 bytes checksum at offset `0xFC`,
+in the directory area. There is also a third checksum a bit more more hidden in the code, covering the 
+OptionROM binary itself. In fact, we can notice that the OptionROM size stored in the directory corresponds 
+to the size of the binary +4 bytes, indicating that something is appended to the EFI blob.
+
+As we have seen in previous sections, `sub_2AF08` is the main function which programs NVRAM data and directory metadata.
+`sub_2BEAD` gets us to the calculation of the integrity values:
+
+```
+0002BF0E                 mov     ebx, 1
+0002BF13                 mov     edx, 60h
+0002BF18                 lea     eax, [esp+8Ch]
+0002BF1F                 call    sub_4F781
+0002BF24                 mov     [esp+1], al
+0002BF28                 mov     ebx, 0FFFFFFFFh
+0002BF2D                 mov     edx, 88h
+0002BF32                 mov     eax, esp
+0002BF34                 call    sub_67BF9
+0002BF39                 mov     [esp+88h], eax
+0002BF40                 mov     edx, eax
+0002BF42                 not     edx
+0002BF44                 mov     [esp+88h], edx
+0002BF4B                 mov     ebx, 23h
+0002BF50                 mov     edx, esp
+0002BF52                 mov     eax, 74h
+```
+
+`[esp+1]` and `[esp+88h]` indicate that the resulting value of `sub_4F781` and `sub_67BF9`, which we'll see are checksum
+calculation routines, are copied over at `+1` and `+88h` offsets of a memory buffer. If we try to map these offsets to the 
+directory layout, in particular to `0x75` and `0xFC`, which are the addresses of the 1 byte and 4 bytes variations in the 
+binary diff, we can see they are aligned with each other. If `esp+88h = 0xFC`, then `esp` == 0x74 and `esp+1 == 0x75`.
+
+`sub_4F781` and `sub_4F781` calculate integrity values respectively on `0x60` and `0x88` bytes read from
+NVRAM through `sub_B119EA`. We see two invocations of `sub_B119EA`, which prepare the data to be checksummed:
+
+```
+0002BEC0                 mov     ebx, 18h
+0002BEC5                 lea     edx, [esp+8Ch]
+0002BECC                 mov     eax, 14h
+0002BED1                 call    sub_B119EA
+```
+
+and 
+```
+0002BEF9                 mov     ebx, 23h
+0002BEFE                 mov     edx, esp
+0002BF00                 mov     eax, 74h
+0002BF05                 call    sub_B119EA
+```
+
+The meaning of the parameters are the following:
+* `eax` contains the offset in NVRAM from which to copy the data over to `[esp+8C]` and `[esp]`
+* `ebx` contains the size to be copied. It must be noted that the size is intended to be the number
+of double words (4 bytes), as the following excerpt of `sub_B119EA` indicates:
+
+```
+000B19FF                 cmp     ebx, edi         -- (`ebx` is the current number of copy operations performed, `edi` is initialized to the input value of `ebx`, i.e. the size in double-words)
+000B1A01                 jnb     short loc_B1A56  -- (exit)
+000B1A03                 mov     edx, ecx
+000B1A05                 add     ecx, 4
+[...]
+000B1A50 loc_B1A50:                              ; CODE XREF: sub_B119EA+4F
+000B1A50                 inc     ebx
+000B1A51                 add     esi, 4           -- (initialized to input value of `eax`, i.e. the source offset)
+```
+Once the data is available `sub_4F781` and `sub_67BF9` calculate respectively 1 and 4 bytes checksums. We can then summarize
+these first two integrity values as follows:
+* We copy `96` (`0x60`) bytes from NVRAM starting at offset `0x14`, and calculate a 1 byte checksum. We copy this checksum to offset `0x75`
+* We copy `140` (`0x88`)  bytes from NVRAM starting at offset `0x74`, and calculate a 4 byte checksum. We copy this checksum to offset `0xFC`
+
+We get to a similar conclusion for the integrity check of the OptionROM itself. In the main PXE update function, `sub_98542`, we can first track the size of the image:
+```
+000986E8 loc_986E8:                              ; CODE XREF: sub_98542+17E
+000986E8                 push    edi
+000986E9                 push    offset aLengthDBytes__ ; "(length = %d bytes ) ...\n"
+```
+
+If we follow `edi` backwards, we can track the invocation of `sub_67BF9`, the routine which calculates the 4 bytes checksum:
+
+```
+00098678                 mov     edx, edi
+0009867A                 mov     eax, esi
+0009867C                 call    sub_67BF9
+00098681                 mov     edx, eax
+00098683                 not     edx
+00098685                 lea     eax, [esi+edi]
+00098688                 mov     [eax], edx
+0009868A                 push    offset aUpdatingPxe ; "Updating PXE "
+0009868F                 xor     eax, eax
+00098691                 mov     al, [esp+44h+var_10]
+00098695                 push    eax
+00098696                 add     edi, 4
+```
+
+`sub_67BF9` is invoked with the size of the image, which doesn't include yet the 4 additional appended bytes. The result is stored at `esi+edi`, i.e. the base address
+of the OptionROM in memory + its length. The lenght of the image is then increased by 4 before being stored in the directory.
 
 
 An algorithm for PXE ROM update
 =======
-From the exploration presented in this post, we can derive the following "fast" update algorithm for
-OptionROM:
+From the exploration presented in this post, we can derive the following "fast" update algorithm for OptionROM:
 
