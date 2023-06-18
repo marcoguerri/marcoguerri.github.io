@@ -3,7 +3,7 @@ layout: post
 title:  "Reverse engineering MS-DOS binaries"
 date:   2023-02-04 08:00:00
 published: false
-categories: reversing programming
+categories: reversing msdos
 pygments: true
 ---
 
@@ -40,32 +40,49 @@ inaccurate, as the tool doesn't always make use of clear function prologue and e
 Stripping PMODE header
 =======
 
-Command line flags
+Reversing PXE commands
 =======
-The OptionROM of the NIC is controlled with two commands:
-* `B57UDIAG.EXE -c <ADAPTER> setpxe`
+Broadcom tool exposes primarily two commands to manipule PXE OptionROM:
 * `B57UDIAG.EXE -c <ADAPTER> pxe <OPTION_ROM_BINARY>`
+* `B57UDIAG.EXE -c <ADAPTER> setpxe <FILE>`
 
-The former enables support for OptionROMs, while the latter overwrites
-the OptionROM region in NVRAM.
+There are more, for example to change the adapter PXE speed. This note will focus only on the two
+above. `pxe` enables support for booting PXE payloads off the NIC NVRAM, while `setpxe` overwrites 
+the OptionROM binary. It is useful to dump the content of NVRAM before and after the invocation of 
+both commands, to get an idea of which area of memory are manipulated. `ethtool` can do this with
+`raw on` flags:
+```
+ethtool raw on
+```
+
+Running `pxe` command generates the the following binary differences:
+
+<p align="center">
+<a id="single_image" href="/img/dos/NVRAM_differences.png">
+<img src="/img/dos/NVRAM_differences.png" alt=""/></a>
+</p>
+
+Overall, three changes stand out, within the first 512 bytes of NVRAM. Further below, we can see the
+whole OptionROM binary blob.
 
 
-Dispatching commands
+Running `setpxe` command instead results in the following binary differences:
+
+
+
+Dispatching command line flags
 =======
-
-We can first look for the occurrences of `setpxe` string in the binary.
-We'll find two:
-
+Looking for occurrences of `setpxe` string gets us to the code which dispatches command line arguments.
+We can find two occurrences of `setpxe`:
 ```
 00235F67 aSetpxe         db 'setpxe',0           ; DATA XREF: sub_F23C5+150o
 ```
-
 and
 ```
 0020767E aSetpxe_0       db 'setpxe',0           ; DATA XREF: dseg02:off_25B266o
 ```
 
-The second is the one of interest, which is also further referenced through its offset:
+The latter is the one of interest, which is also further addressed through its offset:
 
 ```
 0025B266 off_25B266      dd offset aSetpxe_0     ; DATA XREF: cseg01:00031BC4o
@@ -73,123 +90,72 @@ The second is the one of interest, which is also further referenced through its 
 0025B266                                         ; "setpxe"
 ```
 
-If we look for the references to `0x25B266` we'll see similar patterns repeating.
-The first reference is the following:
+If we look for the references to `0x25B266` we'll see similar patterns repeating:
 
-{% highlight assembly linenos %}
-00031BBD loc_31BBD:                              ; CODE XREF: cseg01:00031BA3j
-00031BBD                 lea     ebx, [esp+4000h]
-00031BC4                 mov     edx, offset offset_setpxe
-00031BC9                 mov     eax, ebp
-00031BCB                 call    sub_158A3
-00031BD0                 test    eax, eax
-00031BD2                 jnz     short loc_31BFF
-00031BD4                 mov     edx, 73h
-00031BD9                 mov     eax, offset offset_setpxe
-00031BDE                 call    sub_152F3
-00031BE3                 mov     edi, eax
-00031BE5                 mov     edx, esi
-00031BE7                 xor     eax, eax
-00031BE9                 call    sub_86E31
-00031BEE                 test    eax, eax
-00031BF0                 jz      short loc_31C09
-00031BF2                 push    offset aUnableToLoad_0 ; "Unable to load eeprom content\n"
+{% highlight asm %}
+00031C23 loc_31C23:                              ; CODE XREF: cseg01:00031C1A␘j
+00031C23                 mov     edx, 65h
+00031C28                 mov     eax, offset offset_setpxe
+00031C2D                 call    sub_1531D
 {% endhighlight %}
 
-The other references to `0x25B266` show a similar execution flow however with `0x65` and `0x64` in `edx`. 
-These hex codes, `0x74`, `0x65` and `0x64` are the command line flags supported  by `setpxe`, so we should expect for this 
-code to be dispatching `setpxe` execution based on the parameters provided. 
+The only difference across several references to `0x25B266` are the hex values stored in `edx`. 
+In addition to `0x65`, we also see `0x64` or `0x73`, which are command line flags `-e`, `-d`, `-s`. 
+The parsing happens in multiple stages. We dereference first the content of `[eax+8]`, i.e. 
+`offset offset_setpxe + 8`, checking that it is not 0:
+```
+0001531D sub_1531D       proc near               ; CODE XREF: cseg01:0001C717␙p
+0001531D                                         ; sub_2F945+53␙p ...
+0001531D                 push    4
+00015322                 call    stack_overflow_outer_outer
+00015327                 mov     eax, [eax+8]
+0001532A                 test    eax, eax
+0001532C                 jz      short loc_15346
+```
+
+We then start a loop where we compare `edx` with `[eax]` and in case they don't match, we increase
+`eax` by `0x14h` and repeat. If we look through content of the data segment referenced in this code, 
+we'll see that `0x64`, `0x65`, `0x73` are stored at `0x14` increments starting from `[eax]`. 
+
+```
+0001532E loc_1532E:                              ; CODE XREF: sub_1531D+27␙j
+0001532E                 mov     dh, [eax]
+00015330                 test    dh, dh
+00015332                 jz      short loc_15346
+00015334                 cmp     dl, dh
+00015336                 jnz     short loc_15341
+00015338                 mov     al, [eax+10h]
+0001533B                 and     eax, 0FFh
+00015340                 retn
+00015341 ; ---------------------------------------------------------------------------
+00015341
+00015341 loc_15341:                              ; CODE XREF: sub_1531D+19␘j
+00015341                 add     eax, 14h
+00015344                 jmp     short loc_1532E
+00015346 ; ---------------------------------------------------------------------------
+00015346
+00015346 loc_15346:                              ; CODE XREF: sub_1531D+F␘j
+00015346                                         ; sub_1531D+15␘j
+00015346                 xor     eax, eax
+00015348                 retn
+00015348 sub_1531D       endp
+```
+
+We are essentially trying to match the proper area of memory with command line flag of interest, 
+returning `[eax+10h]`, when we get a match. This latter address stores the value of the command 
+line flag. Based on the return value, the caller will decide how to dispatch further calls to
+honor the input parameters.
+
 
 Stack protection
 ======
-If we follow all `call` instructions, we'll see
-functions starting with a common prologue, similar to the following:
+If we follow all `call` instructions, we see functions starting with a common prologue, similar to the following:
 ```
 000158A3                 push    <HEX_CODE>
 000158A8                 call    sub_19576C
 ```
 
 This is a stack overflow protection mechanism which is prepended to every function call. 
-
-
-
-setpxe command
-======
-We can focus on the PXE enable 
-control path, following therefore `0x65`:
-
-{% highlight assembly linenos %}
-00031C23                 mov     edx, 65h
-00031C28                 mov     eax, offset offset_setpxe
-00031C2D                 call    sub_1531D
-00031C32                 test    eax, eax
-00031C34                 jz      short loc_31C98
-00031C36                 push    0
-00031C38                 mov     ecx, 2
-00031C3D                 mov     ebx, ecx
-00031C3F                 mov     edx, esi
-00031C41                 xor     eax, eax
-00031C43                 call    sub_A1CA8
-{% endhighlight %}
-
-The result of the `sub_A1CA8` is then processed. The return code `A0` seems to indicated that PXE firmware
-was not found in NVRAM:
-
-{% highlight assembly linenos %}
-00031C48                 mov     edx, eax
-00031C4A                 test    eax, eax
-00031C4C                 jz      loc_31DE6
-00031C52                 cmp     eax, 0A0h
-00031C57                 jnz     short loc_31C71
-00031C59                 push    offset aPxeFirmwareCan ; "PXE firmware cannot be found in NVRAM. "...
-00031C5E                 call    sub_16309
-00031C63                 add     esp, 4
-00031C66                 test    eax, eax
-00031C68                 jnz     short loc_31C81
-00031C6A                 mov     eax, edx
-00031C6C                 jmp     retn_path
-{% endhighlight %}
-
-Line `7` is interesting, because as we have seen initially while looking into NVRAM dumps, when PXE is enabled, 
-there is one byte flag which is set to `0x2`, while it's `0x0` when PXE is disabled. If we look at the control 
-path for `0x64`, we can see a similar pattern:
-
-{% highlight assembly linenos %}
-00031C98                 mov     edx, 64h
-00031C9D                 mov     eax, offset offset_setpxe
-00031CA2                 call    sub_1531D
-00031CA7                 test    eax, eax
-00031CA9                 jz      short loc_31CE1
-00031CAB                 push    1
-00031CAD                 xor     ecx, ecx
-00031CAF                 mov     ebx, 2
-00031CB4
-00031CB4 loc_31CB4:                              ; CODE XREF: cseg01:00031DCDj
-00031CB4                 mov     edx, esi
-00031CB6                 xor     eax, eax
-00031CB8                 call    sub_A1CA8
-00031CBD                 test    eax, eax
-00031CBF                 jz      loc_31DE6
-{% endhighlight %}
-
-Here we have a `xor ecx, ecx` on line `7`, which will give us  the `0x0` value. In both cases, we call `sub_A1CA8`.
-For `0x65`, after a sequence of checks, we end up with a `PXE firmware cannot be found in NVRAM. Program anyway? Y/N` message.
-This is important because in the `0x65` control path, we see that depending on the result of `sub_16309` after the 
-`Program anyway?` question, we might jump to `loc_31C81`:
-
-```
-00031C81 loc_31C81:                              ; CODE XREF: cseg01:00031C68j
-00031C81                 push    1
-00031C83                 mov     ecx, 2
-00031C88                 mov     ebx, ecx
-00031C8A                 mov     edx, esi
-00031C8C                 xor     eax, eax
-00031C8E                 call    sub_A1CA8
-00031C93                 jmp     loc_31DE6
-```
-
-We can see the similar `mov ecx, 2` and call to `sub_A1CA8` which at this point we can assume to be a "programming" function
-and we label it accordingly. 
 
 
 Debug messages
@@ -286,10 +252,53 @@ And further down:
 
 TODO: why logs are revelant
 
-pxe command
-======
-
 NVRAM I/O
+=======
+
+
+Programming function
+=======
+
+There main function responsible for altering the content of NVRAM is `sub_8708A`, where we can see a known refernce
+to `eecfg_write` verbose log output:
+
+```
+eecfg_write
+```
+
+Foundamentally, `sub_8708A` ends up calling NVRAM write and read commands as outlined in the previous section.
+
+
+setpxe command
+=======
+`setpxe` command is relatively straightforward. After interpreting command line flags, we dispatch a programming request
+to `sub_A1CA8`. On the PXE enable control path, we can see the following invocation
+
+```
+00031C36                 push    0
+00031C38                 mov     ecx, 2
+00031C3D                 mov     ebx, ecx
+00031C3F                 mov     edx, esi
+00031C41                 xor     eax, eax
+00031C43                 call    program_nvram
+```
+
+while on the PXE disable control path, we have
+
+```
+00031CAB                 push    1
+00031CAD                 xor     ecx, ecx
+00031CAF                 mov     ebx, 2
+00031CB4
+00031CB4 loc_31CB4:                              ; CODE XREF: cseg01:00031DCD␙j
+00031CB4                 mov     edx, esi
+00031CB6                 xor     eax, eax
+00031CB8                 call    program_nvra
+```
+
+The two main differences that stand out are the first stack argument, 0 or 1 and the value in `ecx`, 2 and 0.
+
+pxe command
 =======
 
 
@@ -313,8 +322,9 @@ This code already reveals important information on how the directory is structur
 from an index, NVRAM is addressed as `(((4*index-index)*4)+<BASE>)+<OFFSET>`, i.e. 
 `12*index+<BASE>+<OFFSET>`, suggesting that every item in the table is 12 bytes long.
 
-We first fetch 4 bytes content at +4 offset and reverse its endianess,  using `esp+1Ch+var_14` as temporary storage:
-```
+We first fetch 4 bytes content at +4 offset and reverse its endianess,  using `esp+1Ch+var_14` as temporary storage.
+<details> <summary>Expand code</summary>
+{% highlight asm %}
 0002BBB5                 mov     edx, [eax+4]
 0002BBB8                 and     edx, 0FF000000h
 0002BBBE                 shr     edx, 18h
@@ -332,8 +342,9 @@ We first fetch 4 bytes content at +4 offset and reverse its endianess,  using `e
 0002BBE8                 and     edx, 0FFh
 0002BBEE                 shl     edx, 18h
 0002BBF1                 or      edx, ebx
-```
-
+{% endhighlight %}
+</details>
+<br>
 We then skip skip the entry in the following cases:
 * Its value is `0x3FFFFF`
 * Value of bits `[24,31]` is != 0x10
@@ -427,7 +438,8 @@ directory table, starting from 0:
 
 We then follow a similar pattern seen before, and check content at `+4` offset against 
 `0x3FFFFF`:
-```
+<details> <summary>Expand code</summary>
+{% highlight asm %}
 0002BDBA loc_2BDBA:                              ; CODE XREF: dir_find_entry+25Dj
 0002BDBA                 mov     edx, [esi]
 0002BDBC                 mov     eax, edx
@@ -451,8 +463,9 @@ We then follow a similar pattern seen before, and check content at `+4` offset a
 0002BDF9                 shl     ecx, 18h
 0002BDFC                 or      edx, ecx
 0002BDFE                 test    edx, offset unk_3FFFFF
-```
-
+{% endhighlight %}
+</details>
+<br>
 Also similarly to the first scan, we check bits `[24,31]` against 
 `esp+1Ch+var_10`, which we now know for sure contains the id of the entry 
 (`0x0` for PXE).
@@ -683,11 +696,17 @@ If we follow `edi` backwards, we can track the invocation of `sub_67BF9`, the ro
 00098696                 add     edi, 4
 ```
 
-`sub_67BF9` is invoked with the size of the image, which doesn't include yet the 4 additional appended bytes. The result is stored at `esi+edi`, i.e. the base address
+`sub_67BF9` is invoked with the size of the image, which doesn't include yet the 4 additional bytes. The result is stored at `esi+edi`, i.e. the base address
 of the OptionROM in memory + its length. The lenght of the image is then increased by 4 before being stored in the directory.
 
 
-An algorithm for PXE ROM update
+Device initialization
+=======
+
+Programmatically updating PXE ROM
 =======
 From the exploration presented in this post, we can derive the following "fast" update algorithm for OptionROM:
+
+Corrupted NVRAM
+=======
 
