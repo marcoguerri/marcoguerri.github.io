@@ -498,13 +498,13 @@ we look for NVRAM space to host the data:
 0002B001                 call    sub_29682
 ```
 
-Here I have taken a shortcut and I haven't dive into the details of NVRAM space management
-(I might do that in the future). The strategy I am planning to use is to reserve initially
-a large enough portion of flash by writing a larger PXE Option Rom through the tool in 
-DOS environment, and then iterate on top of the same entry with smaller ROMs without having
-to worry about space allocation.
+Here I have taken a shortcut and as I haven't dived into the details of NVRAM space management.
+I'll leave that for a possible future exercise. The strategy I am planning to use is to reserve 
+initially a large enough portion of flash by writing a larger PXE Option Rom through the Broadcom
+tool in MS-DOS environment, and then iterate on top of the same entry with smaller ROMs without 
+having to worry about space allocation.
 
-The code proceeds in setting new values in the directory entry. We see a similar pattern as 
+The code then sets new values in the directory entry. We see a similar pattern as 
 before: if the ID is `> 0x80`, we jump to the extended directory update section, otherwise we follow
 the base directory path.
 
@@ -522,7 +522,8 @@ the base directory path.
 ```
 
 Before moving forward, we must note that the lenght of the OptionROM, stored in `esp+140h+var_14`
-is aligned to 4 bytes boundaries:
+is aligned to 4 bytes boundaries and increased by 4, as the OptionROM data region will contain
+also a trailing checksum:
 ```
 0002AFB0                 test    byte ptr [esp+140h+var_14], 3
 0002AFB8                 jz      short loc_2AFCD
@@ -532,7 +533,23 @@ is aligned to 4 bytes boundaries:
 0002AFC6                 mov     [esp+140h+var_14], eax
 ```
 
-The lenght is written to at `+4` of the selected index:
+Furthermore `esp+140h+var_14` does not store the lenght alone. The value is multiplied by 4
+as it represents then number of double words (4 bytes). `esp+140h+var_10`, which is the id 
+of the entry, is then stored in the 6 most significant bits
+
+```
+0002B0A5                 mov     ecx, [esp+140h+var_14]
+0002B0AC                 shr     ecx, 2
+0002B0AF                 mov     [esp+140h+var_14], ecx
+0002B0B6                 xor     eax, eax
+0002B0B8                 mov     al, [esp+140h+var_10]
+0002B0BF                 shl     eax, 18h
+0002B0C2                 mov     ebx, ecx
+0002B0C4                 or      ebx, eax
+```
+
+The resulting value is written to at `+4` of the selected index:
+
 ```
 0002B3E6 loc_2B3E6:                              ; CODE XREF: program_NVRAM_maybe_update_directory+20Dj
 0002B3E6                 mov     ecx, [esp+140h+var_14]
@@ -557,7 +574,7 @@ The lenght is written to at `+4` of the selected index:
 ```
 
 At offset `+0`, a value set by the caller gets written. On the PXE update path, it seems to be
-always 0x100000, which is coherent with the dumps on the NVRAM seen earlier:
+always `0x100000`, which is coherent with the dumps of the NVRAM seen earlier:
 
 ```
 0002B434                 mov     ecx, esi
@@ -603,12 +620,11 @@ Integrity checksums
 =======
 There are multiple integrity values stored in NVRAM. Two are immediately obvious from the binary diff
 shown at the beginning of the post, i.e. a 1 byte checksum at offset `0x75` and a 4 bytes checksum at offset `0xFC`,
-in the directory area. There is also a third checksum a bit more more hidden in the code, covering the 
-OptionROM binary itself. In fact, we can notice that the OptionROM size stored in the directory corresponds 
-to the size of the binary +4 bytes, indicating that something is appended to the EFI blob.
+in the directory area. There is also a third "hidden" checksum covering the  OptionROM binary itself. In fact, we 
+have seen earlier that the OptionROM size stored in the directory corresponds to the size of the binary `+4` bytes, 
+indicating that something is appended to the EFI blob.
 
-As we have seen in previous sections, `sub_2AF08` is the main function which programs NVRAM data and directory metadata.
-`sub_2BEAD` gets us to the calculation of the integrity values:
+`sub_2AF08` is the main function which programs NVRAM data and directory metadata and `sub_2BEAD` gets us to the calculation of the integrity values:
 
 ```
 0002BF0E                 mov     ebx, 1
@@ -630,9 +646,9 @@ As we have seen in previous sections, `sub_2AF08` is the main function which pro
 ```
 
 `[esp+1]` and `[esp+88h]` indicate that the resulting value of `sub_4F781` and `sub_67BF9`, which we'll see are checksum
-calculation routines, are copied over at `+1` and `+88h` offsets of a memory buffer. If we try to map these offsets to the 
-directory layout, in particular to `0x75` and `0xFC`, which are the addresses of the 1 byte and 4 bytes variations in the 
-binary diff, we can see they are aligned with each other. If `esp+88h = 0xFC`, then `esp` == 0x74 and `esp+1 == 0x75`.
+calculation routines. These are copied over at `+1` and `+88h` offsets of a memory buffer which if we try to map 
+to the binary diff of the NVRAM area, where we have a 1 byte difference at `0x75` and 4 bytes difference
+at `0xFC`, we can see they are equally distanced. If `esp+88h = 0xFC`, then `esp` == 0x74 and `esp+1 == 0x75`.
 
 `sub_4F781` and `sub_4F781` calculate integrity values respectively on `0x60` and `0x88` bytes read from
 NVRAM through `sub_B119EA`. We see two invocations of `sub_B119EA`, which prepare the data to be checksummed:
@@ -654,23 +670,68 @@ and
 
 The meaning of the parameters are the following:
 * `eax` contains the offset in NVRAM from which to copy the data over to `[esp+8C]` and `[esp]`
-* `ebx` contains the size to be copied. It must be noted that the size is intended to be the number
-of double words (4 bytes), as the following excerpt of `sub_B119EA` indicates:
+* `ebx` contains the size to be copied still to be intended as the number of double words (4 bytes. This can be
+easily seen by following  `sub_B119EA`)
+
+
+Once the data is available `sub_4F781` and `sub_67BF9` calculate respectively 1 and 4 bytes checksums. Here Ghidra provides relatively
+accurate decompiled versions of the two functions. For `sub_4F781`:
 
 ```
-000B19FF                 cmp     ebx, edi         -- (`ebx` is the current number of copy operations performed, `edi` is initialized to the input value of `ebx`, i.e. the size in double-words)
-000B1A01                 jnb     short loc_B1A56  -- (exit)
-000B1A03                 mov     edx, ecx
-000B1A05                 add     ecx, 4
-[...]
-000B1A50 loc_B1A50:                              ; CODE XREF: sub_B119EA+4F
-000B1A50                 inc     ebx
-000B1A51                 add     esi, 4           -- (initialized to input value of `eax`, i.e. the source offset)
+uint __regparm3 UndefinedFunction_0004f78b(char *param_1,int param_2)
+
+{
+  char unaff_BL;
+  byte bVar1;
+  
+  bVar1 = 0;
+  while (param_2 = param_2 + -1, param_2 != -1) {
+    bVar1 = bVar1 + *param_1;
+    param_1 = param_1 + 1;
+  }
+  if (unaff_BL != '\0') {
+    return (uint)param_1 & 0xffffff00 | (uint)(byte)(~bVar1 + 1);
+  }
+  return (uint)param_1 & 0xffffff00 | (uint)bVar1;
+}
 ```
-Once the data is available `sub_4F781` and `sub_67BF9` calculate respectively 1 and 4 bytes checksums. We can then summarize
-these first two integrity values as follows:
-* We copy `96` (`0x60`) bytes from NVRAM starting at offset `0x14`, and calculate a 1 byte checksum. We copy this checksum to offset `0x75`
-* We copy `140` (`0x88`)  bytes from NVRAM starting at offset `0x74`, and calculate a 4 byte checksum. We copy this checksum to offset `0xFC`
+
+For `sub_67BF9`:
+```
+uint __regparm3 UndefinedFunction_00067c06(byte *param_1,uint param_2)
+
+{
+  uint uVar1;
+  uint uVar2;
+  uint unaff_EBX;
+  uint uVar3;
+  uint uVar4;
+  
+  for (uVar4 = 0; uVar4 < param_2; uVar4 = uVar4 + 1) {
+    uVar2 = (uint)*param_1;
+    uVar1 = 0;
+    param_1 = param_1 + 1;
+    do {
+      if (((unaff_EBX ^ uVar2) & 1) == 0) {
+        uVar3 = 0;
+      }
+      else {
+        uVar3 = 0xedb88320;
+      }
+      unaff_EBX = unaff_EBX >> 1 ^ uVar3;
+      uVar2 = uVar2 >> 1;
+      uVar1 = uVar1 + 1;
+    } while (uVar1 < 8);
+  }
+  return unaff_EBX;
+}
+```
+
+
+
+We can then summarize these first two integrity values as follows:
+* We copy `96` (`0x60`) bytes from NVRAM starting at offset `0x14`, and calculate a 1 byte checksum. We copy this checksum to offset `0x75`. This region of memory is the directory, 8 entries of 12 bytes each.
+* We copy `140` (`0x88`)  bytes from NVRAM starting at offset `0x74`, and calculate a 4 byte checksum. We copy this checksum to offset `0xFC`. This region of memory seems to be containing other VPD data.
 
 We get to a similar conclusion for the integrity check of the OptionROM itself. In the main PXE update function, `sub_98542`, we can first track the size of the image:
 ```
@@ -680,7 +741,6 @@ We get to a similar conclusion for the integrity check of the OptionROM itself. 
 ```
 
 If we follow `edi` backwards, we can track the invocation of `sub_67BF9`, the routine which calculates the 4 bytes checksum:
-
 ```
 00098678                 mov     edx, edi
 0009867A                 mov     eax, esi
@@ -696,8 +756,9 @@ If we follow `edi` backwards, we can track the invocation of `sub_67BF9`, the ro
 00098696                 add     edi, 4
 ```
 
-`sub_67BF9` is invoked with the size of the image, which doesn't include yet the 4 additional bytes. The result is stored at `esi+edi`, i.e. the base address
-of the OptionROM in memory + its length. The lenght of the image is then increased by 4 before being stored in the directory.
+The only argument to `sub_67BF9` is the size of the image, which doesn't include yet the 4 additional bytes. 
+The result is stored at `esi+edi`, i.e. the base address of the OptionROM in memory + its length. The lenght of the image 
+is then increased by 4 before being stored in the directory.
 
 
 Device initialization
@@ -705,7 +766,10 @@ Device initialization
 
 Programmatically updating PXE ROM
 =======
-From the exploration presented in this post, we can derive the following "fast" update algorithm for OptionROM:
+Based on the exploration presented in this post, we can derive the following "fast" update algorithm for OptionROM:
+* Verify the integrity to the directory
+* Search through the directory to find an entry dedicated to id == 0x0
+* 
 
 Corrupted NVRAM
 =======
