@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Reverse engineering MS-DOS binaries"
+title:  "Overwriting PXE OptionROM on Broadcom BCM5751 NIC"
 date:   2023-02-04 08:00:00
 published: false
 categories: reversing msdos
@@ -15,29 +15,13 @@ which is accessible from `ethtool`, from Linux. I derived layout specification, 
 and other information by reverse engineering specific control paths of the `B57UDIAG.EXE` tool. 
 
 It must be noted that several results obtained here could have probably been sourced from the existing 
-end to end reverse engineering effort that produced the [ortega specification](https://github.com/hlandau/ortega).
-Nevertheless, I did want to go through a reverse engineering exercise of a MS-DOS tool and this was
+end to end reverse engineering effort that produced the [ortega specification](https://github.com/hlandau/ortega). Nevertheless, I did want to go through a reverse engineering exercise of a MS-DOS tool and this was
 a perfect opportunity, so I essentially ignored any resource that did not include:
 * Datasheet
 * `B57UDIAG.EXE` code
 
 
-The architecture of the tool
-=======
-
-Disassembling LE binaries
-=======
-IDA 4.1 supports disassembling Linear Executable binaries under DOS. 
-The idb produced can then be imported into IDA 5.0 under Windows.
-Both versions of the tool are still available at the time of writing:
-
-
-Alternatively, Ghidra also has a Linear Executable loader, but I have had a much harder time
-using Ghidra to discover all executable code. The disassembled code is also sometimes
-inaccurate, as the tool doesn't always make use of clear function prologue and epilogue.
-[elaborate]
-
-Stripping PMODE header
+Extracting assembly code
 =======
 
 Reversing PXE commands
@@ -498,15 +482,9 @@ we look for NVRAM space to host the data:
 0002B001                 call    sub_29682
 ```
 
-Here I have taken a shortcut and as I haven't dived into the details of NVRAM space management.
-I'll leave that for a possible future exercise. The strategy I am planning to use is to reserve 
-initially a large enough portion of flash by writing a larger PXE Option Rom through the Broadcom
-tool in MS-DOS environment, and then iterate on top of the same entry with smaller ROMs without 
-having to worry about space allocation.
-
-The code then sets new values in the directory entry. We see a similar pattern as 
-before: if the ID is `> 0x80`, we jump to the extended directory update section, otherwise we follow
-the base directory path.
+NVRAM space look-up will be covered in the next section. The code then sets new values in the directory 
+entry. We see a similar pattern as  before: if the ID is `> 0x80`, we jump to the extended directory update section, 
+otherwise we follow the base directory path.
 
 ```
 0002B0F3 loc_2B0F3:                              ; CODE XREF: program_NVRAM_maybe_update_directory+1CDj
@@ -615,6 +593,44 @@ At offset `+8` we write the NVRAM address returned by `sub_29682`, the function 
 ```
 
 NVRAM is then overwritten with the modified directory.
+
+
+NVRAM space look-up
+=======
+`sub_29682` implements the algorithm to find space in NVRAM for the new binary. The code simply iterates through all directory
+entries and tries to identify a start address which doesn't overlap with any existing binary. At every iteration through the directory,
+the candidate address for the new OptionROM could be located in 4 different configurations with respect at the current entry in the directory.
+
+The candidate address + the OptionROM size could be located at lower addresses with respect to the current entry, with no overlap.
+<p align="center">
+<a id="single_image" href="/img/dos/NVRAM_configuration_1.png">
+<img src="/img/dos/NVRAM_configuration_1.png" alt=""/></a>
+</p>
+
+The candidate address \+ the OptionROM size could be located at lower addresses with respect to the current entry, with partial or full overlap.
+
+<p align="center">
+<a id="single_image" href="/img/dos/NVRAM_configuration_2.png">
+<img src="/img/dos/NVRAM_configuration_2.png" alt=""/></a>
+</p>
+
+
+The candidate address is located past the address of the existing directory item + the size of the item.
+
+<p align="center">
+<a id="single_image" href="/img/dos/NVRAM_configuration_3.png">
+<img src="/img/dos/NVRAM_configuration_3.png" alt=""/></a>
+</p>
+
+
+The candidate address is located past the address of the existing directory item start address, but it overlaps partially or entirely with it.
+
+<p align="center">
+<a id="single_image" href="/img/dos/NVRAM_configuration_4.png">
+<img src="/img/dos/NVRAM_configuration_4.png" alt=""/></a>
+</p>
+
+In case 1 and 3, the algorithm move to the next directory item. In case 2 and 4, the algorithm re-initializes the candidate address of the OptionROM to the end of the existing directory item, calculated as its start address \+ size. After that, it starts iterating through the directory items all over from the beginning. Few additional details of how the algorith is initialized are as follows:
 
 Integrity checksums
 =======

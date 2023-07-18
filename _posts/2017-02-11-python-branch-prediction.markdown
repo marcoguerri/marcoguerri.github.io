@@ -1,4 +1,4 @@
----
+--
 layout: post
 title:  "Branch target prediction and performance"
 date:   2017-02-11 08:00:00
@@ -63,8 +63,7 @@ The runtime highlights a speedup close to 50%.
 
 Instruction set
 =======
-In order to make sure the Python
-interpreter was making use of the same instruction set on both architectures, I first
+To make sure the Python interpreter was making use of the same instruction set on both architectures, I
 traced the benchmarks with Intel Software Development emulator. SDE is a dynamic
 binary instrumentation tool capable of tracing the execution down to the assembly
 instruction level, providing emulation support on Intel platforms for instructions
@@ -118,33 +117,44 @@ What immediately stood out from the traces above was the following:
    *  `_randommodule.so` contributed only for 3.5% of the total instructions, while
      all other contributions were mostly coming from CPython.
      
-The percentage of instructions executed does not necessarily translate into the
-same execution time weight, although it is reasonable to expect 
-that `PyEval_EvalFrameEx` is also the major contributor in terms of time.
-For each function listed above, I created an histogram of the instructions executed.
+Results from relative comparison of instructions executed do not necessarily translate into 
+the same execution time comparison. It is reasonable to expect though that `PyEval_EvalFrameEx` is 
+also the major contributor in terms of time. For each function sampled by SDE, I created a histogram
+associating to each instruction, the number of occurrences. Two notes, before looking into the plots:
+* I have restored the histograms from a previous backup and I haven't preserved
+raw data. Unfortunately, these were also unlabeled, so I could not assign a posteriori
+the correct architecture to the red and blue lines. Nevertheless, what they suggest is that 
+the instruction set used on Ivy Bridge and Haswell is exactly the same, so I did not
+go any further in rebuilding the dataset from scratch.
+* I could not restore the plot for `_randommodule.so`, so it is missing from the list
 
-{% assign list = "PyEval_EvalFrameEx, 
-                  Py_add_one_to_index_C,
+
+<p align="center">
+<a id="single_image" href="/img/branch-prediction/PyEval_EvalFrameEx.png">
+<img  src="/img/branch-prediction/PyEval_EvalFrameEx.png" alt="" width=800/></a>
+</p>
+
+{% assign list = "Py_add_one_to_index_C,
                   PyFloat_GetInfo,
                   PyLong_Init,
                   PyFloat_FromDouble,
-                  text,
                   Py_UniversalNewlineFread,
                   ieee754_log_avx,
                   PyDict_GetItem,
                   PyFloat_Unpack8" | remove: " " |split: "," %}
 
 {% for item in list %}
+
+<details> <summary>Expand {{item}} histogram</summary>
 <p align="center">
 <a id="single_image" href="/img/branch-prediction/{{item}}.png">
 <img  src="/img/branch-prediction/{{item}}.png" alt="" width=800/></a>
 </p>
+</details>
 {% endfor %}
 
-Interpreting the histograms
-=======
-The plots suggested that the instruction set used on Ivy Bridge and
-Haswell was exactly the same. I considered worthwhile having a closer look at
+<br>
+Given these results, I considered worthwhile having a closer look at
 the main contributor, `PyEval_EvalFrameEx`.
 
 
