@@ -8,16 +8,18 @@ pygments: true
 ---
 
 I have been working on OptionROM malware development using a Broacdom BCM5751 1G Network Card on 
-a PCEngines APU2D board. `B57UDIAG.EXE` is the vendor tool whichconfigures and tests Broadcom NICs, 
+a PCEngines APU2D board. `B57UDIAG.EXE` is the vendor tool which configures and tests Broadcom NICs, 
 including all PXE related information (OptionROM binary, PXE enablement/disablement, etc.) The tool however runs only on MS-DOS. In order to iterate
-faster during OptionROM development,  I was looking for a way to manipulate correctly the NVRAM of the NIC,
-which is accessible from `ethtool`, from Linux. I derived layout specification, algorithms for integrity checks
+faster during OptionROM development,  I was looking for a way to manipulate from Linux the NVRAM of the NIC,
+which is accessible from `ethtool`. I derived layout specification, algorithms for integrity checks
 and other information by reverse engineering specific control paths of the `B57UDIAG.EXE` tool. 
 
-It must be noted that several results obtained here could have probably been sourced from the existing 
+It must be noted that some of the results obtained here could have probably been sourced from the existing 
 end to end reverse engineering effort that produced the [ortega specification](https://github.com/hlandau/ortega). Nevertheless, I did want to go through a reverse engineering exercise of a MS-DOS tool and this was
 a perfect opportunity, so I essentially ignored any resource that did not include:
-* Datasheet
+* Datasheets
+    * [NetXtreme®/NetLink™ BCM5718 Family Programmer’s Guide](https://docs.broadcom.com/doc/1211168564147)
+    * [BCM571X/BCM5720 NetXtreme/NetLink BCM571X/BCM5720 Family Programmer’s Guide](https://docs.broadcom.com/doc/571X-5720-PG1XX)
 * `B57UDIAG.EXE` code
 
 
@@ -28,15 +30,15 @@ Reversing PXE commands
 =======
 Broadcom tool exposes primarily two commands to manipule PXE OptionROM:
 * `B57UDIAG.EXE -c <ADAPTER> pxe <OPTION_ROM_BINARY>`
-* `B57UDIAG.EXE -c <ADAPTER> setpxe <FILE>`
+* setpxe -e\|-d` from `B57UDIAG.EXE -cmd prompt`
 
 There are more, for example to change the adapter PXE speed. This note will focus only on the two
-above. `pxe` enables support for booting PXE payloads off the NIC NVRAM, while `setpxe` overwrites 
-the OptionROM binary. It is useful to dump the content of NVRAM before and after the invocation of 
+above.  `pxe` overwrites the OptionROM binary, while `setpxe` enables support for booting PXE payloads off the NIC NVRAM. 
+It is useful to dump the content of NVRAM before and after the invocation of 
 both commands, to get an idea of which area of memory are manipulated. `ethtool` can do this with
 `raw on` flags:
 ```
-ethtool raw on
+$ ethtool -e <INTERFACE> raw on
 ```
 
 Running `pxe` command generates the the following binary differences:
@@ -49,8 +51,13 @@ Running `pxe` command generates the the following binary differences:
 Overall, three changes stand out, within the first 512 bytes of NVRAM. Further below, we can see the
 whole OptionROM binary blob.
 
+Running `setpxe -d` and then `setpxe -e` command generates the following binary differences
+<p align="center">
+<a id="single_image" href="/img/dos/NVRAM_differences_pxe.png">
+<img src="/img/dos/NVRAM_differences_pxe.png" alt=""/></a>
+</p>
 
-Running `setpxe` command instead results in the following binary differences:
+We see a single byte changing, probably a flag, and then 4 bytes that varied also with the first command.
 
 
 
@@ -630,17 +637,324 @@ The candidate address is located past the address of the existing directory item
 <img src="/img/dos/NVRAM_configuration_4.png" alt=""/></a>
 </p>
 
-In case 1 and 3, the algorithm move to the next directory item. In case 2 and 4, the algorithm re-initializes the candidate address of the OptionROM to the end of the existing directory item, calculated as its start address \+ size. After that, it starts iterating through the directory items all over from the beginning. Few additional details of how the algorith is initialized are as follows:
+In case 1 and 3, the algorithm moves to the next directory item. In case 2 and 4, candidate address 
+of the OptionROM is re-initialized to the end of the existing directory item, calculated as its start 
+address \+ size. Then, the iteration through the directory items starts all over from the beginning.
+
+We can see the candidate address of the new OptionROM is always pushed to higher addresses. 
+It's interesting to look closer into how the address and size of the initial existing directory entry are
+selected, together with the default candidate address of the OptionROM, as it provides relevant insights 
+over the layout of the NVRAM. The following investigation suggests that before the directory, there exists
+a set of metadata indicating the offset and size of what could be NIC firmware code, which obviously cannot
+be overwritten by OptionROM code, and therefore is used to initialize the default existing directory entry values.
+The initialization is performed at `0x2973A`, where invoke `sub_29543` to extract additional NVRAM information as follows:
+
+* We read 8 bytes from offset `0x8` through `sub_B119EA`. This funcion is analyzed in the next
+section, for now we can assume it copies data from NVRAM into memory. NVRAM starts with the `0xAA559966` 
+signature which is immediately followed by a first directory entry. From the 8 bytes, we take the word at 
+offset `+4`, which represents the offset of the entry.
+* At `0x295A1`, we call `sub_25C1D`, which performs a check on the type of the EEPROM that controls whether
+additional NVRAM page checking code needs to be executed. I haven't fully reversed the EEPROM type check,
+but we can easily derive that the function invoked at `0x295AC` returns the actual page size based on the
+page size selector stored in register `0x7014`. My assumption is therefore that EEPROM type check verifies
+if we are working with paged storage.
+
+
+<details> <summary>Expand - Page checking code</summary>
+{% highlight asm %}
+000248D8 loc_248D8:                              ; CODE XREF: sub_2488F+11␘j
+000248D8                                         ; sub_2488F+1A␘j ...
+000248D8                 mov     eax, 7014h
+000248DD                 call    read_reagister_pci_space
+000248E2                 and     eax, 70000000h
+000248E7                 jnz     short loc_248EF
+000248E9                 mov     eax, 100h
+000248EE                 retn
+000248EF ; ---------------------------------------------------------------------------
+000248EF
+000248EF loc_248EF:                              ; CODE XREF: sub_2488F+58␘j
+000248EF                 cmp     eax, 10000000h
+000248F4                 jnz     short loc_248FC
+000248F6                 mov     eax, 200h
+000248FB                 retn
+000248FC ; ---------------------------------------------------------------------------
+000248FC
+000248FC loc_248FC:                              ; CODE XREF: sub_2488F+65␘j
+000248FC                 cmp     eax, 20000000h
+00024901                 jnz     short loc_24909
+00024903                 mov     eax, 400h
+00024908                 retn
+00024909 ; ---------------------------------------------------------------------------
+00024909
+00024909 loc_24909:                              ; CODE XREF: sub_2488F+72␘j
+00024909                 cmp     eax, 30000000h
+0002490E                 jnz     short loc_24916
+00024910                 mov     eax, 800h
+00024915                 retn
+00024916 ; ---------------------------------------------------------------------------
+00024916
+00024916 loc_24916:                              ; CODE XREF: sub_2488F+7F␘j
+00024916                 cmp     eax, 40000000h
+0002491B                 jnz     short loc_24923
+0002491D                 mov     eax, 1000h
+00024922                 retn
+00024923 ; ---------------------------------------------------------------------------
+00024923
+00024923 loc_24923:                              ; CODE XREF: sub_2488F+8C␘j
+00024923                 cmp     eax, 50000000h
+00024928
+00024928 loc_24928:                              ; CODE XREF: sub_2488F+47␘j
+00024928                 mov     eax, 108h
+0002492D                 retn
+{% endhighlight %}
+</details>
+<br>
+
+Among all the possible page sizes, the code seems to perform ad-hoc operations only with 264 bytes pages. 
+In particular, we take the initial offset of the first entry of the directory and translate it from from 
+512 to 264 bytes pages with `(<OFFSET>/512)*264+<OFFSET>%512`:
+```
+0002497A                 call    sub_2488F
+0002497F                 cmp     eax, 108h
+00024984                 jnz     short loc_249A0
+00024986                 mov     ecx, edx
+00024988                 shr     ecx, 9
+0002498B                 mov     eax, ecx
+0002498D                 shl     eax, 5
+00024990                 add     eax, ecx
+00024992                 shl     eax, 3
+00024995                 and     edx, 1FFh
+0002499B                 add     eax, edx
+0002499D                 pop     edx
+0002499E                 pop     ecx
+0002499F                 retn
+000249A0 ; ---------------------------------------------------------------------------
+000249A0
+000249A0 loc_249A0:                              ; CODE XREF: sub_2496C+18␘j
+000249A0                 mov     eax, edx
+000249A2                 pop     edx
+000249A3                 pop     ecx
+000249A4                 retn
+000249A4 sub_2496C       endp
+```
+It's not clear to me why only 264 bytes pages are rescaled. On my NIC there is a `AT45DB011` flash memory installed, which has exactly 264
+bytes pages, so this conversion will be relevant later. The end result is that the offset of the first entry is stored in `[esi]`. We then 
+fetch the value at 0 offset from the 8 bytes read initially and multiply it by 4, suggesting that the whole word represents a size. 
+From `offset` and `size`, we fetch more NVRAM content.
+
+<details> <summary>Expand - Fetching NVRAM content at offset+size</summary>
+{% highlight asm %}
+000295B3 loc_295B3:                              ; CODE XREF: copy_stage1_regions_nvram?+65␘j
+000295B3                 mov     edx, [esp]
+000295B6                 and     edx, 0FF000000h
+000295BC                 shr     edx, 18h
+000295BF                 mov     eax, [esp]
+000295C2                 and     eax, 0FF0000h
+000295C7                 shr     eax, 8
+000295CA                 or      eax, edx
+000295CC                 mov     edx, [esp]
+000295CF                 and     edx, 0FF00h
+000295D5                 shl     edx, 8
+000295D8                 or      edx, eax
+000295DA                 mov     eax, [esp]
+000295DD                 and     eax, 0FFh
+000295E2                 shl     eax, 18h
+000295E5                 or      eax, edx
+000295E7                 shl     eax, 2
+000295EA                 mov     [ecx], eax
+000295EC                 mov     eax, [esi]
+000295EE                 add     eax, [ecx]
+000295F0                 mov     ebx, 2
+000295F5                 mov     edx, esp
+000295F7                 call    copy_nvram_data?
+{% endhighlight %}
+</details>
+<br>
+
+We can extract relevant information from the dump of a programmed NVRAM to replicate the operations above.
+
+<p align="center">
+<a id="single_image" href="/img/dos/size-offset-combined.png">
+<img src="/img/dos/size-offset-combined.png" alt=""/></a>
+</p>
+
+Offset in this case is `0x2F8` and we can use it as is. Size is `0x2F5` and since our NVRAM uses 264 bytes
+pages, we need to rescaled it. The final address for additional content becomes therefore `(0x2F8/512)*264+0x2F8%512+0x2F5*4`, 
+i.e. `1*264+248+757*4=0xDD4`. From the resulting address, if we encounter `0xAA559966` signature, which is the header magic numer,
+we fetch the word at offset  `+4`, which seems to represent another size, add 8 and sum it up with the offset that got us to this new header.
+Essentially what we get is `0xDD4+8+0x1174=0x1F50`, which we can see it corresponds to the offset of the existing OptionROM in the NVRAM 
+(4 bytes at offset 0x1C).
+
+<details> <summary>Expand - Final offset calculation</summary>
+{% highlight asm %}
+0002962F                 cmp     eax, 669955AAh
+00029634                 jnz     short loc_29679
+00029636                 mov     edx, [esp+4]
+0002963A                 and     edx, 0FF000000h
+00029640                 shr     edx, 18h
+00029643                 mov     eax, [esp+4]
+00029647                 and     eax, 0FF0000h
+0002964C                 shr     eax, 8
+0002964F                 or      edx, eax
+00029651                 mov     eax, [esp+4]
+00029655                 and     eax, 0FF00h
+0002965A                 shl     eax, 8
+0002965D                 or      edx, eax
+0002965F                 mov     eax, [esp+4]
+00029663                 and     eax, 0FFh
+00029668                 shl     eax, 18h
+0002966B                 or      eax, edx
+0002966D                 add     eax, 8
+00029670                 add     [ecx], eax
+00029672                 mov     eax, 1
+00029677                 jmp     short loc_2967B
+{% endhighlight %}
+</details>
+<br>
+
+We can then summarize the new understanding of the layout of NVRAM as follows:
+
+<p align="center">
+<a id="single_image" href="/img/dos/overall-NVRAM-layout.png">
+<img src="/img/dos/overall-NVRAM-layout.png" alt=""/></a>
+</p>
+
+
+
+
+
+
+
+
+00069D27                 jz      short loc_69D3E
+00069D29                 call    sub_2488F
+00069D2E                 push    eax
+00069D2F                 push    offset aPageSizeD ; "Page size = %d \n"
+00069D34                 call    debug_out_console_file_two_params
+00069D39                 add     esp, 8
+00069D3C                 jmp     short loc_69D4B
+00069D3E ; ---------------------------------------------------------------------------
+00069D3E
+00069D3E loc_69D3E:                              ; CODE XREF: sub_696C6+661␘j
+00069D3E                 push    offset aPageSizeNA ; "Page size = N/A \n"
+00069D43                 call    debug_out_console_file_two_params
+00069D48                 add     esp, 4
+
+
+Determines the page size
+
+This pattern is present very often:
+
+00014DEC                 mov     dl, byte_971AF7
+00014DF2                 mov     eax, edx
+00014DF4                 shl     eax, 5
+00014DF7                 add     eax, edx
+00014DF9                 shl     eax, 4
+00014DFC                 mov     edx, eax
+00014DFE                 shl     eax, 7
+00014E01                 add     eax, edx
+00014E03                 mov     edx, [esp+44h+var_28]
+00014E07                 mov     dword_75DAF8[eax], edx
+
+
+000CFA92                 mov     bl, byte_971AF7
+000CFA98                 mov     eax, ebx
+000CFA9A                 shl     eax, 5
+000CFA9D                 add     eax, ebx
+000CFA9F                 shl     eax, 4
+000CFAA2                 mov     ebx, eax
+000CFAA4                 shl     eax, 7
+000CFAA7                 add     eax, ebx
+000CFAA9                 mov     ebx, dword_75DC7C[eax]
+000CFAAF                 push    ebx
+000CFAB0                 mov     edx, dword_75D80C[eax]
+000CFAB6                 push    edx
+000CFAB7                 push    offset aAsicVersionXBo ; "\nAsic Version: %X, Bond ID = 0x%08X"
+
+
+0005C427                 mov     al, byte_971AF7
+0005C42C                 push    eax
+0005C42D                 push    offset aDevD    ; "Dev:%d "
+0005C432                 call    debug_out_console_file_two_params
+
+
+0005E67A                 mov     ecx, eeprom_size[edx+eax]
+0005E681                 push    ecx
+0005E682                 push    offset aHw_initCurrc_0 ; "\nhw_init, CURRCARD.eeprom_size=%x(get f"...
+
+
+(read from f2)
+
+
+Other similar access in the area of interest:
+
+00073809                 mov     dl, device_id
+0007380F                 mov     eax, edx
+00073811                 shl     eax, 5
+00073814                 add     eax, edx
+00073816                 shl     eax, 4
+00073819                 mov     edx, eax
+0007381B                 shl     eax, 7
+0007381E                 cmp     dword_75D80C[edx+eax], 4001h
+
+
+00069345                 mov     edi, dword_75D984[edx+eax]
+0006934C                 push    edi
+0006934D                 mov     ecx, dword_75D980[edx+eax]
+00069354                 push    ecx
+00069355                 mov     ebx, dword_75D758[edx+eax]
+0006935C                 push    ebx
+0006935D                 mov     edi, dword_75D754[edx+eax]
+00069364                 push    edi
+00069365                 push    offset aPhy_deviceXPhy ; "phy_device = %x; phy_device2=%x; phy_ty"...
+
+
+Phy type
+
+It might be the eeprom type:
+
+0005E5F5                 call    extract_type
+0005E5FA                 call    manipulate_type
+0005E5FF                 mov     ecx, eax
+0005E601                 xor     edx, edx
+0005E603                 mov     dl, device_id
+0005E609                 mov     eax, edx
+0005E60B                 shl     eax, 5
+0005E60E                 add     eax, edx
+0005E610                 shl     eax, 4
+0005E613                 mov     edx, eax
+0005E615                 shl     eax, 7
+0005E618                 mov     eeprom_type[edx+eax], ecx
+
+
+Test show curr card and see what it says
+
+Likely check if eeprom supports paged access: https://learn.sparkfun.com/tutorials/reading-and-writing-serial-eeproms/all
+
+Check what showcurcard info shows in terms of EEPROM type
+
+Type seems to be calculated somehow from 0x7014
+
+
+
+
+
+
+
+
+
+
 
 Integrity checksums
 =======
 There are multiple integrity values stored in NVRAM. Two are immediately obvious from the binary diff
-shown at the beginning of the post, i.e. a 1 byte checksum at offset `0x75` and a 4 bytes checksum at offset `0xFC`,
-in the directory area. There is also a third "hidden" checksum covering the  OptionROM binary itself. In fact, we 
-have seen earlier that the OptionROM size stored in the directory corresponds to the size of the binary `+4` bytes, 
-indicating that something is appended to the EFI blob.
+shown at the beginning of the post, i.e. a 1 byte checksum at offset `0x75` and a 4 bytes checksum at 
+offset `0xFC`, in the directory area. There is also a third "hidden" checksum covering the  OptionROM 
+binary itself. In fact, we have seen earlier that the OptionROM size stored in the directory corresponds 
+to the size of the binary `+4` bytes,  indicating that something is appended to the EFI blob.
 
-`sub_2AF08` is the main function which programs NVRAM data and directory metadata and `sub_2BEAD` gets us to the calculation of the integrity values:
+`sub_2AF08` is the main function which programs NVRAM data and directory metadata and `sub_2BEAD` gets 
+us to the calculation of the integrity values:
 
 ```
 0002BF0E                 mov     ebx, 1
@@ -661,10 +975,10 @@ indicating that something is appended to the EFI blob.
 0002BF52                 mov     eax, 74h
 ```
 
-`[esp+1]` and `[esp+88h]` indicate that the resulting value of `sub_4F781` and `sub_67BF9`, which we'll see are checksum
-calculation routines. These are copied over at `+1` and `+88h` offsets of a memory buffer which if we try to map 
-to the binary diff of the NVRAM area, where we have a 1 byte difference at `0x75` and 4 bytes difference
-at `0xFC`, we can see they are equally distanced. If `esp+88h = 0xFC`, then `esp` == 0x74 and `esp+1 == 0x75`.
+`[esp+1]` and `[esp+88h]` indicate the destination address of the resulting value of `sub_4F781` and `sub_67BF9`, 
+which we'll see are checksum calculation routines. The`+1` and `+88h` offsets of the  memory buffer can be mapped to
+the binary diff of the NVRAM area, where we have a 1 byte difference at `0x75` and 4 bytes difference
+at `0xFC`. The two pairs of offsets are equally distancesd, so if `esp+88h = 0xFC`, then `esp` == 0x74 and `esp+1 == 0x75`.
 
 `sub_4F781` and `sub_4F781` calculate integrity values respectively on `0x60` and `0x88` bytes read from
 NVRAM through `sub_B119EA`. We see two invocations of `sub_B119EA`, which prepare the data to be checksummed:
@@ -691,9 +1005,12 @@ easily seen by following  `sub_B119EA`)
 
 
 Once the data is available `sub_4F781` and `sub_67BF9` calculate respectively 1 and 4 bytes checksums. Here Ghidra provides relatively
-accurate decompiled versions of the two functions. For `sub_4F781`:
+accurate decompiled versions of the two functions.
 
-```
+
+<details> <summary>sub_4F781: 1 byte checksum, Ghidra decompiled code </summary>
+
+{% highlight c %}
 uint __regparm3 UndefinedFunction_0004f78b(char *param_1,int param_2)
 
 {
@@ -710,10 +1027,11 @@ uint __regparm3 UndefinedFunction_0004f78b(char *param_1,int param_2)
   }
   return (uint)param_1 & 0xffffff00 | (uint)bVar1;
 }
-```
+{% endhighlight %}
+</details>
 
-For `sub_67BF9`:
-```
+<details> <summary>sub_67BF9: 4 bytes checksum, Ghidra decompiled code </summary>
+{% highlight c %}
 uint __regparm3 UndefinedFunction_00067c06(byte *param_1,uint param_2)
 
 {
@@ -741,9 +1059,10 @@ uint __regparm3 UndefinedFunction_00067c06(byte *param_1,uint param_2)
   }
   return unaff_EBX;
 }
-```
+{% endhighlight %}
+</details>
 
-
+<br>
 
 We can then summarize these first two integrity values as follows:
 * We copy `96` (`0x60`) bytes from NVRAM starting at offset `0x14`, and calculate a 1 byte checksum. We copy this checksum to offset `0x75`. This region of memory is the directory, 8 entries of 12 bytes each.
