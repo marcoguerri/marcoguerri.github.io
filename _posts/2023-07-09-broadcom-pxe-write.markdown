@@ -2,7 +2,7 @@
 layout: post
 title:  "Overwriting PXE OptionROM on Broadcom BCM5751 NIC"
 date:   2023-02-04 08:00:00
-published: true
+published: false
 categories: reversing msdos
 pygments: true
 ---
