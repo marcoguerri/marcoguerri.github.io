@@ -484,11 +484,13 @@ see for `setpxe` command, this is checksum value calculated over low addresses o
 Writing OptionROM with `setpxe`
 =======
 The low address range of the NVRAM stores a table of metadata which is referred to as
-"directory". The function at `0x2BB4D` goes through this table to find an entry suitable
-for storing PXE blob metadata. Every entry is identified with an id and the base directory holds
+"directory". This metadata indicates where various NVRAM blobs are located, including 
+PXE payload. `sub_2BB4D` goes through this table to find an entry which refers to PXE
+binary, with each entry identified with an id and the base directory holding
 8 entries at most. There exists also the concept of extended  directory, which is not covered 
 in this exercise. The code iterates through entries `[0,8[` and under certain conditions, it 
-copies their content to memory. `ecx` is used store the current index and address of NVRAM as follows:
+copies their content to memory. `ecx` is used store the index of the current entry
+in NVRAM and `edi` stores directory base address in memory:
 ```
 0002BBA9 loc_2BBA9:                              ; CODE XREF: dir_find_entry+50j
 0002BBA9                 mov     eax, ecx
@@ -497,8 +499,8 @@ copies their content to memory. `ecx` is used store the current index and addres
 0002BBB0                 shl     eax, 2
 0002BBB3                 add     eax, edi
 ```
-This code already reveals important information on how the directory is structured. In fact, starting
-from an index, NVRAM is addressed as `(((4*index-index)*4)+<BASE>)+<OFFSET>`, i.e. 
+This code already reveals important information on how the directory is structured. Starting
+from an index, as per the code above NVRAM is addressed as `(((4*index-index)*4)+<BASE>)+<OFFSET>`, i.e. 
 `12*index+<BASE>+<OFFSET>`, suggesting that every item in the table is 12 bytes long.
 
 We first fetch 4 bytes content at +4 offset and reverse its endianess,  using `esp+1Ch+var_14` as temporary storage.
@@ -524,9 +526,9 @@ We first fetch 4 bytes content at +4 offset and reverse its endianess,  using `e
 {% endhighlight %}
 </details>
 <br>
-We then skip skip the entry in the following cases:
-* Its value is `0x3FFFFF`
-* Value of bits `[24,31]` is != 0x10
+We then skip the entry in the following cases:
+* The content at offset +4 is `0x3FFFFF`
+* Bits `[24,31]` of the word at offset +4 are != 0x10
 
 ```
 0002BBF3                 test    edx, offset unk_3FFFFF
@@ -537,7 +539,7 @@ We then skip skip the entry in the following cases:
 0002BC07                 jnz     short loc_2BB9F
 ```
 
-Bits `[24,31]` have a have a special meaning, which we'll see later. If the entry passes all checks above, 
+Bits `[24,31]` have a have a special meaning, which we'll see later. If the entry is not skipped, 
 we copy the content at `+8` into `ebp` and call `sub_B19EA`:
 ```
 0002BC3E                 lea     edx, [edi+60h]
@@ -545,8 +547,8 @@ we copy the content at `+8` into `ebp` and call `sub_B19EA`:
 0002BC46                 mov     eax, ebp
 0002BC48                 call    sub_B19EA
 ```
-Through `sub_B19EA`, we ask to fetch NVRAM data from offset `ebp`, which we just read at `<DIRECTORY_ENTRY>+8` 
-for a lenght of 0x30\*4 into destination address in `edx`. We derive the meaning of these parameters by 
+Through `sub_B19EA`, we ask to fetch NVRAM data from offset in `ebp`, which we just read at `<DIRECTORY_ENTRY>+8` 
+for a length of 0x30\*4 into destination address in `edx`. We derive the meaning of these parameters by 
 following `sub_B19EA` and seeing that it increments the source and destination addresses by 4 until we 
 reach the desired length:
 ```
@@ -566,7 +568,7 @@ reach the desired length:
 000B1A51                 add     esi, 4
 ```
 
-Further down the stack, we have a write to `[ebx]`, which is originally `edi+0x60` in the listing above.
+Further down the stack, we have a write to `[ebx]`, which is originally `edi+0x60`:
 ```
 000B0E16                 mov     eax, 6838h
 000B0E1B                 call    sub_21263
@@ -574,9 +576,9 @@ Further down the stack, we have a write to `[ebx]`, which is originally `edi+0x6
 ```
 
 Register `0x6838` seems to be undocumented, and I can only speculate it implementes NVRAM read interface.
-We saw earlier that there are 8 entries in the directory each one 12 bytes long, overall 0x60 bytes:
-we can assume `edi+0x60` points into memory just after the directory table.
-If we succeed in finding an entry that triggers the copy, we set a flag:
+We saw earlier that there are 8 entries in the directory each one 12 bytes long, overall 0x60 bytes, and `edi`
+still holds the base address of the NVRAM in destination memory. If we succeed in finding an entry that triggers 
+the copy, we set a flag in `[esp+1Ch+var_18]`:
 ```
 0002BC55                 mov     [esp+1Ch+var_18], 1
 ```
@@ -592,7 +594,7 @@ and then decide where to dispatch execution:
 ```
 
 `esp+1Ch+var_10` is `0x0` and represent the id of the entry we are trying to add to the table.
-As this is `< 0x80`, we jump further ahead. If instaed the id was `> 0x80` and `esp+1Ch+var_18` 
+As this is `< 0x80`, we jump further ahead. If instead the id was `> 0x80` and `esp+1Ch+var_18` 
 was 0x0 we would jump to a control path where what stands out is:
 
 ```
@@ -601,7 +603,7 @@ was 0x0 we would jump to a control path where what stands out is:
 ```
 
 This seems to be creating the extended directory table, so we can speculate that the leftmost
-byte of the field in the directory entry which we checked against `0x10` might indicate its type,
+byte of the field in the directory entry, which earlier we checked against `0x10`, might indicate its type,
 and 0x10 might represent the extended directory. When attempting to add an entry with
 id `> 0x80`, which at this point is unclear what it represents, if the extended directory is not
 found, it gets created.
@@ -617,7 +619,7 @@ directory table, starting from 0:
 
 We then follow a similar pattern seen before, and check content at `+4` offset against 
 `0x3FFFFF`.{% comment %}
-<details> <summary>Expand code</summary>
+<details> <summary>Expand code - Skipping based directory entry based on content at offset +4</summary>
 {% highlight asm %}
 0002BDBA loc_2BDBA:                              ; CODE XREF: dir_find_entry+25Dj
 0002BDBA                 mov     edx, [esi]
@@ -646,9 +648,8 @@ We then follow a similar pattern seen before, and check content at `+4` offset a
 </details>
 <br>
 {% endcomment %}
-Also similarly to the first scan, we check bits `[24,31]` against 
-`esp+1Ch+var_10`, which we now know for sure contains the id of the entry 
-(`0x0` for PXE).
+Also similarly to the first scan, we check bits `[24,31]` against `esp+1Ch+var_10`, which we now know for sure 
+contains the id of the entry (`0x0` for PXE).
 
 ```
 0002BE06                 mov     ecx, edx
@@ -669,7 +670,8 @@ If we find an entry with a matching id, we perform an additional check:
 `esp+1Ch+var_1C` is a flag passed by the caller, with value `0x1`. We then
 zero out the value at offset `+4` and exit, with the entry id in `[esi]` for
 the caller to find. After having identified an entry in the table,
-we look for NVRAM space to host the data. NVRAM space look-up is covered in the next section.
+we look for NVRAM space to host the data and we'll see in the next section exactly
+which strategy is used by the code to locate this space.
 
 ```
 0002AFF1                 mov     ebx, [esp+140h+var_14]
@@ -678,8 +680,8 @@ we look for NVRAM space to host the data. NVRAM space look-up is covered in the 
 0002B001                 call    sub_29682
 ```
 
-The code then sets new values in the directory  entry. We see a similar pattern as  before: if the ID is `> 0x80`, 
-we jump to the extended directory update section, otherwise we follow the base directory path.
+We then set new values in the directory entry. We see a similar pattern as  before: if the ID is `> 0x80`, 
+we jump to the extended directory update section, otherwise we follow the base directory update path.
 
 ```
 0002B0F3 loc_2B0F3:                              ; CODE XREF: program_NVRAM_maybe_update_directory+1CDj
@@ -707,8 +709,8 @@ also a trailing checksum:
 ```
 
 Furthermore `esp+140h+var_14` does not store the raw length alone. The value is multiplied by 4
-as it represents then number of double words (4 bytes). `esp+140h+var_10`, which is the id 
-of the entry, is then stored in the 6 most significant bits
+as it represents the number of double words (4 bytes). `esp+140h+var_10`, which is the id 
+of the entry, is then stored in the 8 most significant bits of the same word:
 
 ```
 0002B0A5                 mov     ecx, [esp+140h+var_14]
@@ -795,15 +797,19 @@ At offset `+8` we write the NVRAM address returned by `sub_29682`, the function 
 </details>
 <br>
 
-NVRAM is then overwritten with the modified directory. Overall, we can summarize the structure of each entry of NVRAM
-directory as follows:
+NVRAM is then overwritten with the dirty directory stored in memory. Overall, we can summarize the meaning of each of the 
+3 fields on a directory entry as follows:
+* Offset `+0` stores a constant of value `0x100000`, at least for PXE entry types
+* Offset `+4` stores a word containing the lenght of the entry in the 24 least significant 
+bits and the entry id in the 8 most significant bits
+* Offset `+8` stores the offset of the entry in NVRAM
 
 
 NVRAM space look-up
 =======
 `sub_29682` implements the algorithm to find space in NVRAM for the new binary. The code simply iterates through all directory
-entries and tries to identify a start address which doesn't overlap with any existing binary. At every iteration through the directory,
-the candidate address for the new OptionROM could be located in 4 different configurations with respect at the current entry in the directory.
+entries and tries to identify a start address which doesn't overlap with any existing blob. At every iteration through the directory,
+the candidate address for the new OptionROM could be located in 4 different configurations with respect at the current entry in the directory, as follows:
 
 The candidate address + the OptionROM size could be located at lower addresses with respect to the current entry, with no overlap.
 <p align="center">
@@ -844,12 +850,13 @@ selected, together with the default candidate address of the OptionROM, as it pr
 over the layout of the NVRAM. The following investigation suggests that before the directory, there exists
 a set of metadata indicating the offset and size of what could be NIC firmware code, which obviously cannot
 be overwritten by OptionROM code, and therefore is used to initialize the default existing directory entry values.
-The initialization is performed at `0x2973A`, where invoke `sub_29543` to extract additional NVRAM information as follows:
+The initialization is performed at `0x2973A`, where `sub_29543` is invoked to extract additional NVRAM information as follows:
 
 * We read 8 bytes from offset `0x8` through `sub_B119EA`. This funcion is analyzed in the next
 section, for now we can assume it copies data from NVRAM into memory. NVRAM starts with the `0xAA559966` 
-signature which is immediately followed by a first directory entry. From the 8 bytes, we take the word at 
-offset `+4`, which represents the offset of the entry.
+signature which is immediately followed by a first set of metadata just before the beginning of NVRAM directory. 
+We split these 8 bytes in two words, the former of which we'll see in a moment represents a size, while the 
+latter represents an offset.
 * At `0x295A1`, we call `sub_25C1D`, which performs a check on the type of the EEPROM that controls whether
 additional NVRAM page checking code needs to be executed. I haven't fully reversed the EEPROM type check,
 but we can easily derive that the function invoked at `0x295AC` returns the actual page size based on the
@@ -907,7 +914,7 @@ if we are working with paged storage.
 </details>
 <br>
 Among all the possible page sizes, the code seems to perform ad-hoc operations only with 264 bytes pages. 
-In particular, we take the initial offset of the first entry of the directory and translate it from from 
+In particular, we take the second word we just read at `+8+4`  and translate it from from 
 512 to 264 bytes pages with `(<OFFSET>/512)*264+<OFFSET>%512`:
 ```
 0002497A                 call    sub_2488F
@@ -933,10 +940,9 @@ In particular, we take the initial offset of the first entry of the directory an
 000249A4                 retn
 000249A4 sub_2496C       endp
 ```
-It's not clear to me why only 264 bytes pages are rescaled. On my NIC there is a `AT45DB011` flash memory installed, which has exactly 264
-bytes pages, so this conversion will be relevant later. The end result is that the offset of the first entry is stored in `[esi]`. We then 
-fetch the value at 0 offset from the 8 bytes read initially and multiply it by 4, suggesting that the whole word represents a size. 
-From `offset` and `size`, we fetch more NVRAM content.
+It's not clear to me why only 264 bytes pages are rescaled. My NIC is fitted with an `AT45DB011` flash memory, which uses exactly 264
+bytes pages, so this conversion will be relevant later. The rescaled value eventually gets stored in `[esi]`. We then
+mutiply the first word by 4, suggesting, or confirming, that it represents a size. From rescaled `offset` and `size`, we fetch more NVRAM content.
 
 <details> <summary>Expand - Fetching NVRAM content at offset+size</summary>
 {% highlight asm %}
@@ -966,19 +972,19 @@ From `offset` and `size`, we fetch more NVRAM content.
 {% endhighlight %}
 </details>
 <br>
-We can extract relevant information from the dump of a programmed NVRAM to replicate the operations above.
+We can try to replicate the operations above on a real NVRAM binary dump:
 
 <p align="center">
 <a id="single_image" href="/img/dos/size-offset-combined.png">
 <img src="/img/dos/size-offset-combined.png" alt=""/></a>
 </p>
 
-Offset in this case is `0x2F8` and we can use it as is. Size is `0x2F5` and since our NVRAM uses 264 bytes
-pages, we need to rescaled it. The final address for additional content becomes therefore `(0x2F8/512)*264+0x2F8%512+0x2F5*4`, 
-i.e. `1*264+248+757*4=0xDD4`. From the resulting address, if we encounter `0xAA559966` signature, which is the header magic numer,
+Offset in this case is `0x2F8` and it needs to be rescaled as our NVRAM uses 264 bytes pages. Size is `0x2F5` and it needs to
+be multiplied by `+4`. The final address for additional content becomes therefore `(0x2F8/512)*264+0x2F8%512+0x2F5*4`, 
+i.e. `1*264+248+757*4=0xDD4`. From the resulting address, if we encounter `0xAA559966`, which is the header magic numer,
 we fetch the word at offset  `+4`, which seems to represent another size, add 8 and sum it up with the offset that got us to this new header.
-Essentially what we get is `0xDD4+8+0x1174=0x1F50`, which we can see it corresponds to the offset of the existing OptionROM in the NVRAM 
-(4 bytes at offset 0x1C).
+In this example, where we do see header magic at `0xDD4`, what we get is `0xDD4+8+0x1174=0x1F50`, which we can see it corresponds to the 
+offset of the existing OptionROM in the NVRAM, stored in the 4 bytes at `0x1C`. Essentially, the math adds up.
 
 <details> <summary>Expand - Final offset calculation</summary>
 {% highlight asm %}
