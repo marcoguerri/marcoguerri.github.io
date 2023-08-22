@@ -2,7 +2,7 @@
 layout: post
 title:  "Overwriting PXE OptionROM on Broadcom BCM5751 NIC"
 date:   2023-02-04 08:00:00
-published: false
+published: true
 categories: reversing msdos
 pygments: true
 ---
@@ -11,7 +11,7 @@ I have been working on OptionROM malware development using a Broacdom BCM5751 1G
 a PCEngines APU2D board. `B57UDIAG.EXE` is the vendor tool which configures and tests Broadcom NICs, 
 including all PXE related information (OptionROM binary, PXE enablement/disablement, etc.) The tool however runs only on MS-DOS. In order to iterate
 faster during OptionROM development,  I was looking for a way to manipulate from Linux the NVRAM of the NIC,
-which is accessible from `ethtool`. I derived layout specification, algorithms for integrity checks
+which is accessible with `ethtool`. I derived layout specification, algorithms for integrity checks
 and other information by reverse engineering specific control paths of the `B57UDIAG.EXE` tool. 
 
 It must be noted that some of the results obtained here could have probably been sourced from the existing 
@@ -25,6 +25,10 @@ a perfect opportunity, so I essentially ignored any resource that did not includ
 
 Extracting assembly code
 =======
+`B57UDIAG.EXE` tool comes as a UPX compressed linear executable prepended with [Protected Mode extender](https://en.wikipedia.org/wiki/DOS_extender). I have outlined in a different post how the binary can be unpacked to obtain code that can be navigated
+with Ghirda or IDA. For this exercise, I used mostly IDA 5.0, which as explained in the dedicated post, is the last
+free version of IDA which can parse LEs. I occasionally also referred to Ghidra, in particular to its disassembled code, using 
+a custom extension for loading [linear executables](https://github.com/yetmorecode/ghidra-lx-loader).
 
 Reversing PXE commands
 =======
@@ -51,7 +55,7 @@ Running `pxe` command generates the the following binary differences:
 Overall, three changes stand out, within the first 512 bytes of NVRAM. Further below, we can see the
 whole OptionROM binary blob.
 
-Running `setpxe -d` and then `setpxe -e` command generates the following binary differences
+Running `setpxe -d` and then `setpxe -e` command generates the following binary differences:
 <p align="center">
 <a id="single_image" href="/img/dos/NVRAM_differences_pxe.png">
 <img src="/img/dos/NVRAM_differences_pxe.png" alt=""/></a>
@@ -59,30 +63,21 @@ Running `setpxe -d` and then `setpxe -e` command generates the following binary 
 
 We see a single byte changing, probably a flag, and then 4 bytes that varied also with the first command.
 
-
-
 Dispatching command line flags
 =======
-Looking for occurrences of `setpxe` string gets us to the code which dispatches command line arguments.
-We can find two occurrences of `setpxe`:
-```
-00235F67 aSetpxe         db 'setpxe',0           ; DATA XREF: sub_F23C5+150o
-```
-and
+
+A good starting point for reverse engineering the two commands is to look-up how command line flags 
+are dispatched. Occurrences of `setpxe` string such as the following:
 ```
 0020767E aSetpxe_0       db 'setpxe',0           ; DATA XREF: dseg02:off_25B266o
 ```
-
-The latter is the one of interest, which is also further addressed through its offset:
-
+and its offset (`0020767E`):
 ```
-0025B266 off_25B266      dd offset aSetpxe_0     ; DATA XREF: cseg01:00031BC4o
-0025B266                                         ; cseg01:00031BD9o ...
+0025B266 offset_setpxe   dd offset aSetpxe_0     ; DATA XREF: cseg01:00031BC4
+0025B266                                         ; cseg01:00031BD9 ...
 0025B266                                         ; "setpxe"
 ```
-
-If we look for the references to `0x25B266` we'll see similar patterns repeating:
-
+lead us to a similar calls to `sub_1531D` such as the following:
 {% highlight asm %}
 00031C23 loc_31C23:                              ; CODE XREF: cseg01:00031C1A␘j
 00031C23                 mov     edx, 65h
@@ -105,10 +100,10 @@ The parsing happens in multiple stages. We dereference first the content of `[ea
 ```
 
 We then start a loop where we compare `edx` with `[eax]` and in case they don't match, we increase
-`eax` by `0x14h` and repeat. If we look through content of the data segment referenced in this code, 
-we'll see that `0x64`, `0x65`, `0x73` are stored at `0x14` increments starting from `[eax]`. 
+`eax` by `0x14h` and repeat. 
 
-```
+<details> <summary>Expand code - Command line arguments parsing</summary>
+{% highlight asm %}
 0001532E loc_1532E:                              ; CODE XREF: sub_1531D+27␙j
 0001532E                 mov     dh, [eax]
 00015330                 test    dh, dh
@@ -130,14 +125,74 @@ we'll see that `0x64`, `0x65`, `0x73` are stored at `0x14` increments starting f
 00015346                 xor     eax, eax
 00015348                 retn
 00015348 sub_1531D       endp
-```
-
-We are essentially trying to match the proper area of memory with command line flag of interest, 
+{% endhighlight  %}
+</details>
+<br>
+If we look through content of the data segment referenced in this code, 
+we'll see that `0x64`, `0x65`, `0x73` are stored at `0x14` increments starting from `[eax]`. 
+<details> <summary>Expand code - Data segment with command line flags</summary>
+{% highlight asm %}
+0025B266 offset_setpxe   dd offset aSetpxe_0     ; DATA XREF: cseg01:00031BC4␘o
+0025B266                                         ; cseg01:00031BD9␘o ...
+0025B266                                         ; "setpxe"
+0025B26A                 dd offset unk_206DAC
+0025B26E                 dd offset unk_25B216
+0025B272                 dd offset aEnableDisableP ; "Enable/Disable PXE"
+0025B276                 dd offset aPxeSpeed0_Auto ; "PXE Speed:\n 0. auto  1. 10HD  2. 10FD  "...
+0025B27A                 dd offset off_31AC7
+0025B27E                 db    1
+0025B27F                 db    0
+0025B280                 db    0
+0025B281                 db    0
+0025B282                 db  10h
+0025B283                 db    0
+0025B284                 db    0
+0025B285                 db    0
+0025B286 unk_25B286      db  64h ; d             ; DATA XREF: dseg02:0025B2F2␙o
+0025B287                 db    2
+0025B288                 db    0
+0025B289                 db    0
+0025B28A                 dd offset aDisableMba   ; "Disable MBA"
+0025B28E                 db    0
+0025B28F                 db    0
+0025B290                 db    0
+0025B291                 db    0
+0025B292                 db    0
+0025B293                 db    0
+0025B294                 db    0
+0025B295                 db    0
+0025B296                 db    0
+0025B297                 db    0
+0025B298                 db    0
+0025B299                 db    0
+0025B29A                 db  65h ; e
+0025B29B                 db    5
+0025B29C                 db    0
+0025B29D                 db    0
+0025B29E                 dd offset aEnableMbaProto ; "Enable MBA Protocol"
+0025B2A2                 db    0
+0025B2A3                 db    0
+0025B2A4                 db    0
+0025B2A5                 db    0
+0025B2A6                 db    0
+0025B2A7                 db    0
+0025B2A8                 db    0
+0025B2A9                 db    0
+0025B2AA                 db    0
+0025B2AB                 db    0
+0025B2AC                 db    0
+0025B2AD                 db    0
+0025B2AE                 db  73h ; s
+{% endhighlight %}
+</details>
+<br>
+We are essentially trying to match the proper area of memory with the command line flag of interest, 
 returning `[eax+10h]`, when we get a match. This latter address stores the value of the command 
 line flag. Based on the return value, the caller will decide how to dispatch further calls to
 honor the input parameters.
 
 
+{% comment %}
 Stack protection
 ======
 If we follow all `call` instructions, we see functions starting with a common prologue, similar to the following:
@@ -145,34 +200,62 @@ If we follow all `call` instructions, we see functions starting with a common pr
 000158A3                 push    <HEX_CODE>
 000158A8                 call    sub_19576C
 ```
-
-This is a stack overflow protection mechanism which is prepended to every function call. 
-
+This is a stack overflow protection mechanism which is prepended to every function call
+{% endcomment %}
 
 Debug messages
 =====
-Before moving ahead, it is worth having a look at `sub_16309`. This is supposedly a function
-which prints a message on screen and waits for user input, e.g. `Y/N`. In fact, the full message in the listing above is
-`PXE firmware cannot be found in NVRAM. Program anyway? Y/N`. The code makes use of two different types of output:
+Before moving ahead, it is worth having a look at how output is rendered by the tool. There are several debug messages
+distrubuted all over the code, and some do seem to be controlled by verbosity parameters. The more output the tool
+produces, the easier it will be to match its execution to code. In general, we see two types of output:
 
-* Text I/O, implemented by writing directly to video memory buffers
-* Graphical I/O , implemented by writing into memory of video adapter at `B8000`
+* Text I/O, implemented by writing to VGA video memory area at `0xA0000`
+* Graphical I/O implemented by writing into color text mode memory at `0xB8000` 
 
-The interactive messages make all use of the second mode. Following the code which renders colored output to video memory
-is not straightforward, and `dosbox` emulator becomes incredibly useful. The execution under `dosbox` fails becuse not adapter
-is found, and the error messages is printed with the same Graphical I/O approach. In the executions represented in the following
-screenshot, 32 bit program code seems to be pointed by segment selector `0868`, while there seems to be a [TODO] offset between
-`IP` and linear address of the linear executable disassembled by IDA. This is useful to be able to set breakpoints in the correct
-place. The code which implements Graphical I/O begines with loading `B8000` address:
+The corresponding pointers to the video memory areas are initialized in `sub_1AC099`:
+
+```
+001AC0EE                 mov     eax, [ebp+var_4]
+001AC0F1                 mov     dword_2A0909, 400h
+001AC0FB                 mov     dword_2A090D, (offset loc_AFFFF+1)
+001AC105                 mov     dword_002A0911, 0B8000h
+001AC10F                 mov     dword_002A0915, offset loc_A0000
+001AC119                 mov     dword_2A0919, (offset loc_BFFFC+4)
+```
+
+An example of Text I/O could be the following:
+```
+0002A952                 push    offset aUpdatingDire_0 ; "Updating Directory...\n"
+0002A957                 call    sub_0004182D
+0002A95C                 add     esp, 4
+0002A95F                 mov     edx, [esp+164h+var_30]
+```
+
+While an example of the Graphical I/O could be `sub_16309`, where the user sees a dialog and it's expected
+to continue or abort the operation:
+
+```
+00031C57                 jnz     short pxe_firmware_found_ram
+00031C59                 push    offset aPxeFirmwareCan ; "PXE firmware cannot be found in NVRAM. "...
+00031C5E                 call    sub_00016309
+00031C63                 add     esp, 4
+00031C66                 test    eax, eax
+```
+
+Following the I/O code is not straightforward, but `dosbox` emulator can help. The execution of the tool under `dosbox` 
+fails straight away becuse no adapter is found on the system, and the error messages is printed through Graphical I/O.
+In the executions represented in the following screenshot, 32 bit program code seems to be pointed by segment selector `0868`. One
+can find empirically the offset between `dosbox` IP and linear address of the linear executable disassembled by IDA. This is useful to 
+be able to set breakpoints in the correct place. The code which implements Graphical I/O begins with loading address of a constant
+pointing to color text mode memory:
 
 ```
 00016122                 mov     eax, offset dword_258F24
 00016127                 call    sub_16090
 ```
 
-At `0x258F24` one can see the initialization value is set to `0x0B8000`. `eax` can be considered a double pointer in this case.
-
-The actual write to video memory happen happens in the function in `0x15B88`:
+At `0x258F24` one can see the initialization value is set to `0x0B8000`. `eax` can be considered a double pointer in this case. The actual write to 
+video memory happen happens at `sub_15B88`:
 
 ```
 00015BA9 loc_15BA9:     ; CODE XREF: write_b8000_through_ec+Ej
@@ -194,7 +277,7 @@ The state of the execution is very clear from the `dosbox` screenshot below. `EC
 </p>
 
 
-We can even double check that at `B833A` or any address close by are actually backing video memory. 
+We can double check that at `B833A` or any address close by are actually backing video memory. 
 `dosbox` command `sm 0868:<OFFSET> 0x0` will write a null 16 bits at that address. That becomes clearly visible from the output
 
 <p align="center">
@@ -202,68 +285,76 @@ We can even double check that at `B833A` or any address close by are actually ba
 <img src="/img/dos/dosbox_2.png" alt=""/></a>
 </p>
 
-The text mode output is slightly simpler, but there is immediately something interesting to be noticed. We can land immediately
-on the PXE programming path:
-
-```
-0002A952                 push    offset aUpdatingDire_0 ; "Updating Directory...\n"
-0002A957                 call    <TEXT_IO_FUNCTION>
-0002A95C                 add     esp, 4
-0002A95F                 mov     edx, [esp+164h+var_30]
-0002A966                 push    edx
-0002A967                 push    offset aCode_lenImage0 ; "code_len image     = %08x\n"
-0002A96C                 call    <TEXT_IO_FUNCTION>
-```
-
-Following that control path, there first and foremost a setup function for monochrome video memory:
-
-```
-001AC0EE                 mov     eax, [ebp+var_4]
-001AC0F1                 mov     dword_2A0909, 400h
-001AC0FB                 mov     dword_2A090D, (offset loc_AFFFF+1)
-001AC105                 mov     dword_002A0911, 0B8000h
-001AC10F                 mov     dword_002A0915, offset loc_A0000
-001AC119                 mov     dword_2A0919, (offset loc_BFFFC+4)
-```
-
-Which are then later used to perform the actual I/O:
-
+Similarly, text mode output is implemented by writing to VGA memory area, at `0xA0000`:
 ```
 001ACDFC loc_1ACDFC:                             ; CODE XREF: write_to_monochrome_address+20j
 001ACDFC                 mov     eax, dword_002A0915
 001ACE01                 mov     di, word_2A0903
-```
-
-And further down:
-
-```
+[...]
 001ACE4B                 add     edx, esi
 001ACE4D                 mov     es:[eax], dx
 ```
 
-TODO: why logs are revelant
+While following these control paths, I noticed that at the beginning of `sub_0004182D`, which we have seen it referenced
+above with the "Updating directory" message, there is a check on a flag that might result in the function beeing a no-op:
 
-NVRAM I/O
-=======
+```
+0004183E                 test    byte ptr <FLAG_ADDR>, 1
+00041845                 jz      <END>
+0004184B                 lea     eax, [esp+1Ch]
+0004184F                 mov     [esp], eax
+00041852                 mov     ebx, es
+```
+`<FLAG_ADDR>` is accessed in multiple places in write mode, but it seemed to be set to 1 in all my executions, resulting
+in not having any of the debug messages that I could see referenced in code. I could not find a way to flip the value of `<FLAG_ADDR>` through
+the tool, so I just resorted to chaing `jz` into `jnz` and I got a whole lot more of debug messages that helped me map the execution to code.
 
-
-Programming function
+Writing NVRAM
 =======
 
 There main function responsible for altering the content of NVRAM is `sub_8708A`, where we can see a known refernce
 to `eecfg_write` verbose log output:
 
 ```
-eecfg_write
+000870B3                 push    offset aEecfg_writeOff ; "\neecfg_write, offset=0x%x, len=0x%x; "
 ```
 
-Foundamentally, `sub_8708A` ends up calling NVRAM write and read commands as outlined in the previous section.
+Foundamentally, `sub_8708A` ends up writing to NVM write/read interface registers, as outlined by the specs referenced 
+at the beginning of the post. In particular, we can see the code writing to Command Register (with `wr` bit set), 
+Address Register and Write Register:
+
+<details> <summary>Expand code - Acccess to Command, Address and Write registers</summary>
+{% highlight asm %}
+00022A9B loc_22A9B:                              ; CODE XREF: write_through_7008_2+F␘j
+00022A9B                 mov     eax, 7008h
+00022AA0                 call    write_to_register
+00022AA5                 test    bl, 80h
+00022AA8                 jz      short loc_22AB6
+00022AAA                 mov     edx, esi
+00022AAC                 mov     eax, 700Ch
+00022AB1                 call    write_to_register
+00022AB6
+00022AB6 loc_22AB6:                              ; CODE XREF: write_through_7008_2+23␘j
+00022AB6                 or      bl, 38h
+00022AB9                 mov     edx, ebx
+00022ABB                 mov     eax, 7000h
+00022AC0                 call    write_to_register
+00022AC5                 call    sub_221B0
+00022ACA                 test    eax, eax
+00022ACC                 jz      short loc_22AD2
+00022ACE                 xor     eax, eax
+00022AD0                 pop     esi
+00022AD1                 retn
+{% endhighlight %}
+</details>
+<br>
 
 
-setpxe command
+
+Enabling PXE with `pxe -e`
 =======
-`setpxe` command is relatively straightforward. After interpreting command line flags, we dispatch a programming request
-to `sub_A1CA8`. On the PXE enable control path, we can see the following invocation
+`pxe` command is relatively straightforward. After interpreting command line flags, we dispatch a programming request
+to `sub_A1CA8`. On the `pxe -e` control path, we can see the following invocation:
 
 ```
 00031C36                 push    0
@@ -271,10 +362,10 @@ to `sub_A1CA8`. On the PXE enable control path, we can see the following invocat
 00031C3D                 mov     ebx, ecx
 00031C3F                 mov     edx, esi
 00031C41                 xor     eax, eax
-00031C43                 call    program_nvram
+00031C43                 call    sub_A1CA8
 ```
 
-while on the PXE disable control path, we have
+while on the `pxe -d` control path, we have the following:
 
 ```
 00031CAB                 push    1
@@ -284,23 +375,120 @@ while on the PXE disable control path, we have
 00031CB4 loc_31CB4:                              ; CODE XREF: cseg01:00031DCD␙j
 00031CB4                 mov     edx, esi
 00031CB6                 xor     eax, eax
-00031CB8                 call    program_nvra
+00031CB8                 call    sub_A1CA8
 ```
 
 The two main differences that stand out are the first stack argument, 0 or 1 and the value in `ecx`, 2 and 0.
+If we follow `sub_A1CA8`, we land on `sub_A1C0F`, which performs the actual enablement and disablement:
 
-pxe command
-=======
+```
+000A1C7F loc_A1C7F:                              ; CODE XREF: enabling_disabling+69␘j
+000A1C7F                 test    edx, ecx
+000A1C81                 jz      short loc_A1C8F
+000A1C83                 mov     ebx, edx
+000A1C85                 not     ebx
+000A1C87                 and     ebx, [esi]
+000A1C89                 and     edx, ecx
+000A1C8B                 or      edx, ebx
+000A1C8D                 jmp     short loc_A1C93
+000A1C8F ; ---------------------------------------------------------------------------
+000A1C8F
+000A1C8F loc_A1C8F:                              ; CODE XREF: enabling_disabling+72␘j
+000A1C8F                 not     edx
+000A1C91                 and     edx, [esi]
+```
 
+`test edx, ecx` dispatches execution to either enablment, if values differ, or disablement, if values are equal, of PXE. 
+Within `sub_A1CA8`, a sample call to `sub_A1C0F` is the following:
+```
+000A2091                 push    offset pxe_offset
+000A2096                 push    2
+000A2098                 mov     ecx, [esp+34h]
+000A209C                 mov     ebx, [esp+30h]
+000A20A0                 mov     edx, esi
+000A20A2                 lea     eax, [esp+10h]
+```
 
-Updating directory
+We can make the following observations:
+
+* The numeric argument on the stack, 2 in this case, is the initialization value of `edx` in the `test` instruction
+* The value of `ecx`, i.e. `[esp+34h]`, is retained by `sub_A1C0F` and it's directly used in the `test` instruction
+
+If we look up how the stack is managed by `sub_A1CA8`, we can see the following:
+* `sub     esp, 30h` at `000A1CB5`
+* `mov     [esp+2Ch], ecx` at `000A1CC0`
+* Before invoking `sub_A1C0F` we always have two additional `push`, which consititue the only source of change for `esp`.
+Therefore, we can conclude that `-30h+2Ch` is equal to `-30h-8h (double push)+34`, i.e. `-4` and the value used by
+`sub_A1C0F` in the `test` instructions is the `ecx` from `sub_A1CA8`'s caller. As we have seen earlier, flag `-e` sets `ecx` to 2,
+while flag `-d` sets `ecx` to 0.
+
+Eventually, PXE enablment is done by set a single bit, at exactly the position indicated by `edx`.
+```
+000A1C7F loc_A1C7F:                              ; CODE XREF: enabling_disabling+69␘j
+000A1C7F                 test    edx, ecx
+000A1C81                 jz      short loc_A1C8F
+000A1C83                 mov     ebx, edx
+000A1C85                 not     ebx
+000A1C87                 and     ebx, [esi]
+000A1C89                 and     edx, ecx
+000A1C8B                 or      edx, ebx
+000A1C8D                 jmp     short loc_A1C93
+```
+
+Conversely, disablement is done by resetting that same bit, by inverting position bit in `edx`:
+```
+000A1C8F loc_A1C8F:                              ; CODE XREF: enabling_disabling+72␘j
+000A1C8F                 not     edx
+000A1C91                 and     edx, [esi]
+```
+
+The pre-existing word that is having one bit flipped is copied back to `[esi]` which is set to the address of buffer in memory that will be
+written to NVRAM. Later in the function We can sett references to NVRAM write routine `eecfg_write`, with the corresponding offset 
+`0xC4` that stands out from the NVRAM dump seen earlier.
+
+<details> <summary>Expand code - Write PXE enablement flag at 0xC4 offset</summary>
+{% highlight asm %}
+000A2561 loc_A2561:                              ; CODE XREF: program_nvram+85A␘j
+000A2561                 mov     edx, [esp]
+000A2564                 and     edx, 0FF000000h
+000A256A                 shr     edx, 18h
+000A256D                 mov     eax, [esp]
+000A2570                 and     eax, 0FF0000h
+000A2575                 shr     eax, 8
+000A2578                 or      edx, eax
+000A257A                 mov     eax, [esp]
+000A257D                 and     eax, 0FF00h
+000A2582                 shl     eax, 8
+000A2585                 or      edx, eax
+000A2587                 mov     eax, [esp]
+000A258A                 and     eax, 0FFh
+000A258F                 shl     eax, 18h
+000A2592                 or      edx, eax
+000A2594                 mov     [edi+0C4h], edx
+000A259A                 lea     edx, [edi+0C4h]
+000A25A0                 mov     ecx, 4
+000A25A5                 mov     ebx, 0C4h
+000A25AA                 xor     eax, eax
+000A25AC                 call    eecfg_write
+000A25B1                 test    eax, eax
+000A25B3                 jnz     loc_A243D
+000A25B9                 push    offset aVerifyingNvram ; "\nVerifying NVRAM checksum"
+{% endhighlight %}
+</details>
+<br>
+
+There are actually multiple references to `eecfg_write`, and these seem to be executed based on the NIC model. This means that different
+NICs might store PXE enablement flag at different offsets. The PXE enablement NVRAM dump also highlights a 4 bytes change at `0xFC`. As we'll
+see for `setpxe` command, this is checksum value calculated over low addresses of NVRAM.
+
+Writing OptionROM with `setpxe`
 =======
 The low address range of the NVRAM stores a table of metadata which is referred to as
 "directory". The function at `0x2BB4D` goes through this table to find an entry suitable
 for storing PXE blob metadata. Every entry is identified with an id and the base directory holds
-8 entries at most. There exists also the concept of extended  directory, but we will not cover 
-it in this exercise. The code iterates through entries `[0,8[` and under certain conditions, it 
-copies their content to memory. `ecx` is used store the current index and address NVRAM as follows:
+8 entries at most. There exists also the concept of extended  directory, which is not covered 
+in this exercise. The code iterates through entries `[0,8[` and under certain conditions, it 
+copies their content to memory. `ecx` is used store the current index and address of NVRAM as follows:
 ```
 0002BBA9 loc_2BBA9:                              ; CODE XREF: dir_find_entry+50j
 0002BBA9                 mov     eax, ecx
@@ -314,7 +502,7 @@ from an index, NVRAM is addressed as `(((4*index-index)*4)+<BASE>)+<OFFSET>`, i.
 `12*index+<BASE>+<OFFSET>`, suggesting that every item in the table is 12 bytes long.
 
 We first fetch 4 bytes content at +4 offset and reverse its endianess,  using `esp+1Ch+var_14` as temporary storage.
-<details> <summary>Expand code</summary>
+<details> <summary>Expand code - First byte of entry in directory</summary>
 {% highlight asm %}
 0002BBB5                 mov     edx, [eax+4]
 0002BBB8                 and     edx, 0FF000000h
@@ -350,7 +538,7 @@ We then skip skip the entry in the following cases:
 ```
 
 Bits `[24,31]` have a have a special meaning, which we'll see later. If the entry passes all checks above, 
-we copy the content at `+8` into `ebp` and call `0x000B19EA`:
+we copy the content at `+8` into `ebp` and call `sub_B19EA`:
 ```
 0002BC3E                 lea     edx, [edi+60h]
 0002BC41                 mov     ebx, 30h
@@ -360,7 +548,7 @@ we copy the content at `+8` into `ebp` and call `0x000B19EA`:
 Through `sub_B19EA`, we ask to fetch NVRAM data from offset `ebp`, which we just read at `<DIRECTORY_ENTRY>+8` 
 for a lenght of 0x30\*4 into destination address in `edx`. We derive the meaning of these parameters by 
 following `sub_B19EA` and seeing that it increments the source and destination addresses by 4 until we 
-reach the desired lenght:
+reach the desired length:
 ```
 000B19F7                 mov     esi, eax
 000B19F9                 mov     ecx, edx
@@ -385,8 +573,8 @@ Further down the stack, we have a write to `[ebx]`, which is originally `edi+0x6
 000B0E20                 mov     [ebx], eax
 ```
 
-Register `0x6838` seems to be undocumented, and I can only speculate it controls read access of
-NVRAM. We saw earlier that there are 8 entries in the directory each one 12 bytes long, overall 0x60 bytes:
+Register `0x6838` seems to be undocumented, and I can only speculate it implementes NVRAM read interface.
+We saw earlier that there are 8 entries in the directory each one 12 bytes long, overall 0x60 bytes:
 we can assume `edi+0x60` points into memory just after the directory table.
 If we succeed in finding an entry that triggers the copy, we set a flag:
 ```
@@ -428,7 +616,7 @@ directory table, starting from 0:
 ```
 
 We then follow a similar pattern seen before, and check content at `+4` offset against 
-`0x3FFFFF`:
+`0x3FFFFF`.{% comment %}
 <details> <summary>Expand code</summary>
 {% highlight asm %}
 0002BDBA loc_2BDBA:                              ; CODE XREF: dir_find_entry+25Dj
@@ -457,6 +645,7 @@ We then follow a similar pattern seen before, and check content at `+4` offset a
 {% endhighlight %}
 </details>
 <br>
+{% endcomment %}
 Also similarly to the first scan, we check bits `[24,31]` against 
 `esp+1Ch+var_10`, which we now know for sure contains the id of the entry 
 (`0x0` for PXE).
@@ -480,7 +669,7 @@ If we find an entry with a matching id, we perform an additional check:
 `esp+1Ch+var_1C` is a flag passed by the caller, with value `0x1`. We then
 zero out the value at offset `+4` and exit, with the entry id in `[esi]` for
 the caller to find. After having identified an entry in the table,
-we look for NVRAM space to host the data:
+we look for NVRAM space to host the data. NVRAM space look-up is covered in the next section.
 
 ```
 0002AFF1                 mov     ebx, [esp+140h+var_14]
@@ -489,9 +678,8 @@ we look for NVRAM space to host the data:
 0002B001                 call    sub_29682
 ```
 
-NVRAM space look-up will be covered in the next section. The code then sets new values in the directory 
-entry. We see a similar pattern as  before: if the ID is `> 0x80`, we jump to the extended directory update section, 
-otherwise we follow the base directory path.
+The code then sets new values in the directory  entry. We see a similar pattern as  before: if the ID is `> 0x80`, 
+we jump to the extended directory update section, otherwise we follow the base directory path.
 
 ```
 0002B0F3 loc_2B0F3:                              ; CODE XREF: program_NVRAM_maybe_update_directory+1CDj
@@ -518,7 +706,7 @@ also a trailing checksum:
 0002AFC6                 mov     [esp+140h+var_14], eax
 ```
 
-Furthermore `esp+140h+var_14` does not store the lenght alone. The value is multiplied by 4
+Furthermore `esp+140h+var_14` does not store the raw length alone. The value is multiplied by 4
 as it represents then number of double words (4 bytes). `esp+140h+var_10`, which is the id 
 of the entry, is then stored in the 6 most significant bits
 
@@ -533,9 +721,10 @@ of the entry, is then stored in the 6 most significant bits
 0002B0C4                 or      ebx, eax
 ```
 
-The resulting value is written to at `+4` of the selected index:
+The resulting value is written to at `+4` of the selected index in the directory.
 
-```
+<details> <summary>Expand code - Write at +4 offset of the item in directory</summary>
+{% highlight asm %}
 0002B3E6 loc_2B3E6:                              ; CODE XREF: program_NVRAM_maybe_update_directory+20Dj
 0002B3E6                 mov     ecx, [esp+140h+var_14]
 0002B3ED                 and     ecx, 0FF000000h
@@ -556,12 +745,14 @@ The resulting value is written to at `+4` of the selected index:
 0002B42B                 shl     eax, 2
 0002B42E                 sub     eax, edx
 0002B430                 mov     [esp+eax*4+4], ecx
-```
-
+{% endhighlight %}
+</details>
+<br>
 At offset `+0`, a value set by the caller gets written. On the PXE update path, it seems to be
-always `0x100000`, which is coherent with the dumps of the NVRAM seen earlier:
+always `0x100000`, which is coherent with the dumps of the NVRAM seen earlier.
 
-```
+<details> <summary>Expand code - Write at +0 offset of the item in directory</summary>
+{% highlight asm %}
 0002B434                 mov     ecx, esi
 0002B436                 and     ecx, 0FF000000h
 0002B43C                 shr     ecx, 18h
@@ -578,9 +769,12 @@ always `0x100000`, which is coherent with the dumps of the NVRAM seen earlier:
 0002B461                 shl     ecx, 18h
 0002B464                 or      edx, ecx
 0002B466                 mov     [esp+eax*4], edx
-```
-At offset `+8` we write the NVRAM address returned by `sub_29682`, the function which looks up space in NVRAM:
-```
+{% endhighlight %}
+</details>
+<br>
+At offset `+8` we write the NVRAM address returned by `sub_29682`, the function which looks up space in NVRAM.
+<details> <summary>Expand code - Write at +8 offset of the item in directory</summary>
+{% highlight asm %}
 0002B469                 mov     ecx, [esp+140h+var_20]
 0002B470                 and     ecx, 0FF000000h
 0002B476                 shr     ecx, 18h
@@ -597,9 +791,12 @@ At offset `+8` we write the NVRAM address returned by `sub_29682`, the function 
 0002B4AA                 shl     ecx, 18h
 0002B4AD                 or      edx, ecx
 0002B4AF                 mov     [esp+eax*4+8], edx
-```
+{% endhighlight %}
+</details>
+<br>
 
-NVRAM is then overwritten with the modified directory.
+NVRAM is then overwritten with the modified directory. Overall, we can summarize the structure of each entry of NVRAM
+directory as follows:
 
 
 NVRAM space look-up
@@ -709,7 +906,6 @@ if we are working with paged storage.
 {% endhighlight %}
 </details>
 <br>
-
 Among all the possible page sizes, the code seems to perform ad-hoc operations only with 264 bytes pages. 
 In particular, we take the initial offset of the first entry of the directory and translate it from from 
 512 to 264 bytes pages with `(<OFFSET>/512)*264+<OFFSET>%512`:
@@ -770,7 +966,6 @@ From `offset` and `size`, we fetch more NVRAM content.
 {% endhighlight %}
 </details>
 <br>
-
 We can extract relevant information from the dump of a programmed NVRAM to replicate the operations above.
 
 <p align="center">
@@ -811,21 +1006,13 @@ Essentially what we get is `0xDD4+8+0x1174=0x1F50`, which we can see it correspo
 {% endhighlight %}
 </details>
 <br>
-
 We can then summarize the new understanding of the layout of NVRAM as follows:
 
 <p align="center">
 <a id="single_image" href="/img/dos/overall-NVRAM-layout.png">
 <img src="/img/dos/overall-NVRAM-layout.png" alt=""/></a>
 </p>
-
-
-
-
-
-
-
-
+{% comment %}
 00069D27                 jz      short loc_69D3E
 00069D29                 call    sub_2488F
 00069D2E                 push    eax
@@ -934,15 +1121,7 @@ Likely check if eeprom supports paged access: https://learn.sparkfun.com/tutoria
 Check what showcurcard info shows in terms of EEPROM type
 
 Type seems to be calculated somehow from 0x7014
-
-
-
-
-
-
-
-
-
+{% endcomment %}
 
 
 Integrity checksums
@@ -1061,9 +1240,7 @@ uint __regparm3 UndefinedFunction_00067c06(byte *param_1,uint param_2)
 }
 {% endhighlight %}
 </details>
-
 <br>
-
 We can then summarize these first two integrity values as follows:
 * We copy `96` (`0x60`) bytes from NVRAM starting at offset `0x14`, and calculate a 1 byte checksum. We copy this checksum to offset `0x75`. This region of memory is the directory, 8 entries of 12 bytes each.
 * We copy `140` (`0x88`)  bytes from NVRAM starting at offset `0x74`, and calculate a 4 byte checksum. We copy this checksum to offset `0xFC`. This region of memory seems to be containing other VPD data.
