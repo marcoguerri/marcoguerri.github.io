@@ -2,7 +2,7 @@
 layout: post
 title:  "Overwriting PXE OptionROM on Broadcom BCM5751 NIC"
 date:   2023-02-04 08:00:00
-published: false
+published: true
 categories: reversing msdos
 pygments: true
 ---
@@ -22,6 +22,8 @@ a perfect opportunity, so I essentially ignored any resource that did not includ
     * [BCM571X/BCM5720 NetXtreme/NetLink BCM571X/BCM5720 Family Programmer’s Guide](https://docs.broadcom.com/doc/571X-5720-PG1XX)
 * `B57UDIAG.EXE` code
 
+I wrote [a tool](https://github.com/marcoguerri/broadcom-optionrom) based on the exploration presented in this post that automates most of 
+the operations related to writing OptionROM into NVRAM. 
 
 Extracting assembly code
 =======
@@ -1278,17 +1280,29 @@ The only argument to `sub_67BF9` is the size of the image, which doesn't include
 The result is stored at `esi+edi`, i.e. the base address of the OptionROM in memory + its length. The lenght of the image 
 is then increased by 4 before being stored in the directory.
 
+Updating VendorID and DeviceID
+=======
+A final operation that `B57UDIAG.EXE` tool performs is updating VendorID and DeviceID in the OptionROM header, according to the device where the 
+OptionROM is being written to. In my experiments using Tianocore EDKII, I have always generated the OptionROM directly with the correct IDs, through
+`EfiRom`:
+
+```
+./BaseTools/Source/C/bin/EfiRom -f 0x167d -i 0x14e4 -e Build/OvmfX64/DEBUG_GCC5/X64/OptionROM/OptionROM/DEBUG/OptionROM.efi -o OptionROM.final.efi
+```
+
+Overwriting Vendor and Device IDs at flash time is clearly much more flexible. The tool [I have written based on this exercise](https://github.com/marcoguerri/broadcom-optionrom) does not currently perform this operation and fully relies on the header generated at build time.
 
 Device initialization
 =======
-
-Programmatically updating PXE ROM
-=======
-Based on the exploration presented in this post, we can derive the following "fast" update algorithm for OptionROM:
-* Verify the integrity to the directory
-* Search through the directory to find an entry dedicated to id == 0x0
-* 
+In addition to manipulating NRAM itself, `B57UDIAG.EXE` performs several additional NIC initialization and finalization operations. For example,
+at the end of the NVRAM write operations, it resets the NIC. When I started this exercise, I made the naive assumption that writing to NVRAM
+through Linux `tg3` would be safe at runtime. As the change is confined to OptionROM entry, the dirty NVRAM could stay as such until system
+reboot. I have run several tests on the custom [broadcom-optionrom](https://github.com/marcoguerri/broadcom-optionrom) tool, which doesn't 
+alter NIC state beyond content of NVRAM, and this assumption seems to have held so far.
 
 Corrupted NVRAM
 =======
-
+A corrupted NVRAM is a situation that I have recovered from at least a couple of times fully relying on `B57UDIAG.EXE`. I worked out 
+recovery steps based on random pointers found on the internet, without any reverse engineering effort in this case. These devices
+and tools are old enough to make finding resources online complicated. I described recovery steps from some corruption scenarios, which proved 
+to work for me, in the README of [broadcom-optionrom](https://github.com/marcoguerri/broadcom-optionrom) tool.
