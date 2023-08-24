@@ -12,7 +12,9 @@ a PCEngines APU2D board. `B57UDIAG.EXE` is the vendor tool which configures and 
 including all PXE related information (OptionROM binary, PXE enablement/disablement, etc.) The tool however runs only on MS-DOS. In order to iterate
 faster during OptionROM development,  I was looking for a way to manipulate from Linux the NVRAM of the NIC,
 which is accessible with `ethtool`. I derived layout specification, algorithms for integrity checks
-and other information by reverse engineering specific control paths of the `B57UDIAG.EXE` tool. 
+and other information by reverse engineering specific control paths of `B57UDIAG.EXE`. Eventually, 
+I wrote [a tool](https://github.com/marcoguerri/broadcom-optionrom) based on the exploration presented 
+in this post that automates most of the operations related to writing OptionROM into NVRAM. 
 
 It must be noted that some of the results obtained here could have probably been sourced from the existing 
 end to end reverse engineering effort that produced the [ortega specification](https://github.com/hlandau/ortega). Nevertheless, I did want to go through a reverse engineering exercise of a MS-DOS tool and this was
@@ -21,9 +23,6 @@ a perfect opportunity, so I essentially ignored any resource that did not includ
     * [NetXtreme®/NetLink™ BCM5718 Family Programmer’s Guide](https://docs.broadcom.com/doc/1211168564147)
     * [BCM571X/BCM5720 NetXtreme/NetLink BCM571X/BCM5720 Family Programmer’s Guide](https://docs.broadcom.com/doc/571X-5720-PG1XX)
 * `B57UDIAG.EXE` code
-
-I wrote [a tool](https://github.com/marcoguerri/broadcom-optionrom) based on the exploration presented in this post that automates most of 
-the operations related to writing OptionROM into NVRAM. 
 
 Extracting assembly code
 =======
