@@ -1298,10 +1298,3 @@ at the end of the NVRAM write operations, it resets the NIC. When I started this
 through Linux `tg3` would be safe at runtime. As the change is confined to OptionROM entry, the dirty NVRAM could stay as such until system
 reboot. I have run several tests on the custom [broadcom-optionrom](https://github.com/marcoguerri/broadcom-optionrom) tool, which doesn't 
 alter NIC state beyond content of NVRAM, and this assumption seems to have held so far.
-
-Corrupted NVRAM
-=======
-A corrupted NVRAM is a situation that I have recovered from at least a couple of times fully relying on `B57UDIAG.EXE`. I worked out 
-recovery steps based on random pointers found on the internet, without any reverse engineering effort in this case. These devices
-and tools are old enough to make finding resources online complicated. I described recovery steps from some corruption scenarios, which proved 
-to work for me, in the README of [broadcom-optionrom](https://github.com/marcoguerri/broadcom-optionrom) tool.
