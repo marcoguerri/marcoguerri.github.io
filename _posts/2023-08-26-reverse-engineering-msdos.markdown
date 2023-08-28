@@ -96,11 +96,12 @@ The availability of the two versions of IDA mentioned above is as follows:
 permissions to re-distribute the binary.
 * IDA 4.1 can be found online from repositories of old MS-DOS tools
 
-Once the Linear Executable has been split from PMODE/W stub, it can be simply loaded into IDA 4.1 to generate the database:
+Once the Linear Executable has been split from PMODE/W stub, it can be simply loaded into IDA 4.1 to generate the database.
 
 <p align="center">
 <a id="single_image" href="/img/dosreversing/ida4.1.png">
 <img src="/img/dosreversing/ida4.1.png" alt=""/></a>
 </p>
 
-IDA Freeware 5.0 should then just be capable of loading the database file.
+The `idb` file can then be fed into IDA Freeware 5.0 in a modern Windows environment.
+
