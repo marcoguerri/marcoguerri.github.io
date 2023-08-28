@@ -7,13 +7,14 @@ published: yes
 ---
 
 This a collection of notes I have taken while debugging a regression of CERN PXE booting
-infrastructure, which followed the update to PXELINUX 6.03. I traversed the stack down 
-to the network interface firmware, which reminded me of Eric Raymond's "The Cathedral and the Bazaar",
-where he explains why closing hardware driver's sources does not make much sense, and presents
-instead an intermediate model in-between open and closed source,
-i.e. having a closed source ROM and opening the interface to the ROM. I believe
-this experience is a good example of why this latter approach does nothing more
-than shifting the problem.
+infrastructure, which followed the update to PXELINUX 6.03. This investigation brought me down
+the stack to the device firmware, reminding me of Eric Raymond's "The Cathedral and the Bazaar"
+and the problem of closed hardware drivers. The devices I was working with were not at End of Life,
+however not having access to firmware code brought my turnaround time for finding a long term fix 
+from 24 hours to days. In the widget frosting OSS model, Raymond advocates for an intermediate approach
+between open and closed source, where there is a closed source ROM and an open interface to the 
+ROM. I was essentially in this configuration, working on top of Universal Network Device Interface (UNDI).
+Unfortunately, still not enough to enable me to effectively do my job.
 
 Background and setup
 =======
@@ -780,28 +781,16 @@ Reboot and... it worked! Loading initramfs, kernel and booting! Apparently, the 
 returned by the UNDI firmware was always cleared, preventing lpxelinux
 from properly handling incoming data. The firmware was probably ignoring altogether
 that flag, which worked as long as pxelinux was not involved in the interrupt handling.
-Unfortunately, this marked the end of the  investigation: I could not 
+Unfortunately, this marked the end of the investigation: I could not 
 fix the issue myself as I did not have any control over the sources of the firmware of the NIC. 
 Considering `PXENV_UNDI_ISR_OUT_OURS` as always set was not an 
 option either, as it could break the execution on hardware with multiple NICs sharing the 
 same IRQ (or in the best case, it would result in the invocation of the routine for servicing the 
 interrupt for no reason). 
 
-
-Conclusions
-=======
-At this point, the only possible course of action was to file a bug report to 
-the owners of the code, hoping there is enough interest
-on their side to fix the issue in a timely manner. This is a great example
-of how the widget frosting* business model explained by Eric Raymond in The Cathedral
-and the Bazaar would simplify everybody's life. This indirect-sale value model
-applies specifically to hardware manufacturers, for whom, developing and maintaining the software/firmware
-is often just an overhead. The number of benefits that would arise as a consequence of 
-releasing the software under an open license are to be seriously taken into consideration.
-
 Updates
 =======
-   * It turns out the QLogic cLOM8214 is affected by the same issue, and can boot
+   * QLogic cLOM8214 turned out to be affected by the same issue, and can boot
 just fine if `PXENV_UNDI_ISR_OUT_OURS` is  always set. However, this NIC has been
 discontinued and no fixes will be provided. Speaking of widget frosting...
    * Chelsio has provided a firmware fix which allows to boot correctly with lpxelinux 6.03

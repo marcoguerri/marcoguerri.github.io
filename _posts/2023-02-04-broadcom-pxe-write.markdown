@@ -27,8 +27,8 @@ a perfect opportunity, so I essentially ignored any resource that did not includ
 Extracting assembly code
 =======
 `B57UDIAG.EXE` tool comes as a UPX compressed linear executable prepended with [Protected Mode extender](https://en.wikipedia.org/wiki/DOS_extender). I have outlined in a different post how the binary can be unpacked to obtain code that can be navigated
-with Ghirda or IDA. For this exercise, I used mostly IDA 5.0, which as explained in the dedicated post, is the last
-free version of IDA which can parse LEs. I occasionally also referred to Ghidra, in particular to its disassembled code, using 
+with Ghirda or IDA. For this exercise, I used mostly IDA 5.0, which is the last
+free version of IDA capable of parsing LEs. I occasionally also referred to Ghidra, in particular to its disassembled code, using 
 a custom extension for loading [linear executables](https://github.com/yetmorecode/ghidra-lx-loader).
 
 Reversing PXE commands
