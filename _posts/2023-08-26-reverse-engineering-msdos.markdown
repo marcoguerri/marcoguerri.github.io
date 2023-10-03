@@ -7,11 +7,11 @@ categories: reversing msdos
 pygments: true
 ---
 
-I have recently reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html). The pecularity of MS-DOS
-applications is that they sometimes make use of outdated wrappers and formats, which
-modern tooling doesn't always support. The utility I have been working with, came as a
-UPX compressed linear executable prepended with Protected Mode extender and required
-several tools, including IDA 4.1 and IDA 5.0, to be reverse engineered.
+I have recently reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html) and got a chance to work with tools that I had not used before. Broadcom's binary came
+as a UPX compressed linear executable prepended with Protected Mode extender and required
+tools such as IDA 4.1, IDA 5.0, to be reverse engineered. This post is a collection of pointers
+explaining how to get from binary to disassembled and decompiled code for applications packaged
+in a similar way.
 
 MS-DOS protected mode extender
 =======

@@ -1,20 +1,18 @@
 ---
 layout: post
-title:  "Overwriting PXE OptionROM on Broadcom BCM5751 NIC"
+title:  "Reverse enginering UEFI OptionROM layout on BCM575x NIC"
 date:   2023-02-04 08:00:00
 published: true
 categories: reversing msdos
 pygments: true
 ---
 
-I have been working on OptionROM malware development using a Broacdom BCM5751 1G Network Card on 
-a PCEngines APU2D board. `B57UDIAG.EXE` is the vendor tool which configures and tests Broadcom NICs, 
-including all PXE related information (OptionROM binary, PXE enablement/disablement, etc.) The tool however runs only on MS-DOS. In order to iterate
-faster during OptionROM development,  I was looking for a way to manipulate from Linux the NVRAM of the NIC,
-which is accessible with `ethtool`. I derived layout specification, algorithms for integrity checks
-and other information by reverse engineering specific control paths of `B57UDIAG.EXE`. Based on the
-insights presented in this post, I wrote [a tool](https://github.com/marcoguerri/broadcom-optionrom) 
-that automates most of the operations related to writing OptionROM into NVRAM. 
+I have been working on UEFI OptionROM malware research using a Broacdom BCM5751 1G Network Card
+and initially used the old `B57UDIAG.EXE` utility for MS-DOS environment to overwrite PXE ROM and enable or 
+disable PXE boot. However, to iterate quickly during my experiments I needed to manipulate OptionROM directly 
+under Linux. This required reverse engineering some control paths of `B57UDIAG.EXE`, putting together a specification for NVRAM 
+layout, algorithms for integrity checks and other relevant information which was used to develop
+[a tool](https://github.com/marcoguerri/broadcom-optionrom) to manipulate OptionROM in NVRAM without the requirement of a MS-DOS environment.
 
 It must be noted that some of the results obtained here could have probably been sourced from the existing 
 end to end reverse engineering effort that produced the [ortega specification](https://github.com/hlandau/ortega). Nevertheless, I did want to go through a reverse engineering exercise of a MS-DOS tool and this was
@@ -23,6 +21,16 @@ a perfect opportunity, so I essentially ignored any resource that did not includ
     * [NetXtreme®/NetLink™ BCM5718 Family Programmer’s Guide](https://docs.broadcom.com/doc/1211168564147)
     * [BCM571X/BCM5720 NetXtreme/NetLink BCM571X/BCM5720 Family Programmer’s Guide](https://docs.broadcom.com/doc/571X-5720-PG1XX)
 * `B57UDIAG.EXE` code
+
+Goals and assumptions
+=======
+The main goal of this exercise is to understand and replicate NVRAM manipulation logic independently 
+from MS-DOS environment. The easiest way to achieve this is to dump existing NVRAM content through `ethtool`, modify it and write it back to the NIC. 
+As one can notice while inspecting `B57UDIAG.EXE` code, the tool performs several
+NIC initialization and finalization operations. For example,
+at the end of the NVRAM write operations, it resets the NIC. When I started looking into implementing NVRAM manipulation logic, I made the assumption that writing to NVRAM
+through Linux `tg3` driver and `ethtool` would be safe at runtime, with the dirty OptionROM and directory table being "staged" until system
+reboot. I have run several tests with [broadcom-optionrom](https://github.com/marcoguerri/broadcom-optionrom) tool, which doesn't alter NIC state beyond content of NVRAM as described in this post, and this assumption seems to have held so far. Howver, as I don't have any knowledge around runtime firmware operations, I might still be wrong, and interacting with NVRAM while NIC is operational might not be safe under all circumstances. Use the following material at your own risk.
 
 Extracting assembly code
 =======
@@ -315,7 +323,7 @@ the tool, so I just resorted to chaing `jz` into `jnz` and I got a whole lot mor
 Writing NVRAM
 =======
 
-There main function responsible for altering the content of NVRAM is `sub_8708A`, where we can see a known refernce
+The main function responsible for altering the content of NVRAM is `sub_8708A`, where we can see a known refernce
 to `eecfg_write` verbose log output:
 
 ```
@@ -975,19 +983,41 @@ mutiply the first word by 4, suggesting, or confirming, that it represents a siz
 {% endhighlight %}
 </details>
 <br>
-We can try to replicate the operations above on a real NVRAM binary dump:
+We can try to replicate the operations above on a real NVRAM binary dump, using the following data:
 
-<p align="center">
-<a id="single_image" href="/img/dos/size-offset-combined.png">
-<img src="/img/dos/size-offset-combined.png" alt=""/></a>
-</p>
+* Size
+```
+$ xxd -l 4 -seek 8  -C NVRAM.v2.bin 
+00000008: 0000 02f5
+```
+* Offset
+```
+xxd -l 4 -seek 12  -C NVRAM.v2.bin  
+0000000c: 0000 02f8
+```
 
-Offset in this case is `0x2F8` and it needs to be rescaled as our NVRAM uses 264 bytes pages. Size is `0x2F5` and it needs to
-be multiplied by `+4`. The final address for additional content becomes therefore `(0x2F8/512)*264+0x2F8%512+0x2F5*4`, 
+
+The offset, `0x2F8`, needs to be rescaled as our NVRAM uses 264 bytes pages. Size,`0x2F5`, is instead multiplied by `+4`. The final address for additional content becomes therefore `(0x2F8/512)*264+0x2F8%512+0x2F5*4`, 
 i.e. `1*264+248+757*4=0xDD4`. From the resulting address, if we encounter `0xAA559966`, which is the header magic numer,
 we fetch the word at offset  `+4`, which seems to represent another size, add 8 and sum it up with the offset that got us to this new header.
-In this example, where we do see header magic at `0xDD4`, what we get is `0xDD4+8+0x1174=0x1F50`, which we can see it corresponds to the 
-offset of the existing OptionROM in the NVRAM, stored in the 4 bytes at `0x1C`. Essentially, the math adds up.
+In this example, we do see header magic at `0xDD4`:
+```
+$ xxd -l 4 -seek 0xDD4  -C NVRAM.v2.bin           
+00000dd4: 6699 55aa                             
+```
+and the next word is `0x1174`:
+```
+$ xxd -l 4 -seek 0xDD8  -C NVRAM.v2.bin                     
+00000dd8: 0000 1174
+```
+Combining all this together, we get `0xDD4+8+0x1174=0x1F50`, which we can see it corresponds to the 
+offset of the existing OptionROM in the NVRAM, stored in the 4 bytes at `0x1C` in the corresponding
+directory entry:
+
+```
+$ xxd -l 4 -seek 0x1C  -C NVRAM.v2.bin
+0000001c: 0000 1f50
+```
 
 <details> <summary>Expand - Final offset calculation</summary>
 {% highlight asm %}
@@ -1015,12 +1045,7 @@ offset of the existing OptionROM in the NVRAM, stored in the 4 bytes at `0x1C`. 
 {% endhighlight %}
 </details>
 <br>
-We can then summarize the new understanding of the layout of NVRAM as follows:
-
-<p align="center">
-<a id="single_image" href="/img/dos/overall-NVRAM-layout.png">
-<img src="/img/dos/overall-NVRAM-layout.png" alt=""/></a>
-</p>
+Essentially, the math adds up.
 {% comment %}
 00069D27                 jz      short loc_69D3E
 00069D29                 call    sub_2488F
@@ -1293,10 +1318,3 @@ OptionROM is being written to. In my experiments using Tianocore EDKII, I have a
 
 Overwriting Vendor and Device IDs at flash time is clearly much more flexible. The tool [I have written based on this exercise](https://github.com/marcoguerri/broadcom-optionrom) does not currently perform this operation and fully relies on the header generated at build time.
 
-Device initialization
-=======
-In addition to manipulating NRAM itself, `B57UDIAG.EXE` performs several additional NIC initialization and finalization operations. For example,
-at the end of the NVRAM write operations, it resets the NIC. When I started this exercise, I made the naive assumption that writing to NVRAM
-through Linux `tg3` would be safe at runtime. As the change is confined to OptionROM entry, the dirty NVRAM could stay as such until system
-reboot. I have run several tests on the custom [broadcom-optionrom](https://github.com/marcoguerri/broadcom-optionrom) tool, which doesn't 
-alter NIC state beyond content of NVRAM, and this assumption seems to have held so far.
