@@ -2,7 +2,7 @@
 layout: post
 title:  "Reverse engineering Android 2FA OTP application"
 date:   2023-09-09 08:00:00
-published: false
+published: true
 categories: android reversing
 pygments: true
 ---
@@ -25,21 +25,20 @@ checked manually.
 
 High level overview
 =======
-The application implements 2FA functionalities both in online and offline mode. For the former, 
-one just needs to approve a login attempt. For the latter, a 6 digits pin is generated after reading
-a QR code and typing a PIN chosen at the time when the device is enrolled in the system. 
-There is no network requirement for the latter mode.
-
+The application implements 2FA both in online and offline mode. For the former, 
+one just needs to approve the login attempt. For the latter, a 6 digits pin is generated offline
+after reading a QR code provided by the backend and typing a PIN chosen when the device was enrolled.
 This post is focused on the second flavor of OTP generation, in particular on the algorithm for
-OTP calculation. I have not looked into the enrollment process, i.e. the steps to establish
-a shared secret between client and server. OTP generation can be broken down in two phases,
+OTP calculation. I have not looked into the enrollment process, i.e. the steps that establish
+a shared secret between client and server. 
+
+OTP generation can be broken down in two phases,
 which replicate exactly the same cryptographic algorithms, although using different
 constants and taking different inputs:
 
 * From the QR code data, a base64 string representing "Transaction Data" is obtained
 * From Transaction Data, a 6 digits OTP is obtained
 
-At high level, the sequence of transformations is the following:
 <p align="center">
 <img src="/img/android-reversing/algorithm-overview.png" alt=""/>
 </p>
@@ -52,9 +51,13 @@ data and Transaction Data by splitting them into three parts:
 * Input data `[0:16]` is used to derive a symmetric encryption key. The derivation algorithm has
 also a transitive dependency on key material present on the device.
 * Input data `[16:24]` is AES encrypted in combination with an increasing counter, obtaining a
-ciphertext whose lenght matches the one of the input data
+ciphertext whose lenght matches the one of the input data minus `[0:24]`
 * Input deta `[24:]` is a One Time Pad that is XOR-ed with the previous AES ciphertext to get the 
 desired plaintext
+
+<p align="center">
+<img src="/img/android-reversing/input-data-split.png" alt=""/>
+</p>
 
 All cryptographic operations are implemented by `SCOtpManager` class, in `java_src/net/aliaslab/securecallotplib/SCOtpManager.java`. I'll leave aside from this post the analysis of
 the View logic as `SCOtpManager` and imported libraries are sufficiently self
@@ -64,11 +67,11 @@ Key material stored on the device
 =======
 A foundamental requirement for a 2FA device is that the OTP cannot be generated without the device
 itself. This seems to be obvious, but one of the reasons I wanted to reverse engineer the application
-was also to verify that the PIN alone would not be sufficient to generate the OTP. There must be
+was also to verify that the PIN alone would not be sufficient to get the OTP. There must be
 "something I have" involved, not just something I know.
 
 Looking through the code, one can see that the application has a dependency over Android KeyStore and it implements
-a three level key hierarchy. First, a `SecretKey` is retrieved from Android KeyStore. From `smali_classes4/v2/a/a/m.smali|e()`:
+a two level key hierarchy. First, a `SecretKey` is retrieved in `smali_classes4/v2/a/a/m.smali|e()`:
 
 ```
 const-string p1, "AndroidKeyStore"
@@ -82,32 +85,30 @@ move-result-object p1
 check-cast p1, Ljavax/crypto/SecretKey;
 ```
 
-On the read path, this key is used by `smali_classes4/v2/a/a/m.smali|init()` to read sealed objects
-within a file. First, the key is retrieved from `KeyStore` and then `smali_classes4/v2/a/a/m.smali|c()`
-is called to perform the actual reading:
+On the read path, this key is used by `smali_classes4/v2/a/a/m.smali|<init>()` to read sealed objects
+within a file. After retrieving the key, `smali_classes4/v2/a/a/m.smali|c()` is called to read and unseal the data:
 
 ```
 invoke-virtual {p0, p1}, Lv2/a/a/m;->e(Landroid/content/Context;)Ljavax/crypto/SecretKey;
 [...]
 invoke-virtual {p0, p2, p1}, Lv2/a/a/m;->c(Ljavax/crypto/SecretKey;Landroid/content/Context;)Ljava/util/HashMap;
 ```
-From the following excerpt of `c()` the structure of the sealed objects within the file is immediately
-clear:
+Code of `smali_classes4/v2/a/a/m.smali|c()` reveals the structure of the sealed objects within the file. An `IvParameterSpec` is first fetched and used to a Cipher:
 
 ```
 invoke-direct {v1, p2}, Ljava/io/ObjectInputStream;-><init>(Ljava/io/InputStream;)V
-:try_end_1
-.catchall {:try_start_1 .. :try_end_1} :catchall_4
-:try_start_2
+[...]
 invoke-virtual {v1}, Ljava/io/ObjectInputStream;->readObject()Ljava/lang/Object;
 move-result-object v2
-check-cast v2, [B
-if-eqz v2, :cond_2
+[..]
 new-instance v3, Ljavax/crypto/spec/IvParameterSpec;
 invoke-direct {v3, v2}, Ljavax/crypto/spec/IvParameterSpec;-><init>([B)V
 iget-object v2, p0, Lv2/a/a/m;->j:Ljavax/crypto/Cipher;
 const/4 v4, 0x2
 invoke-virtual {v2, v4, p1, v3}, Ljavax/crypto/Cipher;->init(ILjava/security/Key;Ljava/security/spec/AlgorithmParameterSpec;)V
+```
+Then, a hashmap containing device keys is read:
+```
 invoke-virtual {v1}, Ljava/io/ObjectInputStream;->readObject()Ljava/lang/Object;
 move-result-object p1
 check-cast p1, Ljavax/crypto/SealedObject;
@@ -116,15 +117,23 @@ invoke-virtual {p1, v2}, Ljavax/crypto/SealedObject;->getObject(Ljavax/crypto/Ci
 move-result-object p1
 check-cast p1, Ljava/util/HashMap;
 ```
-A sequence of bytes representing IV and a hashmap are serialized back to back.
 
-Intermediate key, from now on referred to as `IK`, is a requirement for generating AES encryption key
-IK is the result of the concatenation of three contributions:
+The hashmap stores three values: `sc_sac`, `sc_k2`, `sc_id`, with only the first two actively used for cryptographic purposes. AES key derivation happens in two steps, with
+an "Intermediate Key" first generated from key material on the device as a
+concatenation of the following contributions:
+
 * A key derived from `sc_sac`, which we will refer to as `IK_0`
 * A key derived from `sc_k2`, which we will refer to as `IK_1`
-* A constant, which we will refer to as `IK_K`
+* A constant, which differs between QR Code (`IK_K0`) and Transaction Data (`IK_K1`). In the former case, it is pre-pended to partial `IK`, while in the latter case it is appended.
 
-**First piece, derived from `sc_sac`**<br>
+<p align="center">
+<img src="/img/android-reversing/intermediate-key-components.png" alt=""/>
+</p>
+
+
+One `IK` is available, the actual key derivation for AES encryption is executed. The following three sections give an overview of how each components of `IK` is derived.
+
+**`IK_0`, derived from `sc_sac`**<br>
 The piece derived from `sc_sac` is the most complex one and it is the result of a sequence of 
 transformations shown in the following diagram:
 <p align="center">
@@ -160,7 +169,7 @@ bytes encryption key [4] to obtain a final ciphertext which constitutes `IK_0` [
 In the diagram above the null-bytes encryption sequence is highlighted as it will be re-used also for the 
 AES key derivation process.
 
-**Second piece, derived from `sc_k2`**<br>
+**`IK_1`, derived from `sc_k2`**<br>
 `sc_k2` is  XOR-ed with time deltas and appended to the initial part of the intermediate key.
 This applies both for QR code and transaction data encryption. The presence of a dependency on
 Unix time is immediately obvious by reading top level decompiled code from `SCOtpManager` class:
@@ -177,7 +186,7 @@ for (int i2 = 1; i2 <= 2; i2++) {
 The time deltas have a 1 hour granularity (ms/3600000) and the application attempts to combine `sc_k2` with [-1,0,+1] added to the current time. Note that this obviously does not constitute in any way a mechanism to force input data to expire. The application does fail to produce a valid result outsid of the [-1,0,1] time window,
 but this only a limitation of client side logic and once can choose any time adjustment constant.
 
-**Third piece, constant**<br>
+**`IK_K`, constant**<br>
  Depending on whether we are working with QR code or transaction data, the intermediate key is further 
 combined with the following:
 * For QR code, a constant correponding to `0x6ab392fd02` is pre-pended. This is value is hardcoded
@@ -186,8 +195,11 @@ combined with the following:
 AES key derivation
 =======
 The AES key derivation process is implemented in `smali/n2/a/a/a.smali|b()`, with the actual input
-parameters coming from `java_src/n2/a/a/a.java|a()`. The derivation process is shown in the following diagram. The null-bytes encryption sequence is exactly the same we have seen for the generation of `IK_0`.
+parameters coming from `java_src/n2/a/a/a.java|a()`. The overall process is shown in the following diagram, with the null-bytes encryption sequence being exactly the same we have seen for the generation of `IK_0`:
 
+<p align="center">
+<img src="/img/android-reversing/aes-key-derivation.png" alt=""/>
+</p>
 Two inputs are provided:
 * The intermediate key, IK
 * The first 16 bytes of input data 
