@@ -32,9 +32,7 @@ This post is focused on the second flavor of OTP generation, in particular on th
 OTP calculation. I have not looked into the enrollment process, i.e. the steps that establish
 a shared secret between client and server. 
 
-OTP generation can be broken down in two phases,
-which replicate exactly the same cryptographic algorithms, although using different
-constants and taking different inputs:
+OTP generation can be broken down in two phases:
 
 * From the QR code data, a base64 string representing "Transaction Data" is obtained
 * From Transaction Data, a 6 digits OTP is obtained
@@ -43,24 +41,32 @@ constants and taking different inputs:
 <img src="/img/android-reversing/algorithm-overview.png" alt=""/>
 </p>
 
-Cryptographic operations appear in the diagram as an `Encrypt + XOR` block because AES encryption and
-One Time Pad XOR are the foundamental primitives in use. Before starting to
- reverse engineer the application I expected to find some kind of HMAC based TOTP/HOTP calculation, 
-however this implementation turned out to be quite different. The `Encrypt + XOR` block works with QR code 
-data and Transaction Data by splitting them into three parts:
-* Input data `[0:16]` is used to derive a symmetric encryption key. The derivation algorithm has
-also a transitive dependency on key material present on the device.
-* Input data `[16:24]` is AES encrypted in combination with an increasing counter, obtaining a
-ciphertext whose lenght matches the one of the input data minus `[0:24]`
-* Input deta `[24:]` is a One Time Pad that is XOR-ed with the previous AES ciphertext to get the 
-desired plaintext
+When I started reverse engineering the application I expected 
+to find some kind of HMAC based TOTP/HOTP calculation, but this implementation turned out to be
+different. The two "Crypto" blocks in the diagram above implement exactly the same cryptographic 
+algorithm using different constants and inputs and they can be further broken down into the following 
+three steps:
+
+1. Derivation of symmetric encryption key
+e. AES encryption
+3. XOR with One Time Pad
+
+Each one of them consumes part of the input data, either QR code or Transaction Data, as follows:
+
+* Derivation of symmetric encryption key consumes input data `[0:16]`. This step has a transive
+dependency on the key material present on the device.
+* AES encryption consumes input data `[16:24]`, wihch is combined with an increasing counter to obtaining a ciphertext whose lenght matches the one of the input data minus `[0:24]`
+* XOR OTP consumes input deta `[24:]`
+
+In summary:
+
 
 <p align="center">
 <img src="/img/android-reversing/input-data-split.png" alt=""/>
 </p>
 
-All cryptographic operations are implemented by `SCOtpManager` class, in `java_src/net/aliaslab/securecallotplib/SCOtpManager.java`. I'll leave aside from this post the analysis of
-the View logic as `SCOtpManager` and imported libraries are sufficiently self
+All cryptographic operations are implemented by `SCOtpManager` class, in `java_src/net/aliaslab/securecallotplib/SCOtpManager.java` and imported libraries. I'll leave aside from this post the analysis of
+the View logic as `SCOtpManager` and dependencies are sufficiently self
 contained that do not need to interact with the UI
 
 Key material stored on the device
@@ -122,18 +128,24 @@ The hashmap stores three values: `sc_sac`, `sc_k2`, `sc_id`, with only the first
 an "Intermediate Key" first generated from key material on the device as a
 concatenation of the following contributions:
 
-* A key derived from `sc_sac`, which we will refer to as `IK_0`
-* A key derived from `sc_k2`, which we will refer to as `IK_1`
-* A constant, which differs between QR Code (`IK_K0`) and Transaction Data (`IK_K1`). In the former case, it is pre-pended to partial `IK`, while in the latter case it is appended.
+* A key derived from `sc_sac`, which we will refer to as `IK(sc_sac)`
+* A key derived from `sc_k2`, which we will refer to as `IK(sc_k2)`
+* A constant, which differs between QR Code, `IK(const_qrcode)`, and Transaction Data, `IK(const_tdata)`. In the former case, it is pre-pended to the first two contributions, while in the latter case it is appended.
 
-<p align="center">
-<img src="/img/android-reversing/intermediate-key-components.png" alt=""/>
-</p>
+Overall, `IK` structure for QR code can be summarized as follows:
 
+```
+IK = IK(const_qrcode) + IK(sc_sac) + IK(sc_k2)
+```
 
-One `IK` is available, the actual key derivation for AES encryption is executed. The following three sections give an overview of how each components of `IK` is derived.
+while `IK structure for Transaction Data can be summarized as follows:
+```
+IK = IK(sc_sac) + IK(sc_k2) + IK(const_tdata)
+```
 
-**`IK_0`, derived from `sc_sac`**<br>
+The following three sections give an overview of how each components of `IK` is derived.
+
+**Derivation of `IK(sc_sac)`**<br>
 The piece derived from `sc_sac` is the most complex one and it is the result of a sequence of 
 transformations shown in the following diagram:
 <p align="center">
@@ -169,7 +181,7 @@ bytes encryption key [4] to obtain a final ciphertext which constitutes `IK_0` [
 In the diagram above the null-bytes encryption sequence is highlighted as it will be re-used also for the 
 AES key derivation process.
 
-**`IK_1`, derived from `sc_k2`**<br>
+**Derivation of `IK(sc_k2)`**<br>
 `sc_k2` is  XOR-ed with time deltas and appended to the initial part of the intermediate key.
 This applies both for QR code and transaction data encryption. The presence of a dependency on
 Unix time is immediately obvious by reading top level decompiled code from `SCOtpManager` class:
@@ -186,7 +198,7 @@ for (int i2 = 1; i2 <= 2; i2++) {
 The time deltas have a 1 hour granularity (ms/3600000) and the application attempts to combine `sc_k2` with [-1,0,+1] added to the current time. Note that this obviously does not constitute in any way a mechanism to force input data to expire. The application does fail to produce a valid result outsid of the [-1,0,1] time window,
 but this only a limitation of client side logic and once can choose any time adjustment constant.
 
-**`IK_K`, constant**<br>
+**Derivation of `IK(const_qrcode)` and `IK(const_tdata)`**<br>
  Depending on whether we are working with QR code or transaction data, the intermediate key is further 
 combined with the following:
 * For QR code, a constant correponding to `0x6ab392fd02` is pre-pended. This is value is hardcoded
@@ -195,25 +207,24 @@ combined with the following:
 AES key derivation
 =======
 The AES key derivation process is implemented in `smali/n2/a/a/a.smali|b()`, with the actual input
-parameters coming from `java_src/n2/a/a/a.java|a()`. The overall process is shown in the following diagram, with the null-bytes encryption sequence being exactly the same we have seen for the generation of `IK_0`:
+parameters coming from `java_src/n2/a/a/a.java|a()`. The overall algorithm is shown in the diagram below, with the null-bytes encryption sequence being very similar to the one we have seen for the generation of `IK(sc_sac)`:
 
 <p align="center">
 <img src="/img/android-reversing/aes-key-derivation.png" alt=""/>
 </p>
 Two inputs are provided:
-* The intermediate key, IK
-* The first 16 bytes of input data 
+* The intermediate key, IK [19]
+* The first 16 bytes of input data [16] 
 
-The 16 bytes are XOR-ed with a constant whose value is use case dependent. QR code data cryptography uses 
-`AliasLabAliasLab`, while `L=T=1W:JCFLSKH3B` is used for transaction data. These constants are not static
-values defined in code, but rather they are generated algoritmically in `smali/n2/a/a/c.smali|<clinit>()`. 
+The 16 bytes are XOR-ed [17] with a constant whose value is use case dependent [18]. 
+QR code operations use `AliasLabAliasLab`, while `L=T=1W:JCFLSKH3B` is used for transaction data. 
+Interestingly, these constants are not static values defined in code, but rather they are generated algoritmically in  `smali/n2/a/a/c.smali|<clinit>()`. 
 There is no source of randomness nor any input given to the algorithm, so the output is always the same.
-The result of the XOR operation constitues the fragment that goes through the null bytes encryption sequence.
+The result of the XOR operation constitues the fragment whose trailing bytes are XOR-ed [28] with the constants [24][26] obtained from the null bytes encryption sequence, which uses IK [19] as encryption key in this case.
 
-As before, the intermediate key encrypts 16 null bytes and produces another set of `c2 and `c3`
-parameters. These are used as XOR patterns for the trailing bytes of the fragment. The final encryption
-step is executed repeatedly (5000 times) and at each result we accumulate XOR result between the 
-ciphertext and the previous value.
+The variation with respect to the algorithm that derives `IK(sc_sac)` is that the final AES encryption
+step [29] is repeated multiple times (5000 in the code I analyzed) and at each step the output value is 
+accumulated through XOR operation with the previous results.
 
 AES encryption
 =======
@@ -224,11 +235,10 @@ with the One Time Pad generates the plaintext.
 <img src="/img/android-reversing/aes-encrypt.png" alt=""/>
 </p>
 
-We have already seen in the previous section how AES key is generated. The plaintext [] is derived
-from bytes `[16:24]` of the input data, which are tranformed as follows:
-* Input data `[16:24]` is copied into the upper half of  an array of 16 null bytes
-* The array is XOR-ed with the same constants we have encountered for AES key derivation
-* An increasing counter is copied in the bottom 8 bytes of the XOR-ed value
+We have already seen in the previous section how AES key is generated. The ciphertext is generated
+from bytes `[16:24]` of the input data [28], which are tranformed as follows:
+* Input data `[16:24]` is XOR-ed [30] with the same constants [31] we have encountered for AES key derivation
+* An increasing counter [33] is copied in upper 8 bytes of the XOR-ed value
 
 As an example, consider the following QR code:
 ```
@@ -240,16 +250,12 @@ If we extract bytes `[16:24]` from input data, we obtain:
 CC2F8B57A545E1C7
 ```
 
-Since we are working with QR code data, the XOR constant is `AliasLabAliasLab`, i.e. `416C6961734C6162416C6961734C6162`. QR code bytes are copied into an array of 16 null bytes:
+Since we are working with QR code data, the XOR constant is `AliasLabAliasLab`, i.e. `416C6961734C6162416C6961734C6162`. QR code bytes are copied XOR-ed for the common lenght:
 ```
-CC2F8B57A545E1C70000000000000000
+CC2F8B57A545E1C7 ^ 416C6961734C6162416C6961734C6162 = 8D43E236D60980A5
 ```
-
-This value is XOR-ed with the constant:
-```
-CC2F8B57A545E1C70000000000000000 ^ 416C6961734C6162416C6961734C6162 = 8D43E236D60980A5416C6961734C6162
-```
-The increasing counter is then copied in the lower 8 bytes of the result:
+The increasing counter is copied in the upper 8 bytes of the 16 bytes result array, while the XOR-ed value is copied in the lower 8 bytes.
+result:
 ```
 8D43E236D60980A50000000000000000 with counter = 0
 8D43E236D60980A50000000000000001 with counter = 1
