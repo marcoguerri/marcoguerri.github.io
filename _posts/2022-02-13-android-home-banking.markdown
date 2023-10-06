@@ -20,6 +20,10 @@ such this one are known, but regardless I am quite uncomfortable with this level
 of complexity for something security related, compared to a simpler
 RFC 4226-based HMAC OTP.
 
+The work presented in this post is the result of reverse engineering 
+[smali code](https://stackoverflow.com/questions/30837450/what-is-smali-code-android) from the unpacked Android application, using mainly  `vscodium` with APK lab extension .
+
+
 High level overview
 =======
 The application implements 2FA both in online and offline mode. For the former, 
