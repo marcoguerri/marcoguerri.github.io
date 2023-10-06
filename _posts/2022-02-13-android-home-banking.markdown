@@ -7,21 +7,18 @@ categories: android reversing
 pygments: true
 ---
 As part of my disaster recovery plan, I want to have a secure, offline, sealed back-up of my 2FA 
-material for online banking and be able to generate OTPs without my phone in case of emergency. 
+material for online banking to generate OTPs without my phone in case of emergency. 
 To get there, I reverse engineered my bank's Android OTP application, expecting
-to find some kind of HMAC-based HTOP/TOPT generation. I found instead an implementation 
-that is significantly more complex than that, involving more than 20k calls to `aes.Encrypt`.
-As a non-expert cryptographer, I am quite uncomfortable with the level of complexity and seemigly
-"custom" operations, at least to my eyes, happening here, compared to a simple RFC 4226-based HMAC
-OTP algorithm. 
-
-Environment setup
-=======
-A couple of words around the setup first. I used `vscodium` and APK lab extension for unpacking the app. 
-Testing has been done on an emulator instance, on a trusted host. I had to enroll the
-emulator as my new 2FA device, so I initially needed connectivity. When needed, a forward proxy was set-up on the same machine. After enrollment, the system was air gapped.
-The `.apk`of the banking app was downloaded via Aurora store, with its signature
-checked manually.
+to find some kind of HMAC-based HTOP/TOPT implementation. I found instead 
+something significantly more complex than that, involving thousand of calls to 
+`aes.Encrypt`. I am not a cryptographer and this is not meant to be a security 
+review. Some red flags did stand out to me, e.g. use of AES in ECB mode in one 
+case,  even though they do not seem to be sufficient to invalidate the security of the 
+whole flow. I am also not familiar with the overall algorithm as something
+recorded in cryptography literature. It might be that hybrid schemes
+such this one are known, but regardless I am quite uncomfortable with this level
+of complexity for something security related, compared to a simpler
+RFC 4226-based HMAC OTP.
 
 High level overview
 =======
@@ -41,17 +38,16 @@ OTP generation can be broken down in two phases:
 <img src="/img/android-reversing/algorithm-overview.png" alt=""/>
 </p>
 
-When I started reverse engineering the application I expected 
-to find some kind of HMAC based TOTP/HOTP calculation, but this implementation turned out to be
-different. The two "Crypto" blocks in the diagram above implement exactly the same cryptographic 
-algorithm using different constants and inputs and they can be further broken down into the following 
-three steps:
+When I started reverse engineering the application I expected  to find some kind of HMAC based TOTP/HOTP 
+calculation, but this wasn't the case. The two "Crypto" blocks in the diagram above implement exactly 
+the same cryptographic algorithm using different constants and inputs and they can be further broken 
+as follows:
 
-1. Derivation of symmetric encryption key
-e. AES encryption
+1. Derivation of symmetric encryption key for AES encryption
+2. AES encryption
 3. XOR with One Time Pad
 
-Each one of them consumes part of the input data, either QR code or Transaction Data, as follows:
+Each one of these steps consumes part of the input data, either QR code or Transaction Data:
 
 * Derivation of symmetric encryption key consumes input data `[0:16]`. This step has a transive
 dependency on the key material present on the device.
@@ -99,8 +95,7 @@ invoke-virtual {p0, p1}, Lv2/a/a/m;->e(Landroid/content/Context;)Ljavax/crypto/S
 [...]
 invoke-virtual {p0, p2, p1}, Lv2/a/a/m;->c(Ljavax/crypto/SecretKey;Landroid/content/Context;)Ljava/util/HashMap;
 ```
-Code of `smali_classes4/v2/a/a/m.smali|c()` reveals the structure of the sealed objects within the file. An `IvParameterSpec` is first fetched and used to a Cipher:
-
+Code of `smali_classes4/v2/a/a/m.smali|c()` reveals the structure of the sealed objects. An `IvParameterSpec` is first fetched and used to inizialize the corresponding Cipher:
 ```
 invoke-direct {v1, p2}, Ljava/io/ObjectInputStream;-><init>(Ljava/io/InputStream;)V
 [...]
@@ -124,7 +119,12 @@ move-result-object p1
 check-cast p1, Ljava/util/HashMap;
 ```
 
-The hashmap stores three values: `sc_sac`, `sc_k2`, `sc_id`, with only the first two actively used for cryptographic purposes. AES key derivation happens in two steps, with
+The hashmap stores three values: 
+* `sc_sac` 
+* `sc_k2` 
+* `sc_id`
+
+ with only the first two actively used for cryptographic purposes. AES key derivation happens in two steps, with
 an "Intermediate Key" first generated from key material on the device as a
 concatenation of the following contributions:
 
@@ -153,7 +153,7 @@ transformations shown in the following diagram:
 </p>
 `sc_sac` [1] is first combined [2] with a use case specific fragment [3]. 
 
-The combination process is implemented in `smali/n2/a/a/f.smali|<init>()` and it is relatively simple
+The combination process is implemented in `smali/n2/a/a/f.smali|<init>()` [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L77) and it is relatively simple
 to understand directly from smali code:
 
 ```
@@ -165,28 +165,28 @@ add-int/lit8 v4, v4, 0x1
 
 One can notice that the fragment is passed as string agument. A more friendly Java equivalent 
 could be the following:
-```java
+```
 int i2 = 0;
 for (char c : str.toCharArray()) {
     i2 = (i2 * 31) + c;
 }
 ```
 
-For QR code operations, the fragment is `sc_k2[0:5]`, while for Transaction Data user PIN is 
-used. The resulting key [4] then encrypts [5] 16 null bytes [6] and the ciphertext [10] is further 
+For QR code operations, the fragment is `sc_k2[0:5]` [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L368), while for Transaction Data user PIN is 
+used [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L444). The resulting key [4] then encrypts [5] 16 null bytes [6] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L83C12-L83C44) and the ciphertext [10] is further 
 shifted \[11\]\[13\]  to obtain two more patterns, `c2` [12] and `c3` [14].
-The trailing bytes of the fragment [3] which exceed `len(fragment)%16` are XOR-ed [7] with either `c2` [12] or `c3` [14], depending on the value of `len(fragment)%16`. The result is encrypted [8]  with the null 
+The trailing bytes of the fragment [3] which exceed `len(fragment)%16` are XOR-ed [7] with either `c2` [12] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L244) `c3` [14] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L249), depending on the value of `len(fragment)%16`. The result is encrypted [8] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L258)  with the null 
 bytes encryption key [4] to obtain a final ciphertext which constitutes `IK_0` [9].
 
 In the diagram above the null-bytes encryption sequence is highlighted as it will be re-used also for the 
 AES key derivation process.
 
 **Derivation of `IK(sc_k2)`**<br>
-`sc_k2` is  XOR-ed with time deltas and appended to the initial part of the intermediate key.
-This applies both for QR code and transaction data encryption. The presence of a dependency on
+`sc_k2` is  XOR-ed with time deltas [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L384C12-L384C46) and appended to the initial part of the intermediate key.
+ The presence of a dependency on
 Unix time is immediately obvious by reading top level decompiled code from `SCOtpManager` class:
 
-```java
+```
 int currentTimeMillis = (int) (System.currentTimeMillis() / ((long) 3600000));
 arrayList.add(ByteBuffer.allocate(4).putInt(currentTimeMillis).array());
 for (int i2 = 1; i2 <= 2; i2++) {
@@ -195,36 +195,36 @@ for (int i2 = 1; i2 <= 2; i2++) {
 }
 ```
 
-The time deltas have a 1 hour granularity (ms/3600000) and the application attempts to combine `sc_k2` with [-1,0,+1] added to the current time. Note that this obviously does not constitute in any way a mechanism to force input data to expire. The application does fail to produce a valid result outsid of the [-1,0,1] time window,
-but this only a limitation of client side logic and once can choose any time adjustment constant.
+The time deltas have a 1 hour granularity (ms/3600000) and the application attempts to combine `sc_k2` with [-1,0,+1] added to the current time. Note that this obviously does not constitute in any way a mechanism to force input data to expire. The application does fail to produce a valid result outside of the [-1,0,1] time window,
+but this only a limitation of client side logic and one can choose any time adjustment constant [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L399-L400).
 
 **Derivation of `IK(const_qrcode)` and `IK(const_tdata)`**<br>
  Depending on whether we are working with QR code or transaction data, the intermediate key is further 
 combined with the following:
-* For QR code, a constant correponding to `0x6ab392fd02` is pre-pended. This is value is hardcoded
-* For transaction data, a constant of `0x8000000000` is appended
+* For QR code, a constant correponding to `0x6ab392fd02` is pre-pended [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L386). This is value is hardcoded
+* For transaction data, a constant of `0x8000000000` [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L458) is appended
 
 AES key derivation
 =======
 The AES key derivation process is implemented in `smali/n2/a/a/a.smali|b()`, with the actual input
-parameters coming from `java_src/n2/a/a/a.java|a()`. The overall algorithm is shown in the diagram below, with the null-bytes encryption sequence being very similar to the one we have seen for the generation of `IK(sc_sac)`:
+parameters coming from `java_src/n2/a/a/a.java|a()`. The overall algorithm is shown in the diagram below, with the null-bytes encryption sequence being very similar to the one used to generate `IK(sc_sac)`:
 
 <p align="center">
 <img src="/img/android-reversing/aes-key-derivation.png" alt=""/>
 </p>
-Two inputs are provided:
-* The intermediate key, IK [19]
-* The first 16 bytes of input data [16] 
+Two inputs are given:
+* The intermediate key, IK [19] [[code,qr]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L386) [[code,tdata]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L458)
+* The first 16 bytes of input data [16] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L308-L313)
 
 The 16 bytes are XOR-ed [17] with a constant whose value is use case dependent [18]. 
-QR code operations use `AliasLabAliasLab`, while `L=T=1W:JCFLSKH3B` is used for transaction data. 
-Interestingly, these constants are not static values defined in code, but rather they are generated algoritmically in  `smali/n2/a/a/c.smali|<clinit>()`. 
+QR code operations use `AliasLabAliasLab` [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L47), while `L=T=1W:JCFLSKH3B` [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L62) is used for transaction data. 
+Interestingly, these constants are not static values defined in code, but rather they are calculated algoritmically at runtime in  `smali/n2/a/a/c.smali|<clinit>()` [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/constant.go).
 There is no source of randomness nor any input given to the algorithm, so the output is always the same.
-The result of the XOR operation constitues the fragment whose trailing bytes are XOR-ed [28] with the constants [24][26] obtained from the null bytes encryption sequence, which uses IK [19] as encryption key in this case.
+The result of the XOR operation constitues the fragment whose trailing bytes are XOR-ed [28] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L276) with the constants [24][26] obtained from the null bytes encryption sequence executed with IK [19] as encryption key in this case.
 
-The variation with respect to the algorithm that derives `IK(sc_sac)` is that the final AES encryption
-step [29] is repeated multiple times (5000 in the code I analyzed) and at each step the output value is 
-accumulated through XOR operation with the previous results.
+The variation with respect to the algorithm that derives `IK(sc_sac)` is that the final XOR with c2 and c3 [28] and AES encryption
+steps [29] are repeated multiple times [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L282-L286) (5000) and at each step the output value is 
+accumulated through XOR operation with the previous results [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L285).
 
 AES encryption
 =======
@@ -235,10 +235,11 @@ with the One Time Pad generates the plaintext.
 <img src="/img/android-reversing/aes-encrypt.png" alt=""/>
 </p>
 
-We have already seen in the previous section how AES key is generated. The ciphertext is generated
-from bytes `[16:24]` of the input data [28], which are tranformed as follows:
-* Input data `[16:24]` is XOR-ed [30] with the same constants [31] we have encountered for AES key derivation
-* An increasing counter [33] is copied in upper 8 bytes of the XOR-ed value
+The ciphertext is generated
+from bytes `[16:24]` of the input data [31], which are tranformed as follows:
+* Input data `[16:24]` is XOR-ed [33] with the same constants [32] we have encountered for AES key derivation [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L315-L319)
+* An increasing counter [34] is copied in upper 8 bytes of the XOR-ed value [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L334)
+
 
 As an example, consider the following QR code:
 ```
@@ -267,9 +268,8 @@ obtain enough 16 bytes arrays to match the length of input data, either QR code 
 
 XOR-ing with One Time Pad
 =======
-The final operation to obtain the desired secrets consists in XOR-ing input data `[24:]` (we have already
-used 24 bytes, for AES key derivation and plaintext calculation) with the encrypted fragments obtained
-in the previous section.
+The final operation which yield OTP secrets consists in XOR-ing input data `[24:]` (we have already
+used 24 bytes, for AES key derivation and plaintext calculation) with the encrypted fragments obtained in the previous section.
 
 
 
