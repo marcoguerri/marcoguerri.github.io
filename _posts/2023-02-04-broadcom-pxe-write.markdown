@@ -5,6 +5,7 @@ date:   2023-02-04 08:00:00
 published: true
 categories: reversing msdos
 pygments: true
+toc: true
 ---
 
 I have been working on UEFI OptionROM malware research using a Broacdom BCM5751 1G Network Card

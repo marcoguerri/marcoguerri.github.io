@@ -5,6 +5,7 @@ date:   2023-09-09 08:00:00
 published: true
 categories: android reversing
 pygments: true
+toc: true
 ---
 As part of my disaster recovery plan, I want to have a secure, offline, sealed back-up of my 2FA 
 material for online banking to generate OTPs without my phone in case of emergency. 
@@ -149,7 +150,8 @@ IK = IK(sc_sac) + IK(sc_k2) + IK(const_tdata)
 
 The following three sections give an overview of how each components of `IK` is derived.
 
-**Derivation of `IK(sc_sac)`**<br>
+Derivation of `IK(sc_sac)`
+---
 The piece derived from `sc_sac` is the most complex one and it is the result of a sequence of 
 transformations shown in the following diagram:
 <p align="center">
@@ -185,7 +187,8 @@ bytes encryption key [4] to obtain a final ciphertext which constitutes `IK_0` [
 In the diagram above the null-bytes encryption sequence is highlighted as it will be re-used also for the 
 AES key derivation process.
 
-**Derivation of `IK(sc_k2)`**<br>
+Derivation of `IK(sc_k2)`
+---
 `sc_k2` is  XOR-ed with time deltas [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L384C12-L384C46) and appended to the initial part of the intermediate key.
  The presence of a dependency on
 Unix time is immediately obvious by reading top level decompiled code from `SCOtpManager` class:
@@ -202,7 +205,8 @@ for (int i2 = 1; i2 <= 2; i2++) {
 The time deltas have a 1 hour granularity (ms/3600000) and the application attempts to combine `sc_k2` with [-1,0,+1] added to the current time. Note that this obviously does not constitute in any way a mechanism to force input data to expire. The application does fail to produce a valid result outside of the [-1,0,1] time window,
 but this only a limitation of client side logic and one can choose any time adjustment constant [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L399-L400).
 
-**Derivation of `IK(const_qrcode)` and `IK(const_tdata)`**<br>
+Derivation of `IK(...)`
+---
  Depending on whether we are working with QR code or transaction data, the intermediate key is further 
 combined with the following:
 * For QR code, a constant correponding to `0x6ab392fd02` is pre-pended [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L386). This is value is hardcoded

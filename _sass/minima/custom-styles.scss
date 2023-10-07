@@ -1,2 +1,25 @@
 // Placeholder to allow defining custom styles that override everything else.
 // (Use `_sass/minima/custom-variables.scss` to override variable defaults)
+
+.section-nav {
+  background-color: #282828;
+  margin: 5px 0 2em;
+  padding: 10px 30px;
+  border: 1px solid #404040;
+  border-radius: 3px;
+}
+
+
+.highlight {
+    border: 1px solid #404040;
+}
+
+div.highlight {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+
+pre.highlight {
+    margin-bottom: 0px;
+}
