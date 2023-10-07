@@ -3,7 +3,7 @@ layout: post
 title:  "Reverse engineering MS-DOS binaries"
 date:   2023-08-26 08:00:00
 published: true
-categories: reversing msdos
+tags: reversing msdos
 pygments: true
 ---
 

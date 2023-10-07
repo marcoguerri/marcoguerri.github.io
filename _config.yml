@@ -16,6 +16,8 @@ plugins:
   - jekyll-feed
   - jekyll-seo-tag
   - jekyll-toc
+  - jekyll-archives
+
 
 # Theme-specific settings
 
@@ -38,11 +40,18 @@ minima:
 # order as they should show up.
 #
 header_pages:
+  - tags.md
   - about.md
-
 # Set to `true` to show excerpts on the homepage.
 #
 show_excerpts: true
 
 disqus:
   shortname: 'marcoguerri'
+
+jekyll-archives:
+  enabled:
+    - tags
+  layout: archive
+  permalinks:
+    tag: '/tags/:name/'

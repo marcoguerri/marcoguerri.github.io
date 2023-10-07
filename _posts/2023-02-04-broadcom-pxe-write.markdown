@@ -3,9 +3,9 @@ layout: post
 title:  "Reverse enginering UEFI OptionROM layout on BCM575x NIC"
 date:   2023-02-04 08:00:00
 published: true
-categories: reversing msdos
 pygments: true
 toc: true
+tags: [reversing, msdos]
 ---
 
 I have been working on UEFI OptionROM malware research using a Broacdom BCM5751 1G Network Card

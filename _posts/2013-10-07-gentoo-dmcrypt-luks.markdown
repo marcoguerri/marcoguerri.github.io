@@ -2,7 +2,7 @@
 layout: post
 title:  "Gentoo full disk encryption with dm-crypt/LUKS"
 date:   2013-10-07 13:31:48
-tag: linux security
+tags: [security, gentoo]
 ---
 
 

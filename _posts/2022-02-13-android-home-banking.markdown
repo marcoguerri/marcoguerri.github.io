@@ -3,14 +3,14 @@ layout: post
 title:  "Reverse engineering Android 2FA OTP application"
 date:   2023-09-09 08:00:00
 published: true
-categories: android reversing
 pygments: true
 toc: true
+tags: [reversing, android]
 ---
 As part of my disaster recovery plan, I want to have a secure, offline, sealed back-up of my 2FA 
 material for online banking to generate OTPs without my phone in case of emergency. 
 To get there, I reverse engineered my bank's Android OTP application, expecting
-to find some kind of HMAC-based HTOP/TOPT implementation. I found instead 
+to find some kind of HMAC-based HOTP/TOTP implementation. I found instead 
 something significantly more complex than that, involving thousand of calls to 
 `aes.Encrypt`. I am not a cryptographer and this is not meant to be a security 
 review. Some red flags did stand out to me, e.g. use of AES in ECB mode in one 
@@ -40,7 +40,7 @@ OTP generation can be broken down in two phases:
 * From Transaction Data, a 6 digits OTP is obtained
 
 <p align="center">
-<img src="/img/android-reversing/algorithm-overview.png" alt=""/>
+<img src="/img/android-reversing/algorithm-overview.png" alt="" style="max-width: 80%"/>
 </p>
 
 When I started reverse engineering the application I expected  to find some kind of HMAC based TOTP/HOTP 

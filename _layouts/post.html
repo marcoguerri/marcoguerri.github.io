@@ -17,6 +17,15 @@ layout: default
           {{ mdate | date: date_format }}
         </time>
       {%- endif -%}
+      {%- if page.tags.size > 0 -%}
+      |
+      {% for tag in page.tags %}
+      <a href="/tags/{{tag}}">{{tag}}</a>
+      {%- if forloop.last == false %}
+      ,
+      {%- endif -%}
+      {% endfor %}
+      {%- endif -%}
       {%- if page.author -%}
         • {% for author in page.author %}
           <span itemprop="author" itemscope itemtype="http://schema.org/Person">
