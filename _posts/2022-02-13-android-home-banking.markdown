@@ -5,7 +5,7 @@ date:   2023-09-09 08:00:00
 published: true
 pygments: true
 toc: true
-tags: [reversing, android]
+tags: [reverse-engineering, android]
 ---
 As part of my disaster recovery plan, I want to have a secure, offline, sealed back-up of my 2FA 
 material for online banking to generate OTPs without my phone in case of emergency. 

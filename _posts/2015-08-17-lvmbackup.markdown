@@ -3,7 +3,7 @@ layout: post
 title:  "Dumping LVM volumes for debugging purposes"
 date:   2015-08-17 08:00:00
 published: yes
-categories: linux administration
+tags: [linux, lvm, storage]
 pygments: true
 ---
 

@@ -3,13 +3,14 @@ layout: post
 title:  "Reverse engineering MS-DOS binaries"
 date:   2023-08-26 08:00:00
 published: true
-tags: reversing msdos
+tags: [reverse-engineering, msdos]
 pygments: true
 ---
 
-I have recently reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html) and got a chance to work with tools that I had not used before. Broadcom's binary came
+I have recently reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html) and got a chance to work with
+formats that I had not seen before. Broadcom's binary came
 as a UPX compressed linear executable prepended with Protected Mode extender and required
-tools such as IDA 4.1, IDA 5.0, to be reverse engineered. This post is a collection of pointers
+tools such as IDA 4.1, IDA 5.0, to be reverse engineered. This post is a collection of notes
 explaining how to get from binary to disassembled and decompiled code for applications packaged
 in a similar way.
 

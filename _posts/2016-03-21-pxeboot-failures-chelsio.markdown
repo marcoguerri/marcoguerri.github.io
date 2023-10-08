@@ -2,7 +2,7 @@
 layout: post
 title:  "pxelinux 6.03 boot failure with Chelsio T520-LL-CR"
 date:   2016-03-20 21:00:00
-categories: linux pxe datacenter
+tags: [linux, pxe, debugging, networking]
 published: yes
 ---
 

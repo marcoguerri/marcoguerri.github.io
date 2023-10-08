@@ -3,7 +3,7 @@ layout: post
 title:  "Debugging a failed Openembedded build with devshell"
 date:   2016-08-27 08:00:00
 published: yes
-categories: openembedded
+tags: [openembedded]
 pygments: true
 ---
 

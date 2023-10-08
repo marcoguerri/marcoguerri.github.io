@@ -2,7 +2,7 @@
 layout: post
 title:  "Exploiting CVE-2014-0160, also known as Heartbleed"
 date:   2014-08-23 13:31:48
-categories: linux security
+tags: [linux, security, vulnerabilities]
 published: yes
 pygments: true
 ---

@@ -3,7 +3,7 @@ layout: post
 title:  "C++ move semantics and rvalue reference"
 date:   2016-11-26 08:00:00
 published: yes
-categories: programming cpp
+tags: [programming, c++]
 pygments: true
 ---
 

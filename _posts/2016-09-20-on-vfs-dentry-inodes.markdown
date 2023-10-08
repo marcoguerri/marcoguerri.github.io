@@ -3,7 +3,7 @@ layout: post
 title:  "Linux VFS internals: dentries"
 date:   2016-09-19 08:00:00
 published: yes
-categories: linux
+tags: [linux, vfs, storage]
 pygments: true
 ---
 

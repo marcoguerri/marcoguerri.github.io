@@ -3,7 +3,7 @@ layout: post
 title:  "Branch target prediction and performance"
 date:   2017-02-11 08:00:00
 published: yes
-categories: performance python
+tags: [python, performace]
 pygments: true
 summary: "Recent CPU microarchitectures have drastically improved the accuracy
 of hardware branch predictors and branch target predictors. Some heavily non-linear workloads
