@@ -5,6 +5,7 @@ date:   2023-08-26 08:00:00
 published: true
 tags: [reverse-engineering, msdos]
 pygments: true
+comments: true
 ---
 
 I have recently reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html) and got a chance to work with
