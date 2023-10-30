@@ -5,6 +5,7 @@ date:   2014-08-23 13:31:48
 tags: [linux, security, vulnerabilities]
 published: yes
 pygments: true
+toc: true
 ---
 
 This post presents a proof of concept of an exploit for the Heartbleed bug.

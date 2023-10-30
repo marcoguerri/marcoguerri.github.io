@@ -5,6 +5,7 @@ date:   2015-08-17 08:00:00
 published: yes
 tags: [linux, lvm, storage]
 pygments: true
+toc: true
 ---
 
 This post covers a possible procedure to "snapshot" a Linux

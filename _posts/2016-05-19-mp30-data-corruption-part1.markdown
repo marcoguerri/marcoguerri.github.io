@@ -3,6 +3,7 @@ layout: post
 title:  "Network data corruption on a Gigabyte R120-P31 - Part 1"
 date:   2016-06-19 21:00:00
 tags: [linux, arm64, debugging, networking]
+toc: true
 ---
 
 This post covers a network data corruption issue encountered on a Gigabyte ARM64 R120-MP31. 

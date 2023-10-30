@@ -221,7 +221,8 @@ capget({version=_LINUX_CAPABILITY_VERSION_3, pid=0}, {effective=0, permitted=0, 
 capset({version=_LINUX_CAPABILITY_VERSION_3, pid=0}, {effective=0, permitted=0, inheritable=0}) = 0
 ```
 
-This looks a lot like an attempt to assess if the process is running as root, following by a drop of all capabilities. So, event if `cap_net_admin+ep` might be working the `capset` call above makes it a no-op. In fact,
+This looks a lot like an attempt to assess if the process is running as root, followed by a drop of all 
+capabilities. So, even if `cap_net_admin+ep` might be working the `capset` call above makes it a no-op. In fact,
 in `iproute2/ip/ip.c` one can see the following excerpt:
 
 ```c
@@ -236,7 +237,7 @@ What is tricked `ip` into thinking it is running as root? `fakeroot` does exactl
 `fakeroot`, `LD_PRELOAD`  and capabilities
 =======
 
-The first attempts with `fakeroot` were certainly not succesful:
+The first attempt with `fakeroot` was unsuccessful:
 
 ```
 $ fakeroot ip link add name br0 type bridge

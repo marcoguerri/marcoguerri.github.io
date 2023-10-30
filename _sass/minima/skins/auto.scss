@@ -267,8 +267,7 @@ $table-border-color: $lm-table-border-color;
 
   @include lm-highlight;
 
-  @media (prefers-color-scheme: dark) {
-    :root {
+    :root.is-dark-mode {
       --minima-brand-color: #{$dm-brand-color};
       --minima-brand-color-light: #{$dm-brand-color-light};
       --minima-brand-color-dark: #{$dm-brand-color-dark};
@@ -292,10 +291,9 @@ $table-border-color: $lm-table-border-color;
       --minima-table-header-bg-color: #{$dm-table-header-bg-color};
       --minima-table-header-border: #{$dm-table-header-border};
       --minima-table-border-color: #{$dm-table-border-color};
+     @include dm-highlight;
     }
 
-    @include dm-highlight;
-  }
 
   $brand-color: var(--minima-brand-color);
   $brand-color-light: var(--minima-brand-color-light);

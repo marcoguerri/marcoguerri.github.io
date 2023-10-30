@@ -4,6 +4,7 @@ title:  "pxelinux 6.03 boot failure with Chelsio T520-LL-CR"
 date:   2016-03-20 21:00:00
 tags: [linux, pxe, debugging, networking]
 published: yes
+toc: true
 ---
 
 This a collection of notes I have taken while debugging a regression of CERN PXE booting
