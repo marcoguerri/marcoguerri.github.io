@@ -5,7 +5,7 @@
 .site-header {
   width: 100%;
   min-height: $spacing-unit * 1.865;
-  display:inline-block;
+  line-height: $base-line-height * $base-font-size * 5.25;
   // Positioning context for the mobile navigation icon
 }
 
@@ -240,7 +240,7 @@
 
 .post-title,
 .post-content h1 {
-  @include relative-font-size(2.625);
+  @include relative-font-size(1.8);
   letter-spacing: -1px;
   line-height: 1.15;
 
@@ -348,12 +348,14 @@ html, body{max-width: $content-width;margin:auto;padding-left:10px; padding-righ
 .content_right {
   position: sticky;
   top: 10px;
-  display: inline-block;
   vertical-align: top;
   text-align: left;
   overflow:clip;
   padding:10px;
-  width: 300px;
+  padding-right:0px;
+  padding-left:0px;
+  width: 330px;
+  float: right;
 }
 
 
