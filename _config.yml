@@ -29,8 +29,8 @@ minima:
   #
   # date_format: "%b %-d, %Y"
 
-  skin: auto
-    #auto
+  skin: dark
+  # auto wip
 
   # Generate social links in footer.
   #
