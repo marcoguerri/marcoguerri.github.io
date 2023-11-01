@@ -3,10 +3,8 @@
  */
 
 .site-header {
-  width: 100%;
-  min-height: $spacing-unit * 1.865;
-  line-height: $base-line-height * $base-font-size * 5.25;
-  // Positioning context for the mobile navigation icon
+  min-height: $spacing-unit * 2.865;
+  padding-top: 30px;
 }
 
 .site-title {
@@ -335,33 +333,37 @@
 
 
 /**
- * Table of content cells
+ * Table of content areas
  */
 
 @media (max-width: 800px) {
 }
 
-html, body{max-width: $content-width;margin:auto;padding-left:10px; padding-right:10px;}
+body{
+    max-width: $content-width;
+    margin:auto;
+    padding-left:10px; 
+    padding-right:10px;
+}
 
 
 
 .content_right {
   position: sticky;
-  top: 10px;
-  vertical-align: top;
-  text-align: left;
   overflow:clip;
   padding:10px;
   padding-right:0px;
-  padding-left:0px;
+  // This could be parametrized
   width: 330px;
   float: right;
+  top: 10px;
 }
 
 
 .content_left {
   display: inline-block;
   text-align: left;
+  // Maximum area minus space taken up by content_right.
   width: calc(100% - 340px);
 }
 

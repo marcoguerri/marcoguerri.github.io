@@ -1,16 +1,13 @@
 <!DOCTYPE html>
 <html lang="{{ page.lang | default: site.lang | default: "en" }}">
+<head>
+  <title></title>
+</head>
+<body>
+  {%- include head.html -%} 
+  <script>
 
-
-  {%- include head.html -%}
-
-  <body>
-
-
-
-
-        <script>
-function updateSkin() {
+  function updateSkin() {
   const localStorageTheme = localStorage.getItem("theme");
    var r = document.querySelector(':root');
 
@@ -23,11 +20,11 @@ function updateSkin() {
         r.classList.remove('is-dark-mode')
       }
   }
-}
+  }
 
-updateSkin();
+  updateSkin();
 
-const button = document.getElementById("demo");
+  const button = document.getElementById("demo");
 
   button.addEventListener("click", () => {
      const localStorageTheme = localStorage.getItem("theme");
@@ -35,25 +32,13 @@ const button = document.getElementById("demo");
      const newTheme = currentThemeSetting === "dark" ? "light" : "dark";
      localStorage.setItem("theme", newTheme);
     updateSkin();
-});
+  });
 
 
-</script>
-
-    <div class="wrapper">
-
-    <div style="margin: auto;">
-    {%- include header.html -%}
-    </div>
-    </div>
-
-
-    <main class="page-content" aria-label="Content">
-        {{ content }}
-    </main>
-
-    {%- include footer.html -%}
-
-  </body>
-
+  </script>
+  {%- include header.html -%}
+  <main class="page-content" aria-label="Content">
+    {{ content }}
+  </main>{%- include footer.html -%}
+</body>
 </html>
