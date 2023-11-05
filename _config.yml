@@ -30,7 +30,6 @@ minima:
   # date_format: "%b %-d, %Y"
 
   skin: auto
-  # auto wip
 
   # Generate social links in footer.
   #
@@ -49,8 +48,6 @@ header_pages:
 #
 show_excerpts: true
 
-disqus:
-  shortname: 'marcoguerri'
 
 jekyll-archives:
   enabled:

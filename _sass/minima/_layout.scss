@@ -13,6 +13,8 @@
   letter-spacing: -1px;
   margin-bottom: 0;
   float: left;
+  margin-right: 10px;
+  margin-top: 2px;
 
   @include media-query($on-palm) {
     padding-right: 45px;
@@ -23,6 +25,21 @@
     color: $site-title-color;
   }
 }
+
+#toggle-skin {
+  font: $base-font-weight #{$base-font-size}/#{$base-line-height} $base-font-family;
+  background-color: $background-color;
+  border: none;
+  background: none!important;
+  padding: 0!important;
+  color: $text-color;
+  cursor: pointer;
+}
+
+#toggle-skin:hover{
+    text-decoration:underline;
+}
+
 
 .site-nav {
   position: absolute;
@@ -381,4 +398,14 @@ body{
     margin-right:auto;
 }
 
+.hide-button {
+  display:none;
+}
+
+.light-element-default {
+    display:none;
+}
+
+.dark-element-default {
+}
 

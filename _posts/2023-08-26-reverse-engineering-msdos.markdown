@@ -11,7 +11,7 @@ toc: true
 
 
 I have recently reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html) and got a chance to work with
-formats that I had not seen before [^1]. Broadcom's binary came
+formats that I had not seen before . Broadcom's binary came
 as a UPX compressed linear executable prepended with Protected Mode extender and required
 tools such as IDA 4.1, IDA 5.0, to be reverse engineered. This post is a collection of notes
 explaining how to get from binary to disassembled and decompiled code for applications packaged
@@ -108,6 +108,3 @@ Once the Linear Executable has been split from PMODE/W stub, it can be simply lo
 </p>
 
 The `idb` file can then be fed into IDA Freeware 5.0 in a modern Windows environment.
-
-[^1]: wat
-

@@ -5,37 +5,6 @@
 </head>
 <body>
   {%- include head.html -%} 
-  <script>
-
-  function updateSkin() {
-  const localStorageTheme = localStorage.getItem("theme");
-   var r = document.querySelector(':root');
-
-  if (localStorageTheme == "dark") {
-      if (!r.classList.contains('is-dark-mode')) {
-        r.classList.add('is-dark-mode')
-      }
-  } else {
-      if (r.classList.contains('is-dark-mode')) {
-        r.classList.remove('is-dark-mode')
-      }
-  }
-  }
-
-  updateSkin();
-
-  const button = document.getElementById("demo");
-
-  button.addEventListener("click", () => {
-     const localStorageTheme = localStorage.getItem("theme");
-     let currentThemeSetting  = localStorageTheme;
-     const newTheme = currentThemeSetting === "dark" ? "light" : "dark";
-     localStorage.setItem("theme", newTheme);
-    updateSkin();
-  });
-
-
-  </script>
   {%- include header.html -%}
   <main class="page-content" aria-label="Content">
     {{ content }}

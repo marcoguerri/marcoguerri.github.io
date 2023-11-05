@@ -2,7 +2,7 @@
     {%- assign default_paths = site.pages | map: "path" -%}
     {%- assign page_paths = site.header_pages | default: default_paths -%}
     {%- assign titles_size = site.pages | map: 'title' | join: '' | size -%}
-    <a class="site-title" style="margin-right: 10px" rel="author" href="{{ "/" | relative_url }}">{{ site.title | escape }}</a>
+    <a class="site-title" rel="author" href="{{ "/" | relative_url }}">{{ site.title | escape }}</a>
     {%- include social.html -%}
 
     {%- if titles_size > 0 -%}
@@ -15,8 +15,91 @@
             </svg>
           </span>
         </label>
+          <script>
 
-        <div class="trigger">
+  function clickDarkLightBtn() {
+    toggleSkin();
+ }
+
+  function toggleSkin() {
+    let currentThemeSetting  = localStorage.getItem("theme");
+    if (currentThemeSetting == null) {
+        currentThemeSetting = "dark"
+    } else {
+        if (currentThemeSetting == "dark") {
+            currentThemeSetting = "light";
+        } else {
+            currentThemeSetting = "dark";
+        }
+    }
+
+    localStorage.setItem("theme",  currentThemeSetting);
+    applyTheme();
+  }
+
+
+  function addRemove(addClasses, removeClasses, firstClass, defaultClass) {
+    var all = Array.from(document.getElementsByClassName(firstClass)).concat(Array.from(document.getElementsByClassName(defaultClass)));
+    for (var i = 0; i < all.length; i++) {
+        all[i].classList.remove(defaultClass);
+        for (var c = 0; c < removeClasses.length; c++) {
+            all[i].classList.remove(removeClasses[c]);
+        }
+        for (var c = 0; c < addClasses.length; c++) {
+            all[i].classList.add(addClasses[c]);
+        }
+    }
+
+  }
+  
+  function applyClassesToElements(theme) {
+    if (theme == "dark") {
+        /* Add hide for light elements */
+        addRemove(["light-element", "hide-button"], "", "light-element", "light-element-default");
+        /* Remove hide for dark elements */
+        addRemove(["dark-element"], ["hide-button"], "dark-element", "dark-element-default");
+    } else {
+        addRemove(["dark-element", "hide-button"], [], "dark-element", "dark-element-default");
+        /* Remove hide for light elements */
+        addRemove(["light-element"], ["hide-button"], "light-element", "light-element-default");
+    }
+    
+  }
+  
+  function applyTheme() {
+   let currentThemeSetting  = localStorage.getItem("theme");
+
+   var r = document.querySelector(':root');
+    if (currentThemeSetting == null) {
+        currentThemeSetting = "dark"
+    }
+
+   if (currentThemeSetting == "dark") {
+    r.classList.add('is-dark-mode')
+
+    if (document.readyState === "complete") {
+        applyClassesToElements("dark")
+    } else {
+        window.addEventListener("DOMContentLoaded", function() {
+            applyClassesToElements("dark")
+        }, false);        
+    }
+  } else {
+    r.classList.remove('is-dark-mode')
+    if (document.readyState === "complete") {
+        applyClassesToElements("light")
+    } else {
+        window.addEventListener("DOMContentLoaded", function() {
+            applyClassesToElements("light")
+        }, false);        
+    }
+  }
+  }
+
+  </script>
+
+
+        <div class="trigger" style="display:inline-block; vertical-align:top;">
           {%- for path in page_paths -%}
             {%- assign my_page = site.pages | where: "path", path | first -%}
             {%- if my_page.title -%}
@@ -24,7 +107,20 @@
             {%- endif -%}
           {%- endfor -%}
         </div>
+          <div style="cursor: pointer; display:inline-block; vertical-align:top; margin-left:50px; margin-right:-5px">
+          <div class="light-element-default" onclick="clickDarkLightBtn()">Dark mode</div>
+          <div class="dark-element-default" onclick="clickDarkLightBtn()">Light mode</div>
+          </div>
+          <div style="cursor: pointer; display:inline-block; padding-top:2px; margin-left:10px;">
+     <svg width="20px" class="light-element-default" alt="Icon used for changing site theme to dark" onclick="clickDarkLightBtn()" aria-hidden="true" focusable="false" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="currentColor" d="M279.135 512c78.756 0 150.982-35.804 198.844-94.775 28.27-34.831-2.558-85.722-46.249-77.401-82.348 15.683-158.272-47.268-158.272-130.792 0-48.424 26.06-92.292 67.434-115.836 38.745-22.05 28.999-80.788-15.022-88.919A257.936 257.936 0 0 0 279.135 0c-141.36 0-256 114.575-256 256 0 141.36 114.576 256 256 256zm0-464c12.985 0 25.689 1.201 38.016 3.478-54.76 31.163-91.693 90.042-91.693 157.554 0 113.848 103.641 199.2 215.252 177.944C402.574 433.964 344.366 464 279.135 464c-114.875 0-208-93.125-208-208s93.125-208 208-208z"></path></svg>
+     <svg width="20px" class="dark-element-default" alt="Icon used for changing site theme to light" onclick="clickDarkLightBtn()" aria-hidden="true" focusable="false" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path fill="white" d="M120 40V16a8 8 0 0 1 16 0v24a8 8 0 0 1-16 0Zm72 88a64 64 0 1 1-64-64a64.07 64.07 0 0 1 64 64Zm-16 0a48 48 0 1 0-48 48a48.05 48.05 0 0 0 48-48ZM58.34 69.66a8 8 0 0 0 11.32-11.32l-16-16a8 8 0 0 0-11.32 11.32Zm0 116.68l-16 16a8 8 0 0 0 11.32 11.32l16-16a8 8 0 0 0-11.32-11.32ZM192 72a8 8 0 0 0 5.66-2.34l16-16a8 8 0 0 0-11.32-11.32l-16 16A8 8 0 0 0 192 72Zm5.66 114.34a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32-11.32ZM48 128a8 8 0 0 0-8-8H16a8 8 0 0 0 0 16h24a8 8 0 0 0 8-8Zm80 80a8 8 0 0 0-8 8v24a8 8 0 0 0 16 0v-24a8 8 0 0 0-8-8Zm112-88h-24a8 8 0 0 0 0 16h24a8 8 0 0 0 0-16Z"></path></svg>
+          </div>
+
+
       </nav>
 
     {%- endif -%}
+<script>
+applyTheme();
+</script>
 </header>

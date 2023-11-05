@@ -7,22 +7,23 @@ pygments: true
 toc: true
 tags: [reverse-engineering, android]
 ---
-As part of my disaster recovery plan, I want to have a secure, offline, sealed back-up of my 2FA 
+As part of my disaster recovery plan, I want to have offline backup of my 2FA 
 material for online banking to generate OTPs without my phone in case of emergency. 
-To get there, I reverse engineered my bank's Android OTP application, expecting
-to find some kind of HMAC-based HOTP/TOTP implementation. I found instead 
-something significantly more complex than that, involving thousand of calls to 
-`aes.Encrypt`. I am not a cryptographer and this is not meant to be a security 
+This required reverse engineered my bank's Android OTP application, that I expected would
+reveal some kind of HMAC-based HOTP/TOTP calculation. I found instead 
+an implementation which is significantly more complex,  involving thousand of calls to 
+`aes.Encrypt`. The work presented in this post is the result of reverse engineering 
+[smali code](https://stackoverflow.com/questions/30837450/what-is-smali-code-android) from the unpacked Android application, using mainly  `vscodium` with APK lab extension .
+
+
+I am not a cryptographer and this is not meant to be a security 
 review. Some red flags did stand out to me, e.g. use of AES in ECB mode in one 
 case,  even though they do not seem to be sufficient to invalidate the security of the 
 whole flow. I am also not familiar with the overall algorithm as something
 recorded in cryptography literature. It might be that hybrid schemes
 such this one are known, but regardless I am quite uncomfortable with this level
 of complexity for something security related, compared to a simpler
-RFC 4226-based HMAC OTP.
-
-The work presented in this post is the result of reverse engineering 
-[smali code](https://stackoverflow.com/questions/30837450/what-is-smali-code-android) from the unpacked Android application, using mainly  `vscodium` with APK lab extension .
+RFC 6238-based TOTP.
 
 
 High level overview
@@ -40,7 +41,8 @@ OTP generation can be broken down in two phases:
 * From Transaction Data, a 6 digits OTP is obtained
 
 <p align="center">
-<img src="/img/android-reversing/algorithm-overview.png" alt="" style="max-width: 80%"/>
+<img class="dark-element-default" src="/img/android-reversing/dark/algorithm-overview.png" alt="" style="max-width: 80%"/>
+<img class="light-element-default" src="/img/android-reversing/light/algorithm-overview.png" alt="" style="max-width: 80%"/>
 </p>
 
 When I started reverse engineering the application I expected  to find some kind of HMAC based TOTP/HOTP 
@@ -63,7 +65,8 @@ In summary:
 
 
 <p align="center">
-<img src="/img/android-reversing/input-data-split.png" alt=""/>
+<img class="dark-element-default" src="/img/android-reversing/dark/input-data-split.png" alt=""/>
+<img class="light-element-default" src="/img/android-reversing/light/input-data-split.png" alt=""/>
 </p>
 
 All cryptographic operations are implemented by `SCOtpManager` class, in `java_src/net/aliaslab/securecallotplib/SCOtpManager.java` and imported libraries. I'll leave aside from this post the analysis of
@@ -155,7 +158,8 @@ Derivation of `IK(sc_sac)`
 The piece derived from `sc_sac` is the most complex one and it is the result of a sequence of 
 transformations shown in the following diagram:
 <p align="center">
-<img src="/img/android-reversing/intermediate-key.png" alt=""/>
+<img class="dark-element-default" src="/img/android-reversing/dark/intermediate-key.png" alt=""/>
+<img class="light-element-default" src="/img/android-reversing/light/intermediate-key.png" alt=""/>
 </p>
 `sc_sac` [1] is first combined [2] with a use case specific fragment [3]. 
 
@@ -218,7 +222,8 @@ The AES key derivation process is implemented in `smali/n2/a/a/a.smali|b()`, wit
 parameters coming from `java_src/n2/a/a/a.java|a()`. The overall algorithm is shown in the diagram below, with the null-bytes encryption sequence being very similar to the one used to generate `IK(sc_sac)`:
 
 <p align="center">
-<img src="/img/android-reversing/aes-key-derivation.png" alt=""/>
+<img class="dark-element-default" src="/img/android-reversing/dark/aes-key-derivation.png" alt=""/>
+<img class="light-element-default" src="/img/android-reversing/light/aes-key-derivation.png" alt=""/>
 </p>
 Two inputs are given:
 * The intermediate key, IK [19] [[code,qr]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L386) [[code,tdata]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L458)
@@ -240,7 +245,8 @@ The AES encryption step, summarized in the following diagram, produces the byte 
 with the One Time Pad generates the plaintext.
 
 <p align="center">
-<img src="/img/android-reversing/aes-encrypt.png" alt=""/>
+<img class="dark-element-default" src="/img/android-reversing/dark/aes-encrypt.png" alt=""/>
+<img class="light-element-default" src="/img/android-reversing/light/aes-encrypt.png" alt=""/>
 </p>
 
 The ciphertext is generated
