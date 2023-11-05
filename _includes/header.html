@@ -18,23 +18,27 @@
           <script>
 
   function clickDarkLightBtn() {
-    toggleSkin();
+    toggleTheme();
+    applyTheme();
  }
 
-  function toggleSkin() {
+ function setThemeIfNull() {
     let currentThemeSetting  = localStorage.getItem("theme");
     if (currentThemeSetting == null) {
         currentThemeSetting = "dark"
-    } else {
+    } 
+
+    localStorage.setItem("theme",  currentThemeSetting);
+  }
+
+  function toggleTheme() {
+        let currentThemeSetting  = localStorage.getItem("theme");
         if (currentThemeSetting == "dark") {
             currentThemeSetting = "light";
         } else {
             currentThemeSetting = "dark";
         }
-    }
-
     localStorage.setItem("theme",  currentThemeSetting);
-    applyTheme();
   }
 
 
@@ -70,10 +74,7 @@
    let currentThemeSetting  = localStorage.getItem("theme");
 
    var r = document.querySelector(':root');
-    if (currentThemeSetting == null) {
-        currentThemeSetting = "dark"
-    }
-
+   
    if (currentThemeSetting == "dark") {
     r.classList.add('is-dark-mode')
 
@@ -121,6 +122,7 @@
 
     {%- endif -%}
 <script>
+setThemeIfNull();
 applyTheme();
 </script>
 </header>
