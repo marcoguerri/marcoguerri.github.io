@@ -9,9 +9,9 @@ tags: [reverse-engineering, android]
 ---
 As part of my disaster recovery plan, I want to have offline backup of my 2FA 
 material for online banking to generate OTPs without my phone in case of emergency. 
-This required reverse engineered my bank's Android OTP application, that I expected would
+This required reverse engineering my bank's Android OTP application, that I expected would
 reveal some kind of HMAC-based HOTP/TOTP calculation. I found instead 
-an implementation which is significantly more complex,  involving thousand of calls to 
+an implementation which is significantly more complex, involving thousand of calls to 
 `aes.Encrypt`. The work presented in this post is the result of reverse engineering 
 [smali code](https://stackoverflow.com/questions/30837450/what-is-smali-code-android) from the unpacked Android application, using mainly  `vscodium` with APK lab extension .
 
@@ -23,7 +23,8 @@ whole flow. I am also not familiar with the overall algorithm as something
 recorded in cryptography literature. It might be that hybrid schemes
 such this one are known, but regardless I am quite uncomfortable with this level
 of complexity for something security related, compared to a simpler
-RFC 6238-based TOTP.
+RFC 6238-based TOTP. [bank-otp-gen](https://github.com/marcoguerri/bank-otp-gen) repo stores
+the code which was written based on this reverse engineering exercise.
 
 
 High level overview
@@ -45,10 +46,8 @@ OTP generation can be broken down in two phases:
 <img class="light-element-default" src="/img/android-reversing/light/algorithm-overview.png" alt="" style="max-width: 80%"/>
 </p>
 
-When I started reverse engineering the application I expected  to find some kind of HMAC based TOTP/HOTP 
-calculation, but this wasn't the case. The two "Crypto" blocks in the diagram above implement exactly 
-the same cryptographic algorithm using different constants and inputs and they can be further broken 
-as follows:
+The two "Crypto" blocks in the diagram above implement exactly the same cryptographic algorithm using 
+different constants and inputs and they can be further broken as follows:
 
 1. Derivation of symmetric encryption key for AES encryption
 2. AES encryption
@@ -58,8 +57,8 @@ Each one of these steps consumes part of the input data, either QR code or Trans
 
 * Derivation of symmetric encryption key consumes input data `[0:16]`. This step has a transive
 dependency on the key material present on the device.
-* AES encryption consumes input data `[16:24]`, wihch is combined with an increasing counter to obtaining a ciphertext whose lenght matches the one of the input data minus `[0:24]`
-* XOR OTP consumes input deta `[24:]`
+* AES encryption consumes input data `[16:24]`, which is combined with an increasing counter to obtain a ciphertext whose length matches the one of the input data minus `[0:24]`
+* XOR OTP consumes input data `[24:]`
 
 In summary:
 
@@ -146,12 +145,12 @@ Overall, `IK` structure for QR code can be summarized as follows:
 IK = IK(const_qrcode) + IK(sc_sac) + IK(sc_k2)
 ```
 
-while `IK structure for Transaction Data can be summarized as follows:
+while `IK` structure for Transaction Data can be summarized as follows:
 ```
 IK = IK(sc_sac) + IK(sc_k2) + IK(const_tdata)
 ```
 
-The following three sections give an overview of how each components of `IK` is derived.
+The following three sections give an overview of how each component of `IK` is derived.
 
 Derivation of `IK(sc_sac)`
 ---
@@ -183,10 +182,10 @@ for (char c : str.toCharArray()) {
 ```
 
 For QR code operations, the fragment is `sc_k2[0:5]` [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L368), while for Transaction Data user PIN is 
-used [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L444). The resulting key [4] then encrypts [5] 16 null bytes [6] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L83C12-L83C44) and the ciphertext [10] is further 
-shifted \[11\]\[13\]  to obtain two more patterns, `c2` [12] and `c3` [14].
-The trailing bytes of the fragment [3] which exceed `len(fragment)%16` are XOR-ed [7] with either `c2` [12] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L244) `c3` [14] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L249), depending on the value of `len(fragment)%16`. The result is encrypted [8] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L258)  with the null 
-bytes encryption key [4] to obtain a final ciphertext which constitutes `IK_0` [9].
+used [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L444). The resulting key [4] then encrypts [5] 16 null bytes [6] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L83C12-L83C44) and the ciphertext [7] is further 
+shifted \[8\]\[10\]  to obtain two more patterns, `c2` [9] and `c3` [11].
+The trailing bytes of the fragment [3] which exceed `len(fragment)%16` are XOR-ed [13] with either `c2` [9] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L244) `c3` [11] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L249), depending on the value of `len(fragment)%16`. The result is encrypted [14] [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L258)  with the null 
+bytes encryption key [4] to obtain a final ciphertext which constitutes `IK(sc_sac)` [15].
 
 In the diagram above the null-bytes encryption sequence is highlighted as it will be re-used also for the 
 AES key derivation process.
@@ -209,7 +208,7 @@ for (int i2 = 1; i2 <= 2; i2++) {
 The time deltas have a 1 hour granularity (ms/3600000) and the application attempts to combine `sc_k2` with [-1,0,+1] added to the current time. Note that this obviously does not constitute in any way a mechanism to force input data to expire. The application does fail to produce a valid result outside of the [-1,0,1] time window,
 but this only a limitation of client side logic and one can choose any time adjustment constant [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L399-L400).
 
-Derivation of `IK(...)`
+Derivation of `IK(const_tdata|const_qrcode)`
 ---
  Depending on whether we are working with QR code or transaction data, the intermediate key is further 
 combined with the following:
@@ -265,12 +264,11 @@ If we extract bytes `[16:24]` from input data, we obtain:
 CC2F8B57A545E1C7
 ```
 
-Since we are working with QR code data, the XOR constant is `AliasLabAliasLab`, i.e. `416C6961734C6162416C6961734C6162`. QR code bytes are copied XOR-ed for the common lenght:
+Since we are working with QR code data, the XOR constant is `AliasLabAliasLab`, i.e. `416C6961734C6162416C6961734C6162`. QR code bytes are XOR-ed for the common length:
 ```
 CC2F8B57A545E1C7 ^ 416C6961734C6162416C6961734C6162 = 8D43E236D60980A5
 ```
-The increasing counter is copied in the upper 8 bytes of the 16 bytes result array, while the XOR-ed value is copied in the lower 8 bytes.
-result:
+The increasing counter is copied in the upper 8 bytes of the 16 bytes result array, while the XOR-ed value is copied in the lower 8 bytes, resulting in the following:
 ```
 8D43E236D60980A50000000000000000 with counter = 0
 8D43E236D60980A50000000000000001 with counter = 1
@@ -284,6 +282,3 @@ XOR-ing with One Time Pad
 =======
 The final operation which yield OTP secrets consists in XOR-ing input data `[24:]` (we have already
 used 24 bytes, for AES key derivation and plaintext calculation) with the encrypted fragments obtained in the previous section.
-
-
-

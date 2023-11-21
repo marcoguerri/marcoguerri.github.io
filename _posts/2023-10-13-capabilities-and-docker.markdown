@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Linux capabilities and Docker"
+title:  "CAP_NET_ADMIN and Linux capabilities meet Docker"
 date:   2023-10-13 08:00:00
 published: false
 pygments: true
