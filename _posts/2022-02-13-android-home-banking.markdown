@@ -6,7 +6,7 @@ published: true
 pygments: true
 toc: true
 tags: [reverse-engineering, android]
-image: /img/android-reversing/dark/intermediate-key.png
+image: /img/android-reversing/light/intermediate-key.png
 ---
 
 As part of my disaster recovery plan, I want to have offline backup of my 2FA 
