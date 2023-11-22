@@ -7,6 +7,8 @@ pygments: true
 toc: true
 tags: [reverse-engineering, android]
 ---
+<meta name="image" property="og:image" content="/img/android-reversing/dark/intermediate-key.png">
+
 As part of my disaster recovery plan, I want to have offline backup of my 2FA 
 material for online banking to generate OTPs without my phone in case of emergency. 
 This required reverse engineering my bank's Android OTP application, that I expected would
