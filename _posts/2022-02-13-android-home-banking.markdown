@@ -6,7 +6,7 @@ published: true
 pygments: true
 toc: true
 tags: [reverse-engineering, android]
-image: /img/android-reversing/input-data-split-preview.png
+image: /img/android-reversing/input-data-split-pre.png
 ---
 
 As part of my disaster recovery plan, I want to have offline backup of 2FA codes 
