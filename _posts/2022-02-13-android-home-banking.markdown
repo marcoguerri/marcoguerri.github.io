@@ -6,27 +6,27 @@ published: true
 pygments: true
 toc: true
 tags: [reverse-engineering, android]
-image: /img/android-reversing/light/input-data-split.png
+image: /img/android-reversing/input-data-split-preview.png
 ---
 
-As part of my disaster recovery plan, I want to have offline backup of my 2FA 
-material for online banking to generate OTPs without my phone in case of emergency. 
+As part of my disaster recovery plan, I want to have offline backup of 2FA codes 
+for online banking to generate OTPs without my phone in case of emergency. 
 This required reverse engineering my bank's Android OTP application, that I expected would
 reveal some kind of HMAC-based HOTP/TOTP calculation. I found instead 
 an implementation which is significantly more complex, involving thousand of calls to 
 `aes.Encrypt`. The work presented in this post is the result of reverse engineering 
-[smali code](https://stackoverflow.com/questions/30837450/what-is-smali-code-android) from the unpacked Android application, using mainly  `vscodium` with APK lab extension .
+[smali code](https://stackoverflow.com/questions/30837450/what-is-smali-code-android) from the unpacked Android application, using mainly  `vscodium` with APK lab extension.
 
 
 I am not a cryptographer and this is not meant to be a security 
 review. Some red flags did stand out to me, e.g. use of AES in ECB mode in one 
 case,  even though they do not seem to be sufficient to invalidate the security of the 
-whole flow. I am also not familiar with the overall algorithm as something
-recorded in cryptography literature. It might be that hybrid schemes
-such this one are known, but regardless I am quite uncomfortable with this level
+whole flow. However, I am still quite uncomfortable with this level
 of complexity for something security related, compared to a simpler
 RFC 6238-based TOTP. [bank-otp-gen](https://github.com/marcoguerri/bank-otp-gen) repo stores
-the code which was written based on this reverse engineering exercise.
+code which was written based on this reverse engineering exercise. Below, you will find some 
+excerpts of smali code from the disassembled application, even though the focus is mostly centered
+around the algorithm and data flow, which were by far the most complex pieces to figure out.
 
 
 High level overview
@@ -284,3 +284,38 @@ XOR-ing with One Time Pad
 =======
 The final operation which yield OTP secrets consists in XOR-ing input data `[24:]` (we have already
 used 24 bytes, for AES key derivation and plaintext calculation) with the encrypted fragments obtained in the previous section.
+
+Closing thoughts
+=======
+Before diving into this reverse engineering exercise, I only had a high level understanding of RFC 6238 and it took just 
+~30 lines of code using only crypto primitives for a basic implementation compatible with google-authenticator:
+
+
+```golang
+    secret := "<secret>"
+
+    byteSecret, err := base32.StdEncoding.DecodeString(secret)
+    if err != nil {
+        panic("decoding byte secret")
+    }   
+    hasher := hmac.New(sha1.New, byteSecret)
+    t := time.Now().Unix()/30
+    buff := bytes.NewBuffer(make([]byte, 0)) 
+    binary.Write(buff, binary.BigEndian, t,) 
+    hasher.Write(buff.Bytes())
+    hmacHash := hasher.Sum(nil)
+
+    offset := int(hmacHash[len(hmacHash)-1] & 0xf)
+    code := ((int(hmacHash[offset]) & 0x7f) << 24) |
+        ((int(hmacHash[offset+1] & 0xff)) << 16) |
+        ((int(hmacHash[offset+2] & 0xff)) << 8) |
+        (int(hmacHash[offset+3]) & 0xff)
+
+    code = code % int(math.Pow10(6))
+    otp := fmt.Sprintf(fmt.Sprintf("%%0%dd", 6), code)
+    fmt.Printf("OTP is %s\n", otp)
+```
+The main logic of  [bank-otp-gen](https://github.com/marcoguerri/bank-otp-gen) consists of  ~350 lines of code.
+This implementation seems to be unnecessarily complex and more importantly, unnecessairly diverging from
+far simpler industry standards. Keep things simple, especially when working on security-critical pices
+of the infrastructure.
