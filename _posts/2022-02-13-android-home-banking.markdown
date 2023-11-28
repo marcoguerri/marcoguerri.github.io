@@ -57,7 +57,7 @@ different constants and inputs and they can be further broken as follows:
 
 Each one of these steps consumes part of the input data, either QR code or Transaction Data:
 
-* Derivation of symmetric encryption key consumes input data `[0:16]`. This step has a transive
+* Derivation of symmetric encryption key consumes input data `[0:16]`. This step has a transitive
 dependency on the key material present on the device.
 * AES encryption consumes input data `[16:24]`, which is combined with an increasing counter to obtain a ciphertext whose length matches the one of the input data minus `[0:24]`
 * XOR OTP consumes input data `[24:]`
