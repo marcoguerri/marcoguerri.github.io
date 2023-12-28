@@ -280,106 +280,65 @@ We see 31.0 MiB/s on the block device benchmark so, we get a projection that div
 
 Reducing R2T latency
 =======
+Ready to Transfer packets are sent out according to `MaxOutstandingR2T` configuration parameter. This value
+determines how many R2T can be sent without having received back the corresponding Data PDU. By default,
+it is set to 1, which means that after a R2T is sent to the initiator, we have to to wait for the Data PDU
+before the next R2T. `MaxOutstandingR2T` can be tweaked to minimize the latency cost coming from R2Ts. 
+Considering a 2M block transfer with 256 KiB `MaxBurstLength`, we'll need 8 R2T to transfer the whole block,
+so setting a value of at least 8 for `MaxOutstandingR2T` means that all R2Ts necessary for the block will
+go out at once as in the following network dump:
 
-Projections
-=======
-
-
-Wired network projections, HDD
-=======
-What value can we project on the wired network? We'll consider a mean one-way latency 0f 0.11 ms and 0.5 ms to transfer
-64 KiB. However, an adjustment needs to be made to the model above. On a Gigabit network, transferring 1M requires
-`0.5 ms (64 KiB tranfer) * 16 = 8 ms`. This is very close to the time it takes for the drive to serve a 1M IO request,
-7.3 ms. This means that depending on other latency contributions that occur once half of the block has been received (
-e.g. a fraction of the CPU time), those 7.3 ms might be pushed beyond the time window to transfer the second half of
-the block. Essentially, the final latency we added in the model above, 7.3 ms, might be higher here. In fact, with 7.3 ms, 
-the project value is off the target by ~30%. Consider that at 30 IOPS (1MB), CPU utilization 12%, if we linearly distribute
-this contribution we get ~4ms per 1M request. Assuming that CPU processing pushes the 7.3ms of the first 1M half of the block
-beyond the transfer window of the second 1MB block (something I need to clarify is why this would not be visible for the second half
-block), we increase the 7.3ms to (7.3+4)ms, 11.3ms.
-```
-0.11+0.5+(0.11+0.11+256/64*0.5)*7+(0.11+((256-64)/64)*0.5+0.11)+0.11+7.3+4.4 = ? ms (33.69 IOPS, 67.4 MiB/s)
-```
-
-Experimentally, we get 62 MiB/s (32 IOPS), which is ~8.7% off. It is more significant than what we got for the wireless network, but
-still acceptable for the problem I need to solve. The good news is that we can gain more accuracy if we push down that final
-contribution coming from drive I/O. And we can do that by moving to SSD.
-
-Wired network projections, SSD
-=======
-The latency for serving a 1M I/O request on SSD is 2.7ms, so it should be well within the transfer time window of 1M and therefore
-we don't need to add any adjustment to the first formula. On 1 Gbps wired network, we would get:
-
-```
-0.11+0.5+(0.11+0.11+256/64*0.5)*7+(0.11+((256-64)/64)*0.5+0.11)+0.11+2.77+4.4 = ? (39.87 IOPS, 79.7 MiB/s). 
-```
-
-10.7% off, real result is 72 MiB, 36 IOPS
-
-```
-(1000/(0.11+0.5+0.11+0.11+((1984/64)*0.5)+0.11+2.7+4.4))*2 = (84.9 MiB/s)
-```
-
-Real result is 82 MiB/s, 41 IOPS. Pretty close, 3.5%
-R2T 16
-
-| R2T    | I/O lat (1M) | CPU lat (1M\*2) | Net lat | Net 64 KiB (MiB/s) |  | Ops (ms) | IOPS             | Est. thr (MiB/s) | Actual thr (MiB/s) | Error (%)        |
-| ------ | :----------: | :-----------: | :-------: | :------------------------: |  | :--------: | :----------------: |:-----------------------------: | :-------------------------: | :----------------: |
-| 1  | 7.3        | 8           | 1.5     | 0.87                     |  | 70.14    | 14.26 | 28.51              | 31                        | 8.02 |
-|        | 7.3        | 8           | 0.11    | 0.5                      |  | 33.28    | 30.05 | 60.1              | 62                        | 3.07 |
-|        | 2.7        | 8           | 0.11    | 0.5                      |  | 28.68    | 34.87 | 69.74              | 72                        | 3.15 |
-|        |            |             |         |                          |  |          |                  |                               |                           |                  |
-|        |            |             |         |                          |  |          |                  |                               |                           |                  |
-| 16 | 2.7        | 8           | 0.11    | 0.5                      |  | 27.14    | 36.85 | 73.69              | 82                        | 10.13 |
-|        | 7.3        | 8           | 0.11    | 0.5                      |  | 31.74    | 31.56 | 63.01              | 70                        | 9.98 |
-|        | 7.3        | 8           | 1.5     | 0.87                     |  | 49.14    | 20.35 | 40.70              | 42                        | 3.1 |
-
-
-
-
-
-If we analyze the results over 1 Gbps wired link, we can draw even further observations.
-
-
-
-If we set R2T to 16, we can observe the following on the network:
 <p align="center">
 <img src="/img/iscsi/r2t_16.png" alt="" style="max-width: 100%"/>
 </p>
 
-R2T packets covering the whole Data PDU lenght are sent back-to-back.
-
-The test below has been executed over a 1 Gbps wired link, with a one-way latency of ~0.15ms. Running the test
-over the spinning disk or the SSD gives incontrovertibly different results. If we add to the model above
-the per-operation I/O latency, we obtain far more accurate projection of the throughput over the wired link.
-
-Bandwidth (MiB/s), IOPS, Samsung SSD, ioengine=sg, 1 thread
-
-|       | Raw device      | iSCSI target | Network | iSCSI initiator |
-| :---- | :------:       | :----:            |:----: | :----:|
-| 64k   |  329/5268             | -            |1 | 2|
-| 128k  |  348/2786     | -            |1 | 2|
-| 256k  |  359/1434             | -            |1 | 2| 
-| 512k  |  363/726            | -            |1 | 2|
-| 1M  |    360/360          | -            |1 | 2|
-| 2M  |    354/176          | -            |1 | 2|
+This significantly reduces the impact of latency over the communication and an updated mathematical model 
+could be the following:
 
 
-R2T 16:
+|  | Request latency           |
+|-- | --------------------------|  
+| 1 | one-way latency for immediate data (64K)|
+| 2 | transmission duration of immediate data |
+| 3 | one-way latency for 8 R2T (transfer time is negligible) |
+| 4 | one-way latency for data PDU |
+| 5 | transfer time for 2M-64K|
+| 6 | one-way latency for "Command completed at target" message |
 
-echo "1000/(2.2+0.92+2.2+2.2+((1984/64)*0.92+8.77)+2.2)*2" | bc -l
+<br>
+Considering again the 2M transfer on wireless network as above, we get:
 
-42.5, real is 40 MiB
+```
+1.5+0.87+1.5+1.5+(1984/64)*0.87+1.5+7.3+8 = 49.14 ms (20.4 IOPS, 40.8 MiB/s)
+```
 
+The actual throughtput in this configuration is 42 MiB/s, so the projection diverges by ~3%.
 
-R2T 1:
-
-echo "1000/(2.2+0.92+(2.2+2.2+256/64*0.92)*7+(2.2+((256-64)/64)*0.92+2.2)+2.2+8.7)*2" | bc -l
-
-25.7, real iw 31.3 MiB
-
-Increasing R2T
+Projections
 =======
+
+Using the models above for `R2T=1` and `R2T=16`, I tried to project throughput in several configurations, which I then verified experimentally.
+Below are the results:
+
+| R2T    | I/O lat (1M) | CPU lat (1M\*2) | Net lat | Net 64 KiB (MiB/s) |  | Ops (ms) | IOPS             | Est. thr (MiB/s) | Actual thr (MiB/s) | Error (%)        |
+| ------ | :----------: | :-----------: | :-------: | :------------------------: |  | :--------: | :----------------: |:-----------------------------: | :-------------------------: | :----------------: |
+| 1      | 7.3        | 8           | 1.5     | 0.87                     |  | 70.14    | 14.26 | 28.51              | 31                        | 8.02 |
+|        | 7.3        | 8           | 0.11    | 0.5                      |  | 34.67    | 28.84 | 57.69              | 62                        | 6.96 |
+|        | 2.7        | 8           | 0.11    | 0.5                      |  | 30.07    | 33.26 | 66.51              | 72                        | 7.62 |
+|        |            |             |         |                          |  |          |                  |                               |                           |                  |
+|        |
+| 16     | 7.3        | 8           | 1.5     | 0.87                     |  | 49.14    | 20.35 | 40.70              | 42                        | 3.1 |
+|        | 7.3        | 8           | 0.11    | 0.5                      |  | 31.74    | 31.56 | 63.01              | 70                        | 9.98 |
+|        | 2.7        | 8           | 0.11    | 0.5                      |  | 27.14    | 36.85 | 73.69              | 82                        | 10.13 |
+
+
+
+The error for `R2T=1` is confined between 7% and 8%. For `R2T=16` the error is stable at 10% except in the slowest scenario, i.e. spinning disk over wireless network,
+where it drops to 3%. I suspect this outlier might be related to the variability of wireless network latency. In particular, in `R2T=16` mode, the number of messages exchanged
+between client and server is lower compared to `R2T=1` and the network latency estimate based on 2ms intervals might not be accurate. With 20 IOPS and 4 one-way latency contributions
+for each operation, we would have 12ms intervals. Truth to be told, I have run a quick ping test and I haven't seen a significant difference with the 2ms results. I haven't investigated
+further as these results are still good enough to inform the architectural decisions summarized in the last section.
+
 
 Conclusions
 =======
