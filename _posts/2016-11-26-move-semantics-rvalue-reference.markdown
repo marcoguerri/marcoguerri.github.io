@@ -7,8 +7,8 @@ tags: [programming, c++]
 pygments: true
 ---
 
-This post walks through new concepts introduced by C++11 such as move semantics, rvalue reference, forwarding, 
-and shows how they affect compile time and runtime behavior.
+A collection of notes where I have recently tried to consolidate C++11 concepts such as move semantics, rvalue reference and forwarding,
+showing how these features affect compile time and runtime behavior of C++ programs. 
 
 Constructor, Copy Constructor and Move Constructor
 =======

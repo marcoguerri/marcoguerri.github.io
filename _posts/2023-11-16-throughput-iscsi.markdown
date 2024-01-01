@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Data driven throughput maximization of iSCSI storage setup"
-date:   2024-10-13 08:00:00
+date:   2023-12-31 08:00:00
 published: true
 pygments: true
 toc: true
@@ -19,9 +19,6 @@ it will be accurate if those conditions change. Unfortunately, my understanding 
 shallow. It is my intention to review the content of this post in the future, but for now, I could
 predict throughput on multiple setups (e.g. Gigabit ethernet instead of wireless, SSD instead on spinning disk), 
 with an acceptable degree of accuracy, so I consider this is a good start.
-
-
-High latency links: https://scst.sourceforge.net/max_outstanding_r2t.txt
 
 NAS setup
 =======
@@ -151,7 +148,8 @@ ioengine=libiscsi
 filename=iscsi\://192.168.1.220\:3260/iqn.2003-01.org.linux-iscsi.alarm.armv7l\:sn.2a40443560f5/0
 {% endhighlight %}
 </details>
-
+\\
+All configurations above have been tests with with `O_DIRECT` and without `O_SYNC`.
 
 Local benchmarks
 =======
@@ -185,17 +183,19 @@ The folloing table shows the results of remote (block device and libiscsi) bench
 <br>
 
 As mentioned earlier, `fio` benchmarks are executed with `direct=1` (`O_DIRECT`) and `sync=0` (no `O_SYNC`), so we are bypassing 
-caches between
-kernel and userspace but we should be queueing write requests to be served by the device asynchronously. In practice however,
-this is not what I am observing. We see from block device benchmarks above that HDD and SSD block device throughputs from the 
-client perspective differ by 10% at 2M. I explain this result with the drive being on a synchronous path for the request.  
-
-If device I/O was fully asynchronous, the
-client should not see any difference, as the slowest link in the chain is network transfer and the rate at which requests
-are queued should be bottlenecked by network. In fact, we are doing only 15 IOPS end to end, while the spinning disk at 2M 
+caches between kernel and userspace and we are writing I/O data directly to DMA buffers (I looked a bit more closely into DMA
+mechanisms in the past while [debugging network I/O on ARM64 systems](https://marcoguerri.github.io/2016/08/19/mp30-data-corruption-part2.html))
+. `O_DIRECT` will not give any guarantee that data is actually stored on the device (for that, we would need `O_SYNC`). 
+Writing to DMA buffers implies that device throughput will have an impact on performance, as DMA regions are normally 
+tracked in hardware ring buffers that are consumed at the device speed.  We see from iSCSI block device benchmarks above that 
+HDD and SSD block device throughputs with `O_DIRECT` from the client perspective differ by 10% at 2M. This might sound 
+counter intuitive because we are doing only 15 IOPS end to end, while the spinning disk at 2M 
 is able to handle 67 raw IOPS and CPU is at 14% utilization, which if projected linearly, should result in ability to 
-handle ~112 IOPS at 100% utilization. I don't understand enough of LIO implementation to tell if this is expected or is a 
-result of a misconfiguration of my backend, I'll need to go through the source code.
+handle ~112 IOPS at 100% utilization. However, despite being far from those 67 raw IOPS, we still see device I/O overhead
+for every operation, deriving from DMA buffer management with the drive. So, we need to consider some latency as synchrnous to the
+request. It probably is not as high as the request latency at max IOPS, where other dynamics such as ring buffer saturation
+are at play, but considering those numbers anyway will make us underestimate expected throughput, which is fine.
+
 
 On the network side, `iperf3` benchmarks show sustained 75 MiB/s (600 Mbit/s) (that would correspond to 38 IOPS at 2M). 
 This however is the best case scenario,
@@ -280,6 +280,10 @@ We see 31.0 MiB/s on the block device benchmark so, we get a projection that div
 
 Reducing R2T latency
 =======
+I obviously not the first one outlining the impact of `R2T` of iSCSI throughput, especially on high latency networks.
+[Documentation of Linux SCST SCSI subsystem was a first good pointer for me](https://scst.sourceforge.net/max_outstanding_r2t.txt).
+
+The impact of `R2T` h
 Ready to Transfer packets are sent out according to `MaxOutstandingR2T` configuration parameter. This value
 determines how many R2T can be sent without having received back the corresponding Data PDU. By default,
 it is set to 1, which means that after a R2T is sent to the initiator, we have to to wait for the Data PDU
@@ -342,3 +346,11 @@ further as these results are still good enough to inform the architectural decis
 
 Conclusions
 =======
+Reducing network latency is a must to obtain decent performance over iSCSI, so is modifying R2T configuration to allow for Ready To Transfer bursts.
+With `O_DIRECT`, the benefits from moving from slow spinning disk to SSD are limited to +17% speedup on wired network. This is not negligible, by
+it is dwarfed by local speedup, which reaches 160%. I'd get close to line speed only by moving to wired network and eliminating completely device 
+latency and CPU latency. The following are the conclusions I came to so far with these experiments:
+* Moving to wired Gigabit ethernet is a must, regardless of `O_DIRECT`
+* Moving to SSD has modest impact on performance in `O_DIRECT`. I haven't tested without `O_DIRECT`, but at least on the receiving end, an additional
+caching layer would result in significant benefits by making I/O latency and CPU latency asynchronous, at the cost of a higher risk of data loss which
+is associated with buffers for I/O.
