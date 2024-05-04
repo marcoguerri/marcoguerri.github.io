@@ -6,6 +6,7 @@ published: true
 pygments: true
 toc: true
 tags: [reverse-engineering, msdos]
+categories: [Technical]
 ---
 
 I have been working on UEFI OptionROM malware research using a Broacdom BCM5751 1G Network Card

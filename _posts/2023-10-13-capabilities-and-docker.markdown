@@ -6,6 +6,7 @@ published: false
 pygments: true
 toc: true
 tags: [docker, linux, capabilities]
+categories: [Technical]
 ---
 
 I spent more time than I was willing to trying to get usage of capabilities right in Docker. I either stumbled

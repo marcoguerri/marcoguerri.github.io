@@ -6,10 +6,7 @@ published: yes
 tags: [python, performance]
 pygments: true
 toc: true
-summary: "Recent CPU microarchitectures have drastically improved the accuracy
-of hardware branch predictors and branch target predictors. Some heavily non-linear workloads
-benefit from a lower rate of mispredicted branches: here I provide an example based
-on CPython."
+categories: [Technical]
 ---
 
 I was recently analyzing the performance of [DIRACBenchmark](https://github.com/DIRACGrid/DB12/blob/387860b582978bef863bf9db286e5241ccc2b301/DIRACbenchmark.py)

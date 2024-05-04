@@ -6,6 +6,7 @@ published: yes
 tags: [linux, lvm, storage]
 pygments: true
 toc: true
+categories: [Technical]
 ---
 
 This post covers a possible procedure to "snapshot" a Linux

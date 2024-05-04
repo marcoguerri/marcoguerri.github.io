@@ -1,11 +1,12 @@
 ---
 layout: post
-title:  "Data driven throughput maximization of iSCSI storage setup"
+title:  "Maximizing throughput of iSCSI storage setup"
 date:   2023-12-31 08:00:00
 published: true
 pygments: true
 toc: true
 tags: [linux, storage, iscsi]
+categories: [Technical]
 ---
 
 I have run some tests on my iSCSI backend, with the intent of planning several upgrades, including

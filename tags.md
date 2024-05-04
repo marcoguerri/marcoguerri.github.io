@@ -12,7 +12,7 @@ title: Tags
     {% capture tag_name %}{{ tag | first }}{% endcapture %}
     <li>
 
-    <a name="{{ tag_name | slugize }}" href="/tags/{{tag_name}}">{{tag_name}}</a></li>
+    <a name="{{ tag_name | slugize }}" href="/tags/{{tag_name | downcase}}">{{tag_name}}</a></li>
   </div>
 {% endfor %}
 </ul>

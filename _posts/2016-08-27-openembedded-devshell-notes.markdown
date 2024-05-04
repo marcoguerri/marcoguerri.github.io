@@ -5,6 +5,7 @@ date:   2016-08-27 08:00:00
 published: yes
 tags: [openembedded]
 pygments: true
+categories: [Technical]
 ---
 
 devshell is a great feature implemented in Openembedded that allows to spawn

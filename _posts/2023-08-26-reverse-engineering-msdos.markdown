@@ -7,6 +7,7 @@ tags: [reverse-engineering, msdos]
 pygments: true
 comments: true
 toc: true
+categories: [Technical]
 ---
 
 

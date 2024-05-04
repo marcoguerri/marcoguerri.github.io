@@ -5,6 +5,7 @@ date:   2016-03-20 21:00:00
 tags: [linux, pxe, debugging, networking]
 published: yes
 toc: true
+categories: [Technical]
 ---
 
 This a collection of notes I have taken while debugging a regression of CERN PXE booting

@@ -5,6 +5,7 @@ date:   2016-11-26 08:00:00
 published: yes
 tags: [programming, c++]
 pygments: true
+categories: [Technical]
 ---
 
 A collection of notes where I have recently tried to consolidate C++11 concepts such as move semantics, rvalue reference and forwarding,

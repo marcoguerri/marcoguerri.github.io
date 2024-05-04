@@ -3,6 +3,7 @@ layout: post
 title: "Lifecycle of a Python multiprocessing.Process"
 date:   2016-07-24 20:00:00
 tags: [python, multiprocessing]
+categories: [Technical]
 ---
 
 This post is a collection of notes on the mechanisms that regulate

@@ -3,6 +3,7 @@ layout: post
 title:  "Network data corruption on Gigabyte R120-P31 - Part 2"
 date:   2016-08-19 21:00:00
 tags: [linux, arm64, debugging, networking]
+categories: [Technical]
 ---
 This is the second part of an [investigation](/2016/06/mp30-data-corruption-part1)
 to solve a data corruption issue encountered on a Gigabyte ARM64 R120-MP31 board. 
@@ -25,11 +26,14 @@ When user space processes allocate memory via `malloc`, the underlying `brk` or
 process but a physical frame is normally not reserved until the first page fault. 
 In this case, however, the newly allocated address must be passed over to the hardware 
 which accesses system memory without going through the CPU MMU, making it necessary
-to have a mapping immediately available. Hardware devices are not always 
-capable of DMAing directly to physical addresses. There is usually IOMMU hardware 
-that translates addresses as seen by the device to physical ones: the kernel allows 
-to obtain a valid DMAble address for the device via the DMA API. 
-In this case `dma_map_single` is used.
+to have a mapping immediately available. 
+
+Hardware devices can be restricted from DMA-ing directly to physical addresses. 
+An IOMMU device might interpose between the device and memory, performing address 
+transation between the two. IOMMU will not allow the device to access memory regions 
+which have not been allocated for its I/O, preventing potentially compromised hardware 
+from tampering with the state of the whole system. The kernel allows to obtain a valid 
+DMAble address for the device via the DMA API. In this case `dma_map_single` is used.
 
 Retrieving frames from system RAM
 =======

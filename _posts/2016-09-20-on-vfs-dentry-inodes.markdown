@@ -5,6 +5,7 @@ date:   2016-09-19 08:00:00
 published: yes
 tags: [linux, vfs, storage]
 pygments: true
+categories: [Technical]
 ---
 
 There is often a lot of counfusion around how directories are represented on the filesystem. This

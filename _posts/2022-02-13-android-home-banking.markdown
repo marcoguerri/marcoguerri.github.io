@@ -6,6 +6,7 @@ published: true
 pygments: true
 toc: true
 tags: [reverse-engineering, android]
+categories: [Technical]
 image: /img/android-reversing/input-data-split-pre.png
 ---
 
@@ -44,8 +45,8 @@ OTP generation can be broken down in two phases:
 * From Transaction Data, a 6 digits OTP is obtained
 
 <p align="center">
-<img class="dark-element-default" src="/img/android-reversing/dark/algorithm-overview.png" alt="" style="max-width: 80%"/>
-<img class="light-element-default" src="/img/android-reversing/light/algorithm-overview.png" alt="" style="max-width: 80%"/>
+<img class="dark-element" src="/img/android-reversing/dark/algorithm-overview.png" alt="" style="max-width: 80%"/>
+<img class="light-element" src="/img/android-reversing/light/algorithm-overview.png" alt="" style="max-width: 80%"/>
 </p>
 
 The two "Crypto" blocks in the diagram above implement exactly the same cryptographic algorithm using 
@@ -66,8 +67,8 @@ In summary:
 
 
 <p align="center">
-<img class="dark-element-default" src="/img/android-reversing/dark/input-data-split.png" alt=""/>
-<img class="light-element-default" src="/img/android-reversing/light/input-data-split.png" alt=""/>
+<img class="dark-element" src="/img/android-reversing/dark/input-data-split.png" alt=""/>
+<img class="light-element" src="/img/android-reversing/light/input-data-split.png" alt=""/>
 </p>
 
 All cryptographic operations are implemented by `SCOtpManager` class, in `java_src/net/aliaslab/securecallotplib/SCOtpManager.java` and imported libraries. I'll leave aside from this post the analysis of
@@ -155,12 +156,12 @@ IK = IK(sc_sac) + IK(sc_k2) + IK(const_tdata)
 The following three sections give an overview of how each component of `IK` is derived.
 
 Derivation of `IK(sc_sac)`
----
+=======
 The piece derived from `sc_sac` is the most complex one and it is the result of a sequence of 
 transformations shown in the following diagram:
 <p align="center">
-<img class="dark-element-default" src="/img/android-reversing/dark/intermediate-key.png" alt=""/>
-<img class="light-element-default" src="/img/android-reversing/light/intermediate-key.png" alt=""/>
+<img class="dark-element" src="/img/android-reversing/dark/intermediate-key.png" alt=""/>
+<img class="light-element" src="/img/android-reversing/light/intermediate-key.png" alt=""/>
 </p>
 `sc_sac` [1] is first combined [2] with a use case specific fragment [3]. 
 
@@ -193,7 +194,7 @@ In the diagram above the null-bytes encryption sequence is highlighted as it wil
 AES key derivation process.
 
 Derivation of `IK(sc_k2)`
----
+=======
 `sc_k2` is  XOR-ed with time deltas [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L384C12-L384C46) and appended to the initial part of the intermediate key.
  The presence of a dependency on
 Unix time is immediately obvious by reading top level decompiled code from `SCOtpManager` class:
@@ -211,7 +212,7 @@ The time deltas have a 1 hour granularity (ms/3600000) and the application attem
 but this only a limitation of client side logic and one can choose any time adjustment constant [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L399-L400).
 
 Derivation of `IK(const_tdata|const_qrcode)`
----
+=======
  Depending on whether we are working with QR code or transaction data, the intermediate key is further 
 combined with the following:
 * For QR code, a constant correponding to `0x6ab392fd02` is pre-pended [[code]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L386). This is value is hardcoded
@@ -223,8 +224,8 @@ The AES key derivation process is implemented in `smali/n2/a/a/a.smali|b()`, wit
 parameters coming from `java_src/n2/a/a/a.java|a()`. The overall algorithm is shown in the diagram below, with the null-bytes encryption sequence being very similar to the one used to generate `IK(sc_sac)`:
 
 <p align="center">
-<img class="dark-element-default" src="/img/android-reversing/dark/aes-key-derivation.png" alt=""/>
-<img class="light-element-default" src="/img/android-reversing/light/aes-key-derivation.png" alt=""/>
+<img class="dark-element" src="/img/android-reversing/dark/aes-key-derivation.png" alt=""/>
+<img class="light-element" src="/img/android-reversing/light/aes-key-derivation.png" alt=""/>
 </p>
 Two inputs are given:
 * The intermediate key, IK [19] [[code,qr]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L386) [[code,tdata]](https://github.com/marcoguerri/bank-otp-gen/blob/master/main.go#L458)
@@ -246,8 +247,8 @@ The AES encryption step, summarized in the following diagram, produces the byte 
 with the One Time Pad generates the plaintext.
 
 <p align="center">
-<img class="dark-element-default" src="/img/android-reversing/dark/aes-encrypt.png" alt=""/>
-<img class="light-element-default" src="/img/android-reversing/light/aes-encrypt.png" alt=""/>
+<img class="dark-element" src="/img/android-reversing/dark/aes-encrypt.png" alt=""/>
+<img class="light-element" src="/img/android-reversing/light/aes-encrypt.png" alt=""/>
 </p>
 
 The ciphertext is generated

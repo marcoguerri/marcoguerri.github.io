@@ -3,12 +3,12 @@ layout: default
 ---
 
 <div class="home">
+  <div class="content_left">
   {%- if page.title -%}
     <h1 class="page-heading">{{ page.title }}</h1>
   {%- endif -%}
 
   {{ content }}
-
 
   {% if site.paginate %}
     {% assign posts = paginator.posts %}
@@ -32,7 +32,7 @@ layout: default
           </a>
         </h3>
         {%- if site.show_excerpts -%}
-          {{ post.excerpt }}
+          {{ post.excerpt | strip_html | truncate: 512 }}
         {%- endif -%}
       </li>
       {%- endfor -%}
@@ -57,5 +57,16 @@ layout: default
     {%- endif %}
 
   {%- endif -%}
+ </div>
+ <div class="content_right">
+<ul id="toc" class="section-nav">
+{% for category in site.categories %}
+<li class="toc-entry toc-h1">
+        <a name="{{ category[0]  }}" href="/categories/{{category[0] | downcase}}">{{category[0]}} ({{category[1].size}})</a></li>
+</li>
+{% endfor %}
+</ul>
+
+</div>
 
 </div>

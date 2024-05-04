@@ -2,13 +2,14 @@
 layout: post
 title:  "LD_PRELOAD and attribute constructor"
 date:   2017-02-18 08:00:00
-published: false
+published: true
 comments: true
-categories: c linker
+categories: [Technical]
 pygments: true
 ---
 
-LD_PRELOAD is a great tool to "override" the behavior of a binary. This post explains how `attribute constructor` and LD_PRELOAD might affect the behavior of the process after execve syscall.
+LD_PRELOAD is a useful feature of dynamic linker that enables overriding the behavior of a binary. This post explains 
+how `attribute constructor` and LD_PRELOAD might affect the behavior of the process after execve syscall.
 
 constructor, destructor and execve
 =======
