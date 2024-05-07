@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "CAP_NET_ADMIN and Linux capabilities meet Docker"
+title:  "CAP_NET_ADMIN for non-root user in Docker container"
 date:   2023-10-13 08:00:00
 published: false
 pygments: true
@@ -9,38 +9,27 @@ tags: [docker, linux, capabilities]
 categories: [Technical]
 ---
 
-I spent more time than I was willing to trying to get usage of capabilities right in Docker. I either stumbled
-across documentation that was too shallow to be of any use
-beyond extremely basic use cases or documentation that was outdated and misleading. 
-One possible complaint I would feel like addressing to Docker ecosystem is that is tries
-to be excessively easy for the end user, hiding any possible source of complexity. Sometime you do need to
-implement slighly more complex setups, and you are on your own, with the codebase being the last resort to get
-unblocked.
-In my case, I did have to to look into Moby's codebase
-to understand how capabilities were managed. This post is an attempt to summarize what I essentially wished
-I'd known before diving into capabilities support for Docker.
+I spent more time than I expected trying to get usage of capabilities right in Docker. I either stumbled
+across documentation that was too shallow to cover anything beyond extremely basic use cases or 
+documentation that was outdated and misleading. One possible complaint I would feel like addressing 
+to Docker ecosystem is that it tries to be excessively easy for the end user, hiding any possible 
+source of complexity. Sometime you do need to be exposed to that complexity, and it feels you are 
+completely on your own, with the codebase being the only source to refer to.
+In my case, I did have to to look into Moby's codebase to understand how capabilities were managed. 
+This post is an attempt to summarize what I essentially wished I'd known before diving into capabilities support for Docker.
 
-Docker documentation on capabilities
+Docker documentation
 =======
-Start from [docs.docker.com](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities), one is pointed to `--cap-add` and `--cap-drop` to
-implement fined grain control over which capabilities are given to the container:
+Starting from [docs.docker.com](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities), 
+one is pointed to `--cap-add` and `--cap-drop` to implement fined grain control over which capabilities are given to the 
+container:
 
 > In addition to --privileged, the operator can have fine grain control over the capabilities using --cap-add and --cap-drop. By default, Docker has a default list of capabilities that are kept. The following table lists the Linux capability options which are allowed by default and can be dropped.
 
 By itself, I find this already very confusing. There are multiple set of capabilities assigned to a process, i.e.
-`permitted`, `effective`, `inheritable`. These are not mentioned anywhere. Reading further:
-
-> To mount a FUSE based filesystem, you need to combine both --cap-add and --device:
-
-To me, this is an example of what I briefly mentioned in the summary: an excessive attempt to hide complexity 
-from users. 
-Mounting a FUSE filesystem
-is something that certainly many users need to do at some point. But I'd rather understand the foundamental
-concepts around capabilities implementation in Docker, than consume a series of baked recipes for very
-specific use cases.
-
-This is essentially it. From the docker/labs repo, there seems to be [additional documentation on capabilities](https://github.com/docker/labs/blob/master/security/capabilities/README.md). This seems to be outdated, and
-it's useful to rebuild the history of capabilities management in Docker to see how we got into this state.
+`permitted`, `effective`, `inheritable`. These are not mentioned anywhere in Docker documentation. From the docker/labs 
+repo, there seems to be [additional documentation on capabilities](https://github.com/docker/labs/blob/master/security/capabilities/README.md), that however appears outdated. It's useful to try rebuilding the history of capabilities management in 
+Docker to see how support has evolved over time.
 
 
 root vs non-root containers
@@ -66,7 +55,7 @@ uid=0(root)
 gid=0(root)
 groups=0(root)
 ```
-As `CAP_NET_ADMIN` is necessary to manipulate network interfaces, the failure was expected. Adding
+As `CAP_NET_ADMIN` is necessary to manipulate network interfaces, `ip` command fails. Adding
 that specific capability seems to be sufficient for the command to succeed:
 ```
 $ sudo docker run --cap-add CAP_NET_ADMIN -it debian ip link add name br0 type bridge  
@@ -132,11 +121,11 @@ CapAmb:	0000000000000000
 ```
 
 When the container does not run as root, effective and permitted capabilities are all cleared, while there is
-no difference in the binding set. From [docker/labs](https://github.com/docker/labs/blob/master/security/capabilities/README.md) repo, one can read:
+no difference in the binding set. [docker/labs](https://github.com/docker/labs/blob/master/security/capabilities/README.md) repo, mentions the following:
 
 > The above command fails because Docker does not yet support adding capabilities to non-root users.
 
-This seems to mach with the output above and this specific behavior for non-root users was introduced by
+This seems to be coherent with the output above. This specific behavior for non-root users was introduced by
  [moby/15ff0939](https://github.com/moby/moby/commit/15ff09395c001bcb0f284461abbc404a1d8bab4d), i.e. 
 "If container will run as non root user, drop permitted, effective caps early". In particular:
 ```
@@ -167,10 +156,14 @@ Something further to notice is that `CapInh` is also cleared in both cases. This
         }
 ```
 Dropping support for inheritable capabilities is a fix for [CVE-2022-24769
-](https://github.com/moby/moby/security/advisories/GHSA-2mm7-x5h6-5pvq)
+](https://github.com/moby/moby/security/advisories/GHSA-2mm7-x5h6-5pvq).
 Event though non-root containers have only the bounding set configured, it should be possible for processes
-within the container to acquire effective capabilities, by setting `<CAP>+ep` on the executable file. In fact
-based on capabilities transformation rules during execve:
+within the container to acquire effective capabilities, by setting `<CAP>+ep` on the executable file:
+* Effective bit (`e` is just a single bit on files) is set, during `execve` all of the permitted capabilities for the thread
+are also mirrored in the effective set.
+*  `CAP` is set as permitted capability
+
+Capabilities transformation rules during execve are the following:
 
 ```
 P'(effective)   = F(effective) ? P'(permitted) : P'(ambient)
@@ -183,9 +176,11 @@ P'(permitted)   = (P(inheritable) & F(inheritable)) |
                  (F(permitted) & P(bounding)) | P'(ambient)
 ```
 
-Given `inheritable` capabilities are always cleared, the new process can acquire permitted capabilities if
-the specific capability is set on the executable file, and that permitted can become effective is the effective
-bit is enabled. Documentation here becomes misleading, in particular [docker/labs/security/capabilities](https://github.com/docker/labs/blob/master/security/capabilities/README.md)  mentions:
+If we had `F(effective)` set, then `P'(effective)` would become `P'(permitted)`, as just mentioned above.
+The content of `P'(permitted)` effectively depends on `(F(permitted) & P(bounding)) | P'(ambient`, given
+ `inheritable` capabilities are always cleared, If `CAP` is set on the file as permitted, given `P(bounding)` is already set to `caps.GetAllCapabilities()`,
+then `CAP` should be acquired as `P'(permitted)` and consequentely as `P'(effective).
+Documentation here becomes misleading, in particular [docker/labs/security/capabilities](https://github.com/docker/labs/blob/master/security/capabilities/README.md)  mentions the following:
 
 > Docker imposes certain limitations that make working with capabilities much simpler. For example, file capabilities are stored within a file's extended attributes, and extended attributes are stripped out when Docker images are built. This means you will not normally have to concern yourself too much with file capabilities in containers.
 
@@ -197,11 +192,10 @@ been committed in Oct 2016 with [d9273d2c](https://github.com/docker/labs/commit
 
 `ip` and CAP_NET_ADMIN
 =======
-I dived into capability support to configure a container for building openembedded images. One of the requirements
-I had was the ability to create a qemu bridge networking setup. I needed the ability to create a bridge interface.
-So, according to the research presented above, adding `cap_net_admin+ep` to `/bin/ip` should have been
-sufficient to manipulate network interfaces without being root. Unfortunately, I was still getting a perimssion
-denied.
+I dived into capability support to configure a container for building Openembedded images. One of the requirements
+I had was the ability to create a qemu bridge networking setup. According to the research presented above, 
+adding `cap_net_admin+ep` to `/bin/ip` (effective bit set, capability set as permitted on the file) should have been
+sufficient to manipulate network interfaces without being root. Unfortunately, I would still get a permission denied error:
 ```
 $ sudo docker run --user 1000:100 --cap-add CAP_NET_ADMIN -it oe_build /bin/sh
 $ getcap /bin/ip
@@ -212,7 +206,7 @@ $ ip link add name br0 type bridge
 RTNETLINK answers: Operation not permitted
 ```
 
-While trying to exactly assess where the "Operation not permitted" was coming from, the following caught my
+While trying to assess where exactly the "Operation not permitted" was coming from, the following caught my
 attention in the `strace` output:
 ```
 getuid()                                = 1000
@@ -223,8 +217,8 @@ capset({version=_LINUX_CAPABILITY_VERSION_3, pid=0}, {effective=0, permitted=0, 
 ```
 
 This looks a lot like an attempt to assess if the process is running as root, followed by a drop of all 
-capabilities. So, even if `cap_net_admin+ep` might be working the `capset` call above makes it a no-op. In fact,
-in `iproute2/ip/ip.c` one can see the following excerpt:
+capabilities. So, even if `cap_net_admin+ep` might be working, the `capset` call above makes it a no-op. In fact,
+in `iproute2/ip/ip.c` (`v4.20.0`) one can see the following excerpt:
 
 ```c
 if (argc < 3 || strcmp(argv[1], "vrf") != 0 ||
@@ -232,19 +226,104 @@ if (argc < 3 || strcmp(argv[1], "vrf") != 0 ||
  drop_cap();
 ```
 
-What is tricked `ip` into thinking it is running as root? `fakeroot` does exactly this.
+Certainly in this case `strcmp(argv[1], "vrf") != 0` is true, so we end up dropping all capabilities.
+`drop_cap` is implemented as follows:
+```c
+void drop_cap(void)
+{
+#ifdef HAVE_LIBCAP
+    /* don't harmstring root/sudo */
+    if (getuid() != 0 && geteuid() != 0) { 
+        cap_t capabilities;
+        cap_value_t net_admin = CAP_NET_ADMIN;
+        cap_flag_t inheritable = CAP_INHERITABLE;
+        cap_flag_value_t is_set;
 
+        capabilities = cap_get_proc();
+        if (!capabilities)
+            exit(EXIT_FAILURE);
+        if (cap_get_flag(capabilities, net_admin, inheritable,
+            &is_set) != 0)
+            exit(EXIT_FAILURE);
+        /* apps with ambient caps can fork and call ip */
+        if (is_set == CAP_CLEAR) {
+            if (cap_clear(capabilities) != 0)
+                exit(EXIT_FAILURE);
+            if (cap_set_proc(capabilities) != 0)
+                exit(EXIT_FAILURE);
+        }    
+        cap_free(capabilities);
+    }    
+#endif
+}
+```
 
-`fakeroot`, `LD_PRELOAD`  and capabilities
+`drop_cap` checks if we are running as normal user (user and effective user id are != 0) and whether the process
+has `CAP_NET_ADMIN` set in the inheritable set, which is the case. If so, all capabilities are dropped,
+hence setting `cap_net_admin+ep` on `ip` becomes a no-op.
+
+`fakeroot` and `LD_PRELOAD`
 =======
 
-The first attempt with `fakeroot` was unsuccessful:
+My first attempt to bypass `drop_cap` consisted in running `ip` under `fakeroot`, which would have altered
+the return value of `getuid` and `geteuid`. I did not have much success:
 
 ```
 $ fakeroot ip link add name br0 type bridge
 ERROR: ld.so: object 'libfakeroot-sysv.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
 RTNETLINK answers: Operation not permitted
 ```
+
+The error is definitely obscure, and `LD_DEBUG=all` doesn't provide much more information. `ld.so` code
+itself is not incredibly eloquent:
+
+```c
+unsigned int old_nloaded = GL(dl_ns)[LM_ID_BASE]._ns_nloaded;
+
+(void) _dl_catch_error (&objname, &err_str, &malloced, map_doit, &args);
+if (__glibc_unlikely (err_str != NULL))
+    {
+        _dl_error_printf ("\
+ERROR: ld.so: object '%s' from %s cannot be preloaded (%s): ignored.\n",
+                       fname, where, err_str);
+```
+
+`ld.so` documentation effectively explains why the dynamic linker is failing, even 
+though the error that is surfaced is aboslutely ambiguous.
+
+```
+Secure-execution mode
+For  security  reasons,  if the dynamic linker determines that a binary
+should be run in secure-execution mode, the effects of some environment
+variables are voided or modified, and furthermore those environment 
+variables are stripped from the environment, so that the program does 
+not even see the definitions. Some of these environment variables affect 
+the operation of the dynamic linker itself, and are described below.
+Other environment variables treated in this way include: GCONV_PATH, 
+GETCONF_DIR, HOSTALIASES, LOCALDOMAIN, LOCPATH, MALLOC_TRACE, NIS_PATH, 
+NLSPATH, RESOLV_HOST_CONF, RES_OPTIONS, TMPDIR, and TZDIR.
+```
+
+Furthermore, quoting from documentation from documentation, we are in secure mode if the `AT_SECURE` 
+entry in the auxiliary vector has a nonzero value. This might happen in one of the following scenario:
+* The process's real and effective user IDs differ, or the real and effective group IDs differ. 
+This typically occurs as a result of executing set-user-ID or set-group-ID program.
+* A process with a non-root user ID executed a binary that conferred capabilities to the process.
+* A nonzero value may have been set by a Linux Security Module
+
+We are trying to to assign capabilities to the process, so we fall within the second use case. 
+For `LD_PRELOAD`, which is effectly what `fakeroot` uses, documentation further explains the
+limitations in secure-execution mode:
+```
+In secure-execution mode, preload pathnames containing slashes are ignored. 
+Furthermore, shared objects are preloaded only from the standard search 
+directories and only if they have set-user-ID mode bit enabled (which is 
+not typical).
+```
+
+`fakeroot` lib happens to be in a non-standard path in `/usr/lib/x86_64-linux-gnu/libfakeroot/libfakeroot-sysv.so`. 
+Changing that would not be sufficient, as it would require also having the `set-user-ID`, bit
+set. Where there is such a limitation in secure-execution mode?
 
 
 
@@ -253,21 +332,21 @@ Is d0527e22839a73347b5e723994ebba62e9037051 in containerd going to revert this a
 
 ```
 @@ -943,6 +943,11 @@ func WithCapabilities(caps []string) SpecOpts {
-                s.Process.Capabilities.Bounding = caps
-                s.Process.Capabilities.Effective = caps
-                s.Process.Capabilities.Permitted = caps
+            s.Process.Capabilities.Bounding = caps
+            s.Process.Capabilities.Effective = caps
+            s.Process.Capabilities.Permitted = caps
 +               if len(caps) == 0 {
 +                       s.Process.Capabilities.Inheritable = nil
 +               } else if len(s.Process.Capabilities.Inheritable) > 0 {
 +                       filterCaps(&s.Process.Capabilities.Inheritable, caps)
 +               }
- 
-                return nil
-        }
+
+            return nil
+    }
 @@ -968,6 +973,16 @@ func removeCap(caps *[]string, s string) {
-        *caps = newcaps
- }
- 
+    *caps = newcaps
+}
+
 +func filterCaps(caps *[]string, filters []string) {
 +       var newcaps []string
 +       for _, c := range *caps {

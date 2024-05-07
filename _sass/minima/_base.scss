@@ -254,16 +254,26 @@ table {
     background: #bbbbbb
 }
 
+html[data-theme="light"]  {
+  .toc-active {
+    border-left: 1px solid #000000;
+  }
+} 
+
+html[data-theme="dark"]  {
+  .toc-active {
+    border-left: 1px solid #e9ecef;
+  }
+}
+
 ul#toc {
   list-style-type: none;
-  border-left: 1px solid #e9ecef;
   $active-bgcolor: #ecebec;
   padding-left: 5px;
   
   a {
     display: flex;
     padding: 2px 8px;
-    color: $text-color;
 
     * {
       pointer-events: none;
@@ -271,23 +281,19 @@ ul#toc {
 
     &:hover {
       text-decoration: none;
-      background-color: darken($active-bgcolor, 10%);
-      color: #121416;
+      color: $text-color;
     }
   }
 
   .toc-active {
-    background-color: darken($active-bgcolor, 20%);
     transition: background 0.5s;
-    border-left: 2px solid #202020;
-    margin-left: -2px;
+    margin-left: 0px;
 
     &:hover {
-      background-color: darken($active-bgcolor, 20%);
+      color: $text-color;
     }
 
     a {
-      color: #121416;
     }
   }
 }

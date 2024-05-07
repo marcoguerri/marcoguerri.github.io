@@ -36,7 +36,6 @@ function toggleTheme() {
         currentThemeSetting = "dark";
     }
     localStorage.setItem("theme", currentThemeSetting);
-    console.log("setting attr");
     document.documentElement.setAttribute('data-theme', currentThemeSetting);
     apply();
 }

@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Linux VFS internals: dentries"
+title:  "Linux VFS internals and dentries"
 date:   2016-09-19 08:00:00
 published: yes
 tags: [linux, vfs, storage]
