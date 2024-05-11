@@ -8,7 +8,7 @@ pygments: true
 categories: [Technical]
 ---
 
-A collection of notes where I have recently to consolidate C++11 concepts such as move semantics, rvalue reference and forwarding,
+A collection of notes where I have tried to consolidate C++11 concepts such as move semantics, rvalue reference and forwarding,
 showing how these features affect compile time and runtime behavior of C++ programs. 
 
 Constructor, Copy Constructor and Move Constructor
