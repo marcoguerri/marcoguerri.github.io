@@ -3,12 +3,12 @@ layout: post
 title:  "C++ move semantics and rvalue reference"
 date:   2016-11-26 08:00:00
 published: yes
-tags: [programming, c++]
+tags: [programming, cpp]
 pygments: true
 categories: [Technical]
 ---
 
-A collection of notes where I have recently tried to consolidate C++11 concepts such as move semantics, rvalue reference and forwarding,
+A collection of notes where I have recently to consolidate C++11 concepts such as move semantics, rvalue reference and forwarding,
 showing how these features affect compile time and runtime behavior of C++ programs. 
 
 Constructor, Copy Constructor and Move Constructor

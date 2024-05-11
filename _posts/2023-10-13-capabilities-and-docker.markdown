@@ -2,7 +2,7 @@
 layout: post
 title:  "CAP_NET_ADMIN for non-root user in Docker container"
 date:   2023-10-13 08:00:00
-published: false
+published: true
 pygments: true
 toc: true
 tags: [docker, linux, capabilities]
@@ -265,8 +265,11 @@ hence setting `cap_net_admin+ep` on `ip` becomes a no-op.
 `fakeroot` and `LD_PRELOAD`
 =======
 
-My first attempt to bypass `drop_cap` consisted in running `ip` under `fakeroot`, which would have altered
-the return value of `getuid` and `geteuid`. I did not have much success:
+My first attempt to bypass `drop_cap` consisted in running `ip` under `fakeroot`, an `LD_PRELOAD`
+shared library which overwrites some `libc` calls to either make userspace believe we are running as root
+(e.g. by overwriting `getuid`, `geteuid` to return 0) or record that some operations (e.g. `open` + `O_CREAT`) should 
+look  like as they have been performed as root to other userspace tools such as `tar`. The process that is being 
+fakeroot-ed remains effectively unprivileged. I did not have much success:
 
 ```
 $ fakeroot ip link add name br0 type bridge
@@ -282,18 +285,18 @@ unsigned int old_nloaded = GL(dl_ns)[LM_ID_BASE]._ns_nloaded;
 
 (void) _dl_catch_error (&objname, &err_str, &malloced, map_doit, &args);
 if (__glibc_unlikely (err_str != NULL))
-    {
-        _dl_error_printf ("\
-ERROR: ld.so: object '%s' from %s cannot be preloaded (%s): ignored.\n",
-                       fname, where, err_str);
+{
+    _dl_error_printf("\
+        ERROR: ld.so: object '%s' from %s cannot be preloaded (%s): ignored.\n",
+        fname, where, err_str);
 ```
 
-`ld.so` documentation effectively explains why the dynamic linker is failing, even 
-though the error that is surfaced is aboslutely ambiguous.
+`ld.so` documentation explains why the dynamic linker is failing, even 
+though the error which is surfaced is aboslutely ambiguous.
 
 ```
 Secure-execution mode
-For  security  reasons,  if the dynamic linker determines that a binary
+For security reasons, if the dynamic linker determines that a binary
 should be run in secure-execution mode, the effects of some environment
 variables are voided or modified, and furthermore those environment 
 variables are stripped from the environment, so that the program does 
@@ -304,16 +307,17 @@ GETCONF_DIR, HOSTALIASES, LOCALDOMAIN, LOCPATH, MALLOC_TRACE, NIS_PATH,
 NLSPATH, RESOLV_HOST_CONF, RES_OPTIONS, TMPDIR, and TZDIR.
 ```
 
-Furthermore, quoting from documentation from documentation, we are in secure mode if the `AT_SECURE` 
+Furthermore, quoting from documentation, we are in secure mode if the `AT_SECURE` 
 entry in the auxiliary vector has a nonzero value. This might happen in one of the following scenario:
 * The process's real and effective user IDs differ, or the real and effective group IDs differ. 
 This typically occurs as a result of executing set-user-ID or set-group-ID program.
 * A process with a non-root user ID executed a binary that conferred capabilities to the process.
 * A nonzero value may have been set by a Linux Security Module
 
-We are trying to to assign capabilities to the process, so we fall within the second use case. 
+We are trying to assign capabilities to the process, matching the second use case.
 For `LD_PRELOAD`, which is effectly what `fakeroot` uses, documentation further explains the
-limitations in secure-execution mode:
+limitations of secure-execution mode:
+
 ```
 In secure-execution mode, preload pathnames containing slashes are ignored. 
 Furthermore, shared objects are preloaded only from the standard search 
@@ -321,46 +325,25 @@ directories and only if they have set-user-ID mode bit enabled (which is
 not typical).
 ```
 
-`fakeroot` lib happens to be in a non-standard path in `/usr/lib/x86_64-linux-gnu/libfakeroot/libfakeroot-sysv.so`. 
-Changing that would not be sufficient, as it would require also having the `set-user-ID`, bit
-set. Where there is such a limitation in secure-execution mode?
+`fakeroot` lib happens to be in a non-standard path in `/usr/lib/x86_64-linux-gnu/libfakeroot/libfakeroot-sysv.so`,
+neither does it have `SUID` set, so `ld.so` will refuse to preload it.
 
-
-
-{% comment %}
-Is d0527e22839a73347b5e723994ebba62e9037051 in containerd going to revert this again?
+Alternatives to `fakeroot`
+=======
+We could force `ip` not to clear capabilities by starting the container as root, retain `CAP_NET_ADMIN` as inheritable 
+through `capsh` and drop privileges ourselves instead of asking Docker to do it.
 
 ```
-@@ -943,6 +943,11 @@ func WithCapabilities(caps []string) SpecOpts {
-            s.Process.Capabilities.Bounding = caps
-            s.Process.Capabilities.Effective = caps
-            s.Process.Capabilities.Permitted = caps
-+               if len(caps) == 0 {
-+                       s.Process.Capabilities.Inheritable = nil
-+               } else if len(s.Process.Capabilities.Inheritable) > 0 {
-+                       filterCaps(&s.Process.Capabilities.Inheritable, caps)
-+               }
-
-            return nil
-    }
-@@ -968,6 +973,16 @@ func removeCap(caps *[]string, s string) {
-    *caps = newcaps
-}
-
-+func filterCaps(caps *[]string, filters []string) {
-+       var newcaps []string
-+       for _, c := range *caps {
-+               if capsContain(filters, c) {
-+                       newcaps = append(newcaps, c)
-+               }
-+       }
-+       *caps = newcaps
-+}
-+
+capsh --keep=1 --user=dev --inh=cap_net_admin=i --
 ```
 
-Here is ip discussion about dropping all capabilities: https://www.spinics.net/lists/netdev/msg816698.html
-We can add set-user-id to fakeroot shared object, as it's not possible to inject into it any malicious behavior.
-https://github.com/moby/moby/security/advisories/GHSA-2mm7-x5h6-5pvq
+This works, but would be a regression with respect to [CVE-2022-24769](https://nvd.nist.gov/vuln/detail/cve-2022-24769),
+as the container would not start with empty inheritable capabilities. It would also result in dropping privileges relatively
+late, compared to starting the container as unprivileged user.
 
-{% endcomment %}
+Preferred method
+=======
+I have preferred the `LD_PRELOAD` approach, stripping down `fakeroot` to the smallest surface necessary by overriding
+`getuid` and `geteuid` only with a custom shared object. Note that the library has to be loaded with the relative path,
+as pathnames containing slashes are ignored. Also, `LD_DEBUG` won't work in secure-execution mode unless `/etc/suid-debug`
+is present on the filesystem.

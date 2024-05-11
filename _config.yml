@@ -44,9 +44,9 @@ minima:
 header_pages:
   - tags.md
   - about.md
-# Set to `true` to show excerpts on the homepage.
+# Set to `true` to show excerpts on the homepage
 #
-show_excerpts: false
+show_excerpts: true
 
 permalink: /:year/:month/:day/:slug:output_ext
 

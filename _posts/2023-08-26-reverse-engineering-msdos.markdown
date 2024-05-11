@@ -11,7 +11,7 @@ categories: [Technical]
 ---
 
 
-I have recently reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html) which came
+I have reverse engineered some control paths of an [old MS-DOS tool from Broadcom](https://marcoguerri.github.io/reversing/msdos/2023/02/04/broadcom-pxe-write.html) which came
 as a UPX compressed linear executable prepended with Protected Mode extender and required
 tools such as IDA 4.1, IDA 5.0, to be reverse engineered. This post is a collection of notes
 explaining how to get from binary to disassembled and decompiled code for applications packaged
