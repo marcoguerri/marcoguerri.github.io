@@ -140,7 +140,7 @@ This seems to be coherent with the output above. This specific behavior for non-
 +       }
 ```
 Something further to notice is that `CapInh` is also cleared in both cases. This comes instead from [moby/dd38613d](https://github.com/moby/moby/commit/dd38613d0c8974438fa24b63fb6c540a66e7939c), which essentially makes inheritable capabilities irrelevant in all cases. 
-```
+G```
         if ec.Privileged {
 -               if p.Capabilities == nil {
 -                       p.Capabilities = &specs.LinuxCapabilities{}
@@ -307,16 +307,16 @@ GETCONF_DIR, HOSTALIASES, LOCALDOMAIN, LOCPATH, MALLOC_TRACE, NIS_PATH,
 NLSPATH, RESOLV_HOST_CONF, RES_OPTIONS, TMPDIR, and TZDIR.
 ```
 
-Furthermore, quoting from documentation, we are in secure mode if the `AT_SECURE` 
-entry in the auxiliary vector has a nonzero value. This might happen in one of the following scenario:
+We are in secure mode if the `AT_SECURE` entry in the auxiliary vector has a nonzero value. 
+This might happen in one of the following scenario:
 * The process's real and effective user IDs differ, or the real and effective group IDs differ. 
 This typically occurs as a result of executing set-user-ID or set-group-ID program.
 * A process with a non-root user ID executed a binary that conferred capabilities to the process.
 * A nonzero value may have been set by a Linux Security Module
 
-We are trying to assign capabilities to the process, matching the second use case.
+We are trying to assign capabilities to the process, so we fall within the the second use case.
 For `LD_PRELOAD`, which is effectly what `fakeroot` uses, documentation further explains the
-limitations of secure-execution mode:
+limitations in secure-execution mode:
 
 ```
 In secure-execution mode, preload pathnames containing slashes are ignored. 
@@ -326,7 +326,8 @@ not typical).
 ```
 
 `fakeroot` lib happens to be in a non-standard path in `/usr/lib/x86_64-linux-gnu/libfakeroot/libfakeroot-sysv.so`,
-neither does it have `SUID` set, so `ld.so` will refuse to preload it.
+neither does it have `SUID` set, so `ld.so` will refuse to preload it. Note also that `LD_DEBUG` won't work in 
+secure-execution mode unless `/etc/suid-debug` is present on the filesystem.
 
 Alternatives to `fakeroot`
 =======
@@ -343,7 +344,13 @@ late, compared to starting the container as unprivileged user.
 
 Preferred method
 =======
-I have preferred the `LD_PRELOAD` approach, stripping down `fakeroot` to the smallest surface necessary by overriding
-`getuid` and `geteuid` only with a custom shared object. Note that the library has to be loaded with the relative path,
-as pathnames containing slashes are ignored. Also, `LD_DEBUG` won't work in secure-execution mode unless `/etc/suid-debug`
-is present on the filesystem.
+According to the commit which introduced `drop_cap` in `ip`, capabilities are dropped so that users can safely add
+caps to the binary for `ip vrf exec`. I am unclear why only the `vrf` use case would be considered as requiring 
+`CAP_NET_ADMIN`, `CAP_SYS_ADMIN` and `CAP_DAC_OVERRIDE`, and why one would force dropping capabilities (modulo
+the check on the inheritable set) on all other cases.
+
+Despite starting the container with `CAP_SYS_ADMIN` as inheritable capability is a regression with respect to 
+[CVE-2022-24769](https://nvd.nist.gov/vuln/detail/cve-2022-24769), I still consider it preferable compared
+to the fragile `LD_PRELOAD` approach. Based on my current understanding, the risks coming from a binary
+having a file inheritable capability set and acquiring it in the process permitted set is comparable to the
+binary having the same capability set as permitted.
