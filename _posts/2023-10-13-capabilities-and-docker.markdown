@@ -140,7 +140,8 @@ This seems to be coherent with the output above. This specific behavior for non-
 +       }
 ```
 Something further to notice is that `CapInh` is also cleared in both cases. This comes instead from [moby/dd38613d](https://github.com/moby/moby/commit/dd38613d0c8974438fa24b63fb6c540a66e7939c), which essentially makes inheritable capabilities irrelevant in all cases. 
-G```
+
+```
         if ec.Privileged {
 -               if p.Capabilities == nil {
 -                       p.Capabilities = &specs.LinuxCapabilities{}
@@ -218,7 +219,7 @@ capset({version=_LINUX_CAPABILITY_VERSION_3, pid=0}, {effective=0, permitted=0, 
 
 This looks a lot like an attempt to assess if the process is running as root, followed by a drop of all 
 capabilities. So, even if `cap_net_admin+ep` might be working, the `capset` call above makes it a no-op. In fact,
-in `iproute2/ip/ip.c` (`v4.20.0`) one can see the following excerpt:
+in `iproute2/ip/ip.c` (> `v4.16`) one can see the following excerpt:
 
 ```c
 if (argc < 3 || strcmp(argv[1], "vrf") != 0 ||
@@ -258,7 +259,7 @@ void drop_cap(void)
 }
 ```
 
-`drop_cap` checks if we are running as normal user (user and effective user id are != 0) and whether the process
+This checks if we are running as normal user (user and effective user id are != 0) and whether the process
 has `CAP_NET_ADMIN` set in the inheritable set, which is the case. If so, all capabilities are dropped,
 hence setting `cap_net_admin+ep` on `ip` becomes a no-op.
 
@@ -344,13 +345,13 @@ late, compared to starting the container as unprivileged user.
 
 Preferred method
 =======
-According to the commit which introduced `drop_cap` in `ip`, capabilities are dropped so that users can safely add
-caps to the binary for `ip vrf exec`. I am unclear why only the `vrf` use case would be considered as requiring 
-`CAP_NET_ADMIN`, `CAP_SYS_ADMIN` and `CAP_DAC_OVERRIDE`, and why one would force dropping capabilities (modulo
-the check on the inheritable set) on all other cases.
+According to the commit which introduced `drop_cap` in `iproute2` ([ba2fc55b](https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/commit/?id=ba2fc55b99f8363c80ce36681bc1ec97690b66f5)), capabilities are dropped so that users can safely 
+add caps to the binary for `ip vrf exec`. I am unclear why only the `vrf` use case would be considered as requiring 
+`CAP_NET_ADMIN`, `CAP_SYS_ADMIN` and `CAP_DAC_OVERRIDE`, while forcing everything else to use root, modulo the check on
+the inheritable set).
 
-Despite starting the container with `CAP_SYS_ADMIN` as inheritable capability is a regression with respect to 
-[CVE-2022-24769](https://nvd.nist.gov/vuln/detail/cve-2022-24769), I still consider it preferable compared
+Starting the container with `CAP_SYS_ADMIN` as inheritable capability is a regression with respect to 
+[CVE-2022-24769](https://nvd.nist.gov/vuln/detail/cve-2022-24769), but I still consider it preferable compared
 to the fragile `LD_PRELOAD` approach. Based on my current understanding, the risks coming from a binary
-having a file inheritable capability set and acquiring it in the process permitted set is comparable to the
+having a file inheritable capability set and acquiring it in the process permitted set is equivalent to the
 binary having the same capability set as permitted.
