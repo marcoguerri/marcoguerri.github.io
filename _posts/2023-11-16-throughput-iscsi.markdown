@@ -353,5 +353,5 @@ it is dwarfed by local speedup, which reaches 160%. I'd get close to line speed 
 latency and CPU latency. The following are the conclusions I came to so far with these experiments:
 * Moving to wired Gigabit ethernet is a must, regardless of `O_DIRECT`
 * Moving to SSD has modest impact on performance in `O_DIRECT`. I haven't tested without `O_DIRECT`, but at least on the receiving end, an additional
-caching layer would result in significant benefits by making I/O latency and CPU latency asynchronous, at the cost of a higher risk of data loss which
-is associated with buffers for I/O.
+caching layer would result in significant benefits by making I/O latency and CPU latency asynchronous.
+

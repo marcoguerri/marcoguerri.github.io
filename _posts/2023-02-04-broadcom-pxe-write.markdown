@@ -826,31 +826,31 @@ the candidate address for the new OptionROM could be located in 4 different conf
 
 The candidate address + the OptionROM size could be located at lower addresses with respect to the current entry, with no overlap.
 <p align="center">
-<img class="dark-element-default" src="/img/dos/dark/NVRAM_configuration_1.png" alt=""/>
-<img class="light-element-default" src="/img/dos/light/NVRAM_configuration_1.png" alt=""/>
+<img class="dark-element" src="/img/dos/dark/NVRAM_configuration_1.png" alt=""/>
+<img class="light-element" src="/img/dos/light/NVRAM_configuration_1.png" alt=""/>
 </p>
 
 The candidate address \+ the OptionROM size could be located at lower addresses with respect to the current entry, with partial or full overlap.
 
 <p align="center">
-<img class="dark-element-default" src="/img/dos/dark/NVRAM_configuration_2.png" alt=""/>
-<img class="light-element-default" src="/img/dos/light/NVRAM_configuration_2.png" alt=""/>
+<img class="dark-element" src="/img/dos/dark/NVRAM_configuration_2.png" alt=""/>
+<img class="light-element" src="/img/dos/light/NVRAM_configuration_2.png" alt=""/>
 </p>
 
 
 The candidate address is located past the address of the existing directory item + the size of the item.
 
 <p align="center">
-<img class="dark-element-default" src="/img/dos/dark/NVRAM_configuration_3.png" alt=""/>
-<img class="light-element-default" src="/img/dos/light/NVRAM_configuration_3.png" alt=""/>
+<img class="dark-element" src="/img/dos/dark/NVRAM_configuration_3.png" alt=""/>
+<img class="light-element" src="/img/dos/light/NVRAM_configuration_3.png" alt=""/>
 </p>
 
 
 The candidate address is located past the address of the existing directory item start address, but it overlaps partially or entirely with it.
 
 <p align="center">
-<img class="dark-element-default" src="/img/dos/dark/NVRAM_configuration_4.png" alt=""/>
-<img class="light-element-default" src="/img/dos/light/NVRAM_configuration_4.png" alt=""/>
+<img class="dark-element" src="/img/dos/dark/NVRAM_configuration_4.png" alt=""/>
+<img class="light-element" src="/img/dos/light/NVRAM_configuration_4.png" alt=""/>
 </p>
 
 In case 1 and 3, the algorithm moves to the next directory item. In case 2 and 4, candidate address 
