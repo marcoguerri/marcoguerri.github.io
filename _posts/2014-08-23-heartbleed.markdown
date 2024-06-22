@@ -382,7 +382,6 @@ ssl3_write_bytes (s=0x9910a58, type=24, buf_=0x99609a8, len=23) at s3_pkt.c:584
             249     if (i > 0) b->num_write+=(unsigned long)i;
 {% endhighlight %}
 
-A full trace is available <a href="/includes/hb_trace.txt" target="_blank">here</a>.
 The `buffer_write` function is defined in `crypto/bio/bf_buf.c`.
 
 {% highlight c  %}
