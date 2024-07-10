@@ -3,7 +3,7 @@ title: marcoguerri
 # The `>` after `description:` means to ignore line-breaks until next key.
 # If you want to omit the line-break after the end of text, use `>-` instead.
 description: 
-  ©2013-2023 Marco Guerri
+  ©2013-2024 Marco Guerri
 
 author:
     name: Marco Guerri
@@ -19,6 +19,7 @@ plugins:
   - jekyll-seo-tag
   - jekyll-toc
   - jekyll-archives
+  - jekyll-paginate
 
 
 # Theme-specific settings
@@ -46,9 +47,13 @@ header_pages:
   - about.md
 # Set to `true` to show excerpts on the homepage
 #
-show_excerpts: true
+show_excerpts: false
 
-permalink: /:year/:month/:day/:slug:output_ext
+paginate: 10
+
+
+
+  #permalink: /:year/:month/:day/:slug:output_ext
 
 jekyll-archives:
   enabled:
@@ -56,5 +61,5 @@ jekyll-archives:
     - categories
   layout: archive
   permalinks:
-    tag: '/tags/:name/'
-    category: '/categories/:name/'
+      tag: '/tags/:name/'
+      category: '/categories/:name/'

@@ -2,6 +2,7 @@
 layout: page
 permalink: /categories/
 title: Categories
+hidden: true
 ---
 
 <div id="archives">
