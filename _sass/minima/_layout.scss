@@ -136,7 +136,7 @@
  */
 .site-footer {
   border-top: 1px solid $border-color-01;
-  padding: $spacing-unit 0;
+  padding: 15px 0;
 }
 
 .footer-heading {
@@ -301,7 +301,7 @@
 .social-media-list {
   margin: 10px 10px;
   li {
-    float: left;
+    display:inline-block;
     margin: 0px 10px 0px 5px;
     &:last-of-type { margin-right: 0 }
     a {
@@ -316,11 +316,9 @@
  * Pagination navbar
  */
 .pagination {
-  margin-bottom: $spacing-unit;
   @extend .social-media-list;
   li {
     a, div {
-      min-width: 41px;
       text-align: center;
       box-sizing: border-box;
     }

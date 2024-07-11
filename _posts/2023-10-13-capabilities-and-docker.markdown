@@ -9,14 +9,14 @@ tags: [docker, linux, capabilities]
 categories: [Technical]
 ---
 
-I spent more time than I expected trying to get usage of capabilities right in Docker. I either stumbled
-across documentation that was too shallow to cover anything beyond extremely basic use cases or 
-documentation that was outdated and misleading. One possible complaint I would feel like addressing 
-to Docker ecosystem is that it tries to be excessively easy for the end user, hiding any possible 
-source of complexity. Sometime you do need to be exposed to that complexity, and it feels you are 
-completely on your own, with the codebase being the only source to refer to.
-In my case, I did have to to look into Moby's codebase to understand how capabilities were managed. 
-This post is an attempt to summarize what I essentially wished I'd known before diving into capabilities support for Docker.
+I spent some time trying to get capabilities work in Docker in non-root containers, and it wasn't a smooth journey. 
+I either stumbled across documentation that would only cover basic use cases or documentation that was outdated and 
+misleading. One possible complaint I would feel like addressing to Docker ecosystem is that it tries to be excessively 
+easy for the end user, hiding any possible source of complexity. Sometimes you do need to be exposed to that complexity, 
+and you are  completely on your own, with the codebase being the only source to refer to.
+In my case, I did have to look into Moby's codebase to understand how permitted, effective, and inheritable capabilities were managed. 
+This post is an attempt to summarize what I essentially wished I had known when trying to build a non-root
+container with minimal privileges in which additional network interfaces had to be created.
 
 Docker documentation
 =======
