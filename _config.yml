@@ -53,7 +53,7 @@ paginate: 10
 
 
 
-  #permalink: /:year/:month/:day/:slug:output_ext
+permalink: /:year/:month/:day/:slug:output_ext
 
 jekyll-archives:
   enabled:
