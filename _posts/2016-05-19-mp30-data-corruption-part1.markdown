@@ -33,9 +33,7 @@ f5ffba20ce077a9f789a61ff8aedb471  -
 f5ffba20ce077a9f789a61ff8aedb471  -
 {% endhighlight %}
 
-After ruling out the most obvious factors, I wrote a slightly more elaborated
-<a href="https://github.com/marcoguerri/checksum-test" target="_blank">
-script</a>
+After ruling out the most obvious factors, I wrote a slightly more elaborated script
 that would transfer a specific payload together with the corresponding checksum. 
 Upon encountering a non-matching checksum, the server would write on disk the 
 incoming data. The dump of a payload coming from /dev/zero would look as follows:
