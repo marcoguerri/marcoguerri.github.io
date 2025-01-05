@@ -11,7 +11,7 @@ categories: [Technical]
 
 I spent some time trying to get capabilities work in Docker in non-root containers, and it wasn't a smooth journey. 
 I either stumbled across documentation that would only cover basic use cases or documentation that was outdated and 
-misleading. One possible complaint I would feel like addressing to Docker ecosystem is that it tries to be excessively 
+misleading. One possible feedback I would feel like addressing to Docker ecosystem is that it tries to be excessively 
 easy for the end user, hiding any possible source of complexity. Sometimes you do need to be exposed to that complexity, 
 and you are  completely on your own, with the codebase being the only source to refer to.
 In my case, I did have to look into Moby's codebase to understand how permitted, effective, and inheritable capabilities were managed. 

@@ -257,13 +257,19 @@ table {
 html[data-theme="light"]  {
   .toc-active {
     border-left: 1px solid #000000;
+    padding-left: 1px !important;
   }
 } 
 
 html[data-theme="dark"]  {
   .toc-active {
     border-left: 1px solid #e9ecef;
+    padding-left: 1px !important;
   }
+}
+
+.toc-entry {
+  padding-left: 2px;
 }
 
 ul#toc {
@@ -278,6 +284,9 @@ ul#toc {
     * {
       pointer-events: none;
     }
+    &:visited {
+      text-decoration: none;
+    }
 
     &:hover {
       text-decoration: none;
@@ -287,7 +296,6 @@ ul#toc {
 
   .toc-active {
     transition: background 0.5s;
-    margin-left: 0px;
 
     &:hover {
       color: $text-color;

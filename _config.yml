@@ -51,8 +51,6 @@ show_excerpts: false
 
 paginate: 10
 
-
-
 permalink: /:year/:month/:day/:slug:output_ext
 
 jekyll-archives:
@@ -63,3 +61,31 @@ jekyll-archives:
   permalinks:
       tag: '/tags/:name/'
       category: '/categories/:name/'
+
+jekyll-spaceship:
+  # default enabled processors
+  processors:
+    - mathjax-processor
+  mathjax-processor:
+    src:
+      - https://polyfill.io/v3/polyfill.min.js?features=es6
+      - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+    config:
+      tex:
+        tags: "ams"
+        inlineMath:
+          - ['$','$']
+          - ['\(','\)']
+        displayMath:
+          - ['$$','$$']
+          - ['\[','\]']
+        autoload:
+          cases:
+            - []
+            - ['numcases', 'subnumcases']
+      svg:
+        fontCache: 'global'
+    optimize: # optimization on building stage to check and add mathjax scripts
+      enabled: true # value `false` for adding to all pages
+      include: []   # include patterns for math expressions checking (regexp)
+      exclude: []   # exclude patterns for math expressions checking (regexp)
