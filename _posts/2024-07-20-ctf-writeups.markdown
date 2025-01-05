@@ -2,7 +2,7 @@
 layout: post
 title:  "Repository of CTF writeups"
 date:   2024-07-20 08:00:00
-published: true
+published: false
 pygments: true
 toc: true
 tags: [ctf, vulnerabilities]

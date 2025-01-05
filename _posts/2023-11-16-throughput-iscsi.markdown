@@ -75,8 +75,8 @@ I am dealing with.
 | :----         | :------:    | :----:    | :----:    | :----:   | :----: |  :----:    |
 | wired 1s      | 0.31        | 0.32      | 0.54      | 0.90     | 0.06   |  19.5%     |
 | wireless 1s   | 5.50        | 4.42      | 34.61     | 299      | 12.95  |  234.5%    |
-| wired 2ms     | 0.22        | 0.18      | 0.35      | 0.77     | 0.05   |  22.7%     |d
-| wireless 2ms  | 2.95        | 2.64      | 7.63      | 133      | 3.32   |  112.5%    |d
+| wired 2ms     | 0.22        | 0.18      | 0.35      | 0.77     | 0.05   |  22.7%     |
+| wireless 2ms  | 2.95        | 2.64      | 7.63      | 133      | 3.32   |  112.5%    |
 
 
 `fio` benchmarks
@@ -131,7 +131,7 @@ screenshot below:
 </p>
 and the full `fio` configuration file is reported below.
 
-<details> <summary>fio configuration file for libiscsi tests</summary>d
+<details> <summary>fio configuration file for libiscsi tests</summary>
 {% highlight text  %}
 [sequential-write]
 rw=write
@@ -173,7 +173,7 @@ The following table shows the results of remote (block device and libiscsi) benc
 |       | (MiB/s, IOPS, CPU util)  | (MiB/s, IOPS) | (MiB/s, IOPS)|
 | :---- | :----:                   | :----:           | :----: |
 | 64k   | 18.3/292/7%              |  15.5/237        | 13.7/219|
-| 128k  | 17/138/7%                |  15.1/121        | 14.8/118|d
+| 128k  | 17/138/7%                |  15.1/121        | 14.8/118|
 | 256k  | 24.4/97/8%               | 22.6/90          | 21.8/87 |
 | 512k  | 28.7/57/10%              | 27.5/54          | 29.3/58 |
 | 1M    | 30.8/30/12%              | 30.1/30          | 33.4/33|
@@ -228,7 +228,7 @@ this communication  could be the following:
 Mapping the benchmark results above to this model would result in the following:
 
 |   |     |Request latency           |
-|-- | --  |--------------------------| d
+|-- | --  |--------------------------|
 | 1 | 1.5ms  | one-way latency for immediate data (64K)|
 | 2 | 0.87ms | transmission duration of immediate data |
 | 3 | 1.5ms |  one-way latency for R2T |
@@ -269,7 +269,7 @@ in the worst-case scenario. The reason is that according to the reasoning above,
 the higher would be the impact of CPU processing as the shadowing effect would become less relevant.
 I have used the 1M request latency as a reference (with 12% CPU utilization at 30 IOPS), which yields 8ms per 2MB request.
 
-If we put everything together:d
+If we put everything together:
 
 ```
 1.5+0.87+(1.5+1.5+256/64*0.87)*7+(1.5+((256-64)/64)*0.87+1.5)+1.5+7.3+8 = 70.14 ms (14.3 IOPS, 28.5 MiB/s)
@@ -299,7 +299,7 @@ could be the following:
 
 
 |  | Request latency           |
-|-- | --------------------------| d
+|-- | --------------------------|
 | 1 | one-way latency for immediate data (64K)|
 | 2 | transmission duration of immediate data |
 | 3 | one-way latency for 8 R2T (transfer time is negligible) |

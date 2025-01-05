@@ -2,7 +2,7 @@
 layout: post
 title:  "Calculating remainder without division operations"
 date:   2024-08-17 08:00:00
-published: true
+published: false
 pygments: true
 toc: true
 tags: [algorithms, arithmetic]

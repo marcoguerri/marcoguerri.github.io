@@ -2,7 +2,7 @@
 layout: post
 title:  "Password keyring back-up and disaster recovery"
 date:   2024-10-13 08:00:00
-published: true
+published: false
 pygments: true
 toc: true
 tags: [disaster-recovery, cryptography]
